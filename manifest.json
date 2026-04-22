@@ -1,0 +1,17 @@
+{
+  "name": "UEC SAN FRANCISCO DE ASIS",
+  "short_name": "SFA",
+  "start_url": "https://urcsanfranciscodeasis.com.ve",
+  "display": "standalone",
+  "background_color": "#fff",
+  "description": "Colegio en Cabudare. Unidad Educativa Colegio",
+  "icons": [{
+    "src": "images/icons/home48.png",
+    "sizes": "48x48",
+    "type": "image/png"
+  }, {
+    "src": "img/touch/home72.png",
+    "sizes": "72x72",
+    "type": "image/png"
+  }]
+}

@@ -1,0 +1,21 @@
+{
+    "oswald": {
+        "normal": "oswald-normal_216a6c32550f2a3916895898509fa750"
+    },
+    "nunito": {
+        "normal": "nunito-normal_176125b1b6dc4704cbf0390040859779"
+    },
+    "font awesome 5 brands": {
+        "normal": "font_awesome_5_brands_normal_85574d3df4b14bd7f0481160dda643a8"
+    },
+    "font awesome 5 free": {
+        "normal": "\/var\/www\/dacabe\/storage\/fonts\/font_awesome_5_free_normal_314a37ff8714fd8e536db1b27c2406c0",
+        "900": "font_awesome_5_free_900_0bd8a58965919e308b524863f106c403"
+    },
+    "ionicons": {
+        "normal": "ionicons-normal_499ed0e151682fc2c1ba5340c204f05f"
+    },
+    "ubuntu": {
+        "normal": "ubuntu_normal_586fc05279d08db69a17eeb5f9ccbb6d"
+    }
+}

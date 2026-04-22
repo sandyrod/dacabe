@@ -1,0 +1,26 @@
+body {
+    color: #F0E995;
+    background-color: EEB8F8 !important;
+}
+
+.background-overlay {
+    background-image: url(https://miinvitacion.com/wp-content/uploads/2020/10/klipartz.com-14-1.png);
+    background-position: center center;
+    background-repeat: repeat;
+    background-size: 18% auto;
+    opacity: 0.84;    
+}
+
+.dorado {
+    color: #EEF59D !important;
+}
+
+.calig {
+    font-family: 'Rochester', sans-serif !important;
+    font-size: 30px !important;
+}
+
+.btn-no {
+    background-color: #F2C0EF;
+    color: #9E16AE;
+}

@@ -1,0 +1,228 @@
+:root {
+  --yellow: #e9b938;
+  --pink: #d2427f;
+  --blue: #28a6da;
+  --green: #6aa32e;
+  --white: #fff;
+  --black: #000;
+  --red: #bd0000;
+  --purple: #9859b6;
+  --orange: #ff8000;
+  --lightblue: #4deeea;
+}
+
+.calendar_all {
+  margin: 1;
+  padding: 0;
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  line-height: 20px;
+}
+
+.calendar_all {
+  overflow-x: hidden;
+  height: 100%;
+  width: 101%;
+  margin: 0;
+  background: #202e38;
+  font-family: "Roboto Mono", monospace;
+  color: var(--white);
+}
+
+.h1_calendar,
+.h2_calendar {
+  margin: 0;
+  text-align: center;
+  position: relative;
+  top: 20px;  
+}
+
+.h1_calendar {
+  text-transform: uppercase;
+  font-size: 20px;
+}
+.h2_calendar {
+  font-size: 15px;
+  color: var(--lightblue);
+}
+.symbology {
+  width: 400px;
+  margin: auto;
+  padding: 0;
+  position: relative;
+  top: 30px;
+}
+
+.category {
+  font-size: 15px;
+}
+
+.item {
+  width: 15px;
+  height: 15px;
+  vertical-align: middle;
+}
+
+.text {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  margin-top: -14px;
+  display: block;
+  margin-left: 20px;
+}
+
+.periodic-table {
+  width: 80%;
+  margin: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  position: relative;
+  top: 20px;
+}
+
+.element {
+  width: 80px;
+  height: 80px;
+  margin-top: 10px;
+  margin-right: 10px;
+}
+.number {
+  text-align: right;
+  font-size: 10px;
+  font-weight: bold;
+  margin-right: 5px;
+  margin-bottom: 1px;
+}
+.symbol {
+  font-size: 20px;
+  font-weight: bold;
+  text-transform: capitalize;
+  padding-left: 5px;
+}
+.name_item {
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: capitalize;
+  padding-left: 5px;
+}
+.capital-letter {
+  text-transform: uppercase;
+}
+
+.imperative {
+  border: 3px solid var(--yellow);
+  color: var(--yellow);
+}
+.imperative-icon {
+  color: var(--yellow);
+}
+.mechanical {
+  border: 3px solid var(--red);
+  color: var(--red);
+}
+.mechanical-icon {
+  color: var(--red);
+}
+.mechanical-icon {
+  color: var(--red);
+}
+
+.concurrent {
+  border: 3px solid var(--white);
+  color: var(--white);
+}
+.concurrent-icon {
+  color: var(--white);
+}
+
+.dynamic {
+  border: 3px solid var(--pink);
+  color: var(--pink);
+}
+.dynamic-icon {
+  color: var(--pink);
+}
+
+.declarative {
+  border: 3px solid var(--purple);
+  color: var(--purple);
+}
+.declarative-icon {
+  color: var(--purple);
+}
+
+.scripting {
+  border: 3px solid var(--green);
+  color: var(--green);
+}
+.scripting-icon {
+  color: var(--green);
+}
+
+.functional {
+  border: 3px solid var(--blue);
+  color: var(--blue);
+}
+.functional-icon {
+  color: var(--blue);
+}
+
+.object-oriented {
+  border: 3px solid var(--orange);
+  color: var(--orange);
+}
+.object-oriented-icon {
+  color: var(--orange);
+}
+
+.multi-paradigm {
+  border: 3px solid var(--lightblue);
+  color: var(--lightblue);
+}
+.multi-paradigm-icon {
+  color: var(--lightblue);
+}
+
+.element:hover {
+  transform: scale(1.1);
+  color: var(--black);
+  transition-duration: 0.3s;
+  cursor: pointer;
+}
+
+.imperative:hover {
+  background: var(--yellow);
+}
+.dynamic:hover {
+  background: var(--pink);
+}
+
+.functional:hover {
+  background: var(--blue);
+}
+
+.scripting:hover {
+  background: var(--green);
+}
+.concurrent:hover {
+  background: var(--white);
+}
+
+.mechanical:hover {
+  background: var(--red);
+}
+
+.declarative:hover {
+  background: var(--purple);
+}
+
+.object-oriented:hover {
+  background: var(--orange);
+}
+.multi-paradigm:hover {
+  background: var(--lightblue);
+}
+

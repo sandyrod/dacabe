@@ -1,0 +1,16 @@
+.login-box{
+	background-color: white;
+	border-radius: 25%; 
+}
+
+.invoice-info-data {
+	height: 1.5rem !important;
+}
+
+.profile-user-img-woman {
+	border: 3px solid #ff6fd9;
+}
+
+.select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background: #1E5693 !important;
+}

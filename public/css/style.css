@@ -1,0 +1,362 @@
+@import url(https://fonts.googleapis.com/css?family=Ubuntu);
+
+.navbar-primary {
+    background-color: #075895 !important;
+}
+
+.login-box{
+	background-color: white;
+	border-radius: 25%; 
+}
+
+.pull-right{
+	text-align: right !important;
+}
+
+
+.text-center{
+	text-align: center !important;
+}
+
+.row-arc {
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px;
+	box-shadow: 0px 1px 9px 0px rgb(96 94 94 / 50%);	
+}
+
+.widget-user-2 .widget-user-username {
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.widget-user-2 .widget-user-desc {
+    font-size: 0.9rem;
+}
+
+.fc-toolbar  {
+	/* background-color: #b0c0cf !important; */
+}
+
+.fc-center h2 {
+	color: #093a6e !important;
+}
+
+.header-sd {
+	font-family: "Ubuntu";
+	color: #b2d6ef; 
+	font-weight: bold; 
+	font-size: 1.3rem; 
+	vertical-align: bottom;
+}
+
+.header-sdcloud {
+	color: white; 
+}
+
+.span-header-upt {
+	text-align: center !important;
+}
+
+.span-header-upt ul{
+	padding-inline-start: 0 !important;
+}
+
+.text-dark {
+    color: #075895 !important;	
+}
+
+.navbar-badge {
+    font-size: .7rem !important;
+    font-weight: 400;
+    padding: 2px 4px;
+    position: absolute;
+    right: 5px;
+    top: 2px !important;
+}
+
+.badge-warning {
+    color: #000406;
+    background-color: #ffc107;
+}
+
+.login-logo, .register-logo {
+    font-size: .1rem;
+    font-weight: 100;
+    margin-bottom: 0 !important;
+}
+
+@media screen and (max-width: 991px) {
+	.span-header-upt {
+		text-align: left !important;
+	}
+	.span-header-upt ul{
+		padding-inline-start: 30px !important;
+	}
+	.logo-nube {
+		display: none;
+	}
+}
+
+.description-block {
+	background-color: #F1F4F5;
+}
+
+.description-block:hover {
+	background-color: #BADBE6;
+}
+
+/* SHOPPINGCART */
+
+.ripple-surface {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    vertical-align: bottom;
+}
+
+/* OVERLAY CEV  */
+
+.image-container {
+    position: relative;
+    overflow: hidden;
+}
+
+.image-container img {
+    width: 100%;
+    transition: transform 0.5s ease; /* Efecto de zoom */
+}
+
+.image-container:hover img {
+    transform: scale(1.1); /* Aumenta el tamaño de la imagen al pasar el mouse */
+}
+
+.overlay-pnf {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(9, 66, 83, 0.98); /* Overlay transparente */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0; /* Oculto por defecto */
+    transition: opacity 0.5s ease; /* Transición suave */
+}
+
+.image-container:hover .overlay-pnf {
+	/* opacity: 1; */
+}
+
+.text {
+    color: white; /* Color del texto */
+    font-size: 1rem; /* Tamaño del texto */
+    text-align: center;
+    transition: transform 0.5s ease; /* Efecto de zoom en el texto */
+}
+
+.image-container:hover .text {
+    transform: scale(1.2); /* Aumenta el tamaño del texto al pasar el mouse */
+}
+
+.bg-product :hover {
+	/* background-color: #CBDEE1; */
+	background-color: #B9D7DF;
+	border-bottom-left-radius: 5%;
+	border-bottom-right-radius: 5%;
+}
+
+.bg-product  {
+	box-shadow: 0px 1px 9px 0px rgb(96 94 94 / 50%);	
+	border-bottom-left-radius: 5%;
+	border-bottom-right-radius: 5%;
+}
+
+/* END SHOPPINGCART */
+
+/* SPINNER */
+@keyframes spinner {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinner-border {
+    animation: spinner 1s linear infinite;
+}
+/* FIN SPINNER */
+
+/* BTN */
+
+.btn-sdmodule a {
+	color: #304C65;
+}
+
+.btn-sdmodule {
+    border-radius: 3px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    color: #304C65;
+    font-size: 16px;
+    height: 60px;
+    margin: 0 0 10px 10px;
+    min-width: 80px;
+    padding: 15px 5px;
+    position: relative;
+    text-align: center;
+
+
+	width: 150px;
+	height: 80px; 
+	padding: 15px 5px;
+	border-radius: 20px;
+	/* background: linear-gradient(109.6deg, rgb(44, 83, 131) 18.9%, rgb(95, 175, 201) 91.1%); */
+	background: #6CB4EE;
+
+
+}
+
+
+a.btn-sdmodule:hover {
+	 background: #16689B !important;
+	 font-size: 17px;
+	 color: #D8EAF5;
+	 border-color: #0F3B56;
+}
+
+/* FIN BTN */
+
+.products-list .product-info {
+	margin-left: 0px !important;
+}
+
+.card-img-top-seller {
+  width: 60%;
+  border-radius: 50%;
+  margin: 0 auto;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+.card-seller {
+  padding: 1.5em 0.5em 0.5em;
+  text-align: center;
+  border-radius: 2em;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+}
+.card-title-seller {
+  font-weight: bold;
+  font-size: 1.5em;
+}
+.btn-primary-seller {
+  border-radius: 2em;
+  padding: 0.5em 1.5em;
+}
+.bg-blue-ligth {
+	background: #EAF0F5;
+}
+.card-dacabe{
+    background-color: #fe9f30;
+}
+
+/* CART EFFECTS */
+.cart {
+    transition: transform 0.3s ease;
+}
+
+.animate {
+    transform: scale(1.5);
+    transition: transform 0.3s ease;
+}
+
+@keyframes shake {
+    0% { transform: translate(1px, 0); }
+    25% { transform: translate(-1px, 0); }
+    50% { transform: translate(1px, 0); }
+    75% { transform: translate(-1px, 0); }
+    100% { transform: translate(0, 0); }
+}
+
+.shake {
+    animation: shake 0.5s; /* Duración de la animación */
+}
+
+.product-list-in-card li:hover {
+	background: #E3F4F8;
+}
+
+/*  Carrusel */
+
+/* Ocultar flechas por defecto */
+.owl-prev, .owl-next {
+    opacity: 0; /* Hacerlas invisibles */
+    transition: opacity 0.3s ease; /* Transición suave */
+}
+
+/* Mostrar flechas al pasar el mouse sobre el contenedor */
+.owl-carousel:hover .owl-prev, 
+.owl-carousel:hover .owl-next {
+    opacity: 1; /* Hacerlas visibles */
+}
+
+/* Estilo para las flechas de navegación */
+.owl-prev, .owl-next {
+    background-color: #007bff; /* Color de fondo */
+    color: white; /* Color del texto */
+    border-radius: 50%; /* Bordes redondeados */
+    width: 40px; /* Ancho del botón */
+    height: 40px; /* Alto del botón */
+    display: flex; /* Para centrar el contenido */
+    align-items: center; /* Centrar verticalmente */
+    justify-content: center; /* Centrar horizontalmente */
+    position: absolute; /* Posicionamiento absoluto */
+    top: calc(50% + 10px); /* Ajustar la posición vertical 10px debajo del centro */
+    z-index: 10; /* Asegurarse de que esté por encima de otros elementos */
+    cursor: pointer; /* Cambia el cursor al pasar por encima */
+}
+
+/* Posición de las flechas */
+.owl-prev {
+    left: 10px; /* Espacio desde la izquierda */
+}
+
+.owl-next {
+    right: 10px; /* Espacio desde la derecha */
+}
+
+/* Efecto al pasar el mouse */
+.owl-prev:hover, .owl-next:hover {
+    background-color: #0056b3; /* Color de fondo al pasar el mouse */
+}
+
+.img-seller {
+    max-width: 100px !important;
+}
+
+@media screen and (max-width: 991px) {
+    .img-seller {
+        width: 100%  !important;
+    }
+    .users-list>li {
+        float: left;
+        padding: 10px;
+        text-align: center;
+        width: 50%;
+    }
+}
+
+
+
+.card-productos {
+    min-height:645px;
+}
+
+@media screen and (max-width: 1060px) {
+    .card-productos {
+        min-height:740px;
+    }
+}
+
+@media screen and (max-width: 991px) {
+    .card-productos {
+        min-height:100%;
+    }
+}

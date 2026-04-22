@@ -1,0 +1,208 @@
+/* primary color #e5c41a */
+.header-social-icon a:hover,
+.solution-and-result ul li a i,
+.panel>a::after,
+.entry-summary .style-italic,
+.panel>a.collapsed::after,
+.digital-markating ul li a i,
+.marketing-session li i,
+.slide-details li i,
+.menu li a:hover,
+.post-heading span,
+.entry-summary span,
+.entry-header a i, 
+.single-offer-item i,
+.single-blog-post i,
+.add-description .app-store .google-play,
+.main-menu li.active > a,
+.primary-color,
+a:focus, a:hover,
+.post-meta li a:hover,
+.menu li a:hover,
+.header-menu-area .header-menu li a.active {
+	color: #e5c41a;
+}
+.header-nav .menu>li.active>a:before,
+.service-style-3 .icon-circle-wrap.execution i,
+.footer-style-3 .social-icon ul li>a.active,
+.tagcloud a:hover,
+.tagcloud a:focus,
+.service-style-4 .service:hover .icon-circle-wrap i,
+.btn-secondary-alt:hover,
+.copyright-bar .social-icon ul a:hover,
+.btn-light:focus,
+.btn-light:hover,
+.primary-bg,
+.btn-secondary,
+.btn-secondary-alt:hover,
+.btn-secondary-alt:focus,
+.btn-primary:hover,
+.secondary-bg .btn-primary,
+.secondary-bg .btn-primary-alt:hover,
+.secondary-bg .btn-primary:hover 
+{
+	background-color: #e5c41a;
+}
+.footer-style-3 .social-icon ul li>a.active,
+.primary-bg .testimonial-carousel-2 .owl-dots .owl-dot.active span,
+.dark-bg .btn-secondary:hover,
+.dark-bg .btn-secondary:focus,
+.tagcloud a:hover,
+.tagcloud a:focus,
+.service-style-4 .service:hover .icon-circle-wrap,
+.add-description .app-store .google-play,
+.btn-secondary-alt,
+.footer-style-3 .social-icon a:hover,
+.copyright-bar .social-icon ul a:hover,
+.btn.btn-light:focus,
+.btn-light:hover,
+.primary-border,
+.btn-secondary,
+.btn-primary:hover,
+.secondary-bg .btn-primary-alt,
+.secondary-bg .btn-primary-alt:hover,
+.secondary-bg .btn-primary 
+{
+	border-color: #e5c41a;
+}
+
+/* Secondary color #0782c8 */
+.network-achive-description ul a i,
+.footer-style-2 .social-icon a i,
+.header-social-icon a,
+.caseStudies-filter li:hover,
+.caseStudies-filter li.active,
+.comment-title,
+.comment-list .author-title a,
+.blog-style-3 .secondary-bg-color,
+.recent-posts .post-meta,
+.blog-second-post span,
+.add i,
+.single-client .active,
+.single-client:hover span,
+.header-style3 .main-menu li a.active,
+.featured-area-style-2 .service:hover .icon-circle-wrap i,
+.add-description > ul li a i,
+.client-name span,
+.icon-circle-wrap i,
+.primary-bg h2 span,
+.secondary-bg h2 span,
+.dark-bg h2 span,
+.btn-primary-alt,
+.secondary-color,
+.btn-alt:hover,
+.Contact-us ul i,
+.ladis-client,
+.contact-us-icon
+{
+	color: #0782c8;
+}
+.about-single-team-member:hover .team-member-details,
+.header-style2 .main-menu .menu > li.active > a:after,
+.color-overlay:after,
+.case-studies-img-holder:after,
+.service-style-3 .icon-circle-wrap.planing i,
+.newsletter .header-search-button,
+.error-page .form-control.submit,
+.entry-summary mark,
+.confidential-guide,
+.about-single-team-member.active .team-member-details,
+.social-icon > ul li > a:hover,
+.footer-style-2 .social-icon ul a:hover,
+.service-style-3 .icon-circle-wrap i,
+.single-blog-post:hover .read-more-btn,
+.font-page-activities-icon-wrap i:hover,
+.service:hover .icon-circle-wrap i,
+.secondary-bg,
+.btn-primary-alt:hover,
+.btn-primary,
+.primary-bg .btn-secondary-alt:hover
+{
+	background-color: #0782c8;
+}
+.recent-posts li:hover .recent-posts-image,
+.service-style-4 .icon-circle-wrap i,
+.featured-area-style-2 .icon-circle-wrap,
+.contact-us-icon,
+.caseStudies-filter li:hover,
+.caseStudies-filter li.active,
+.comment li,
+.widget li:hover,
+.blog-pagination li a:hover,
+.blog-pagination li a.active,
+.secondary-bg .testimonial-carousel-2 .owl-dots .owl-dot.active span,
+.blog-pagination li a:hover,
+.social-icon > ul li > a:hover,
+.footer-style-2 .social-icon ul a:hover,
+.font-page-activities-icon-wrap,
+.icon-circle-wrap,
+footer .hover-color-secondary a:hover,
+.secondary-color,
+.btn-primary-alt,
+.btn-primary,
+.btn-alt:hover
+{
+	border-color: #0782c8;
+}
+
+/* dark color #222222 */
+.btn-dark,
+.btn-secondary:hover,
+.dark-bg,
+.btn-dark{
+	background-color: #222222;
+}
+.btn-dark,
+.btn-secondary:hover,
+.btn-dark{
+	border-color: #222222;
+}
+
+
+header,
+.add-description > ul li a ,
+.btn-secondary-alt
+{
+	color: #444444;
+}
+footer{
+	background-color:#111111;
+}
+.footer-style-2, .footer-style-3 a, .footer-style-2 ul li a{
+	color: #989898;
+}
+
+/*Scroll-to-Top*/
+.scroll-to-top{
+	  background: #191919 none repeat scroll 0 0;
+}
+.read-more-btn i,
+.add-description .app-store .apple-store,
+.single-blog-post a,
+.footer-style-2 .back-to-top{
+	 color: #888888;
+}
+
+/*Background Matching Section*/
+.secondary-bg .form-control,
+.primary-bg .form-control {
+  background: rgba(0, 0, 0, 0.1) none repeat scroll 0 0;
+}
+
+.secondary-bg .selectize-input.focus{
+	border-color: #0675b4;
+}
+
+.secondary-bg .checkbox .cr{
+	background-color: #0675b4 ;
+}
+
+.dark-bg .service .icon-circle-wrap i{
+	border: none;
+}
+.dark-bg .selectize-control.single .selectize-input.input-active{
+	background-color: #292929;
+}
+.dark-bg .selectize-input > *{
+	color: #999999;
+}

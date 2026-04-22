@@ -1,0 +1,27 @@
+body
+{
+  margin: 0mm 0mm 0mm -10mm;
+}
+
+.invoice-text{
+	font-family: sans-serif;
+	font-size: 12pt;
+}
+
+.invoice-text-small{
+	font-family: sans-serif;
+	font-size: 10pt;
+	line-height: 0.8px;
+}
+
+.line {
+	border-top: solid 1px #B4B1B1;
+}
+
+.pt-200 {
+	padding-top: 160px;
+}
+
+.div-middle {
+	width: 50px;
+}

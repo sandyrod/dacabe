@@ -39,17 +39,17 @@ class ComisionVendedorController extends Controller
                 JOIN pago_grupo_detalles pgd_sub ON cv.pago_id = pgd_sub.id
                 LEFT JOIN comision_pagos cp ON cv.id = cp.comision_vendedores_id
                 GROUP BY pgd_sub.pedido_id, cv.nombre_vendedor, cv.correo_vendedor, pgd_sub.created_at
-            ) as comision_agrupada'), function($join) {
+            ) as comision_agrupada'), function ($join) {
                 $join->on('pgd.pedido_id', '=', 'comision_agrupada.pedido_id');
             })
-            ->leftJoin(DB::raw('(SELECT pedido_id, COUNT(*) as total_productos FROM pedido_detalle GROUP BY pedido_id) as pd_count'), function($join) {
+            ->leftJoin(DB::raw('(SELECT pedido_id, COUNT(*) as total_productos FROM pedido_detalle GROUP BY pedido_id) as pd_count'), function ($join) {
                 $join->on('pgd.pedido_id', '=', 'pd_count.pedido_id');
             })
             ->leftJoin(DB::raw('(SELECT DISTINCT pp.pedido_id, 
                 CASE WHEN pag.tpago_id IN (14, 16) THEN 1 ELSE 0 END as tiene_divisa,
                 CASE WHEN pag.tpago_id NOT IN (14, 16) THEN 1 ELSE 0 END as tiene_bolivares
                 FROM pagos_pedidos pp 
-                JOIN pagos pag ON pp.pago_id = pag.id) as pagos_info'), function($join) {
+                JOIN pagos pag ON pp.pago_id = pag.id) as pagos_info'), function ($join) {
                 $join->on('pgd.pedido_id', '=', 'pagos_info.pedido_id');
             })
             ->select(
@@ -100,7 +100,7 @@ class ComisionVendedorController extends Controller
         // Ordenamiento
         $sortField = $request->get('sort', 'fecha');
         $sortDirection = $request->get('direction', 'desc');
-        
+
         // Mapeo de campos para ordenamiento
         $sortableFields = [
             'fecha' => 'comision_agrupada.fecha_pedido',
@@ -109,17 +109,17 @@ class ComisionVendedorController extends Controller
             'total' => 'total_comision',
             'estado' => 'estatus_comision'
         ];
-        
+
         // Validar campo de ordenamiento
         if (array_key_exists($sortField, $sortableFields)) {
             $sortField = $sortableFields[$sortField];
         } elseif (!in_array($sortField, $sortableFields)) {
             $sortField = 'comision_agrupada.fecha_pedido';
         }
-        
+
         // Validar dirección
         $sortDirection = in_array(strtolower($sortDirection), ['asc', 'desc']) ? $sortDirection : 'desc';
-        
+
         // Aplicar ordenamiento
         if ($sortField === 'total_comision' || $sortField === 'estatus_comision') {
             // Para campos agregados, usar HAVING
@@ -144,7 +144,7 @@ class ComisionVendedorController extends Controller
         // Obtener totales generales
         $totalesQuery = DB::connection('company')->table('comision_vendedores as cv')
             ->join('pago_grupo_detalles as pgd', 'cv.pago_id', '=', 'pgd.id');
-        
+
         // Aplicar los mismos filtros a los totales
         if ($request->has('vendedor') && $request->vendedor) {
             $totalesQuery->where('cv.correo_vendedor', $request->vendedor);
@@ -231,7 +231,7 @@ class ComisionVendedorController extends Controller
             ->orderBy('nombre')
             ->get();
 
-        // Obtener tasa del día desde dacabe.tasas
+        // Obtener tasa del día desde companytasas
         $tasaRecord = DB::connection('company')
             ->table('tasas')
             ->orderBy('created_at', 'desc')
@@ -240,7 +240,7 @@ class ComisionVendedorController extends Controller
 
         // Check if any filters are applied (excluding sort and direction)
         $hasFilters = $request->hasAny(['vendedor', 'cliente', 'estado', 'fecha_inicio', 'fecha_fin']);
-        
+
         // Paginar los resultados agrupados
         if ($hasFilters) {
             // If filters are applied, show all results without pagination
@@ -369,16 +369,16 @@ class ComisionVendedorController extends Controller
     public function aprobar(Request $request, $pagoId)
     {
         $request->validate([
-            'pagos_destino_id'  => 'required|exists:mysql.banks,id',
-            'fecha_pago'        => 'required|date',
-            'monto_bs'          => 'nullable|numeric|min:0',
-            'monto_divisa'      => 'nullable|numeric|min:0',
-            'tasa'              => 'nullable|numeric|min:0',
-            'forma_pago'        => 'required|in:Divisa,Bolivares,Otro',
+            'pagos_destino_id' => 'required|exists:mysql.banks,id',
+            'fecha_pago' => 'required|date',
+            'monto_bs' => 'nullable|numeric|min:0',
+            'monto_divisa' => 'nullable|numeric|min:0',
+            'tasa' => 'nullable|numeric|min:0',
+            'forma_pago' => 'required|in:Divisa,Bolivares,Otro',
             'numero_referencia' => 'nullable|string',
-            'observaciones'     => 'nullable|string',
-            'correo_vendedor'   => 'nullable|email',
-            'saldo_aplicado'    => 'nullable|numeric|min:0',
+            'observaciones' => 'nullable|string',
+            'correo_vendedor' => 'nullable|email',
+            'saldo_aplicado' => 'nullable|numeric|min:0',
         ]);
 
         // Soportar múltiples IDs separados por coma
@@ -410,16 +410,16 @@ class ComisionVendedorController extends Controller
                 $factor = $totalComision > 0 ? ($comision->monto_comision / $totalComision) : 0;
 
                 ComisionPago::create([
-                    'grupo_pago_id'          => $grupoPagoId,
+                    'grupo_pago_id' => $grupoPagoId,
                     'comision_vendedores_id' => $comision->id,
-                    'pagos_destino_id'       => $request->pagos_destino_id,
-                    'observaciones'          => $request->observaciones,
-                    'fecha_pago'             => $request->fecha_pago,
-                    'monto_bs'               => $request->monto_bs * $factor,
-                    'monto_divisa'           => $request->monto_divisa * $factor,
-                    'tasa'                   => $request->tasa,
-                    'forma_pago'             => $request->forma_pago,
-                    'numero_referencia'      => $request->numero_referencia,
+                    'pagos_destino_id' => $request->pagos_destino_id,
+                    'observaciones' => $request->observaciones,
+                    'fecha_pago' => $request->fecha_pago,
+                    'monto_bs' => $request->monto_bs * $factor,
+                    'monto_divisa' => $request->monto_divisa * $factor,
+                    'tasa' => $request->tasa,
+                    'forma_pago' => $request->forma_pago,
+                    'numero_referencia' => $request->numero_referencia,
                 ]);
 
                 DB::connection('company')->table('comision_vendedores')
@@ -456,20 +456,20 @@ class ComisionVendedorController extends Controller
                 ->unique()
                 ->implode(', ');
 
-            $fechaPago  = \Carbon\Carbon::parse($request->fecha_pago)->format('d/m/Y');
-            $refText    = $request->numero_referencia ?: 'sin referencia';
+            $fechaPago = \Carbon\Carbon::parse($request->fecha_pago)->format('d/m/Y');
+            $refText = $request->numero_referencia ?: 'sin referencia';
 
             // Movimiento 1: Comisión devengada (crédito al vendedor)
             ComisionMovimiento::registrarMovimiento([
-                'correo_vendedor'         => $correoVendedor,
-                'nombre_vendedor'         => $nombreVendedor,
-                'tipo'                    => 'comision_devengada',
-                'monto'                   => $totalComision,
-                'es_credito'              => true,
-                'concepto'                => "Comisión por venta de: {$productos} — Pedido(s): {$pedidosIds}",
-                'grupo_pago_id'           => $grupoPagoId,
+                'correo_vendedor' => $correoVendedor,
+                'nombre_vendedor' => $nombreVendedor,
+                'tipo' => 'comision_devengada',
+                'monto' => $totalComision,
+                'es_credito' => true,
+                'concepto' => "Comisión por venta de: {$productos} — Pedido(s): {$pedidosIds}",
+                'grupo_pago_id' => $grupoPagoId,
                 'monto_comision_original' => $totalComision,
-                'registrado_por'          => auth()->id(),
+                'registrado_por' => auth()->id(),
             ]);
 
             // Movimiento 2: Pago realizado (débito al vendedor)
@@ -483,17 +483,17 @@ class ComisionVendedorController extends Controller
             }
 
             ComisionMovimiento::registrarMovimiento([
-                'correo_vendedor'         => $correoVendedor,
-                'nombre_vendedor'         => $nombreVendedor,
-                'tipo'                    => 'pago_comision',
-                'monto'                   => $montoPagadoUSD,
-                'es_credito'              => false,
-                'concepto'                => $conceptoPago,
-                'grupo_pago_id'           => $grupoPagoId,
+                'correo_vendedor' => $correoVendedor,
+                'nombre_vendedor' => $nombreVendedor,
+                'tipo' => 'pago_comision',
+                'monto' => $montoPagadoUSD,
+                'es_credito' => false,
+                'concepto' => $conceptoPago,
+                'grupo_pago_id' => $grupoPagoId,
                 'monto_comision_original' => $totalComision,
-                'monto_pagado_real'       => $montoPagadoUSD,
-                'saldo_aplicado'          => $saldoAplicado > 0.001 ? $saldoAplicado : null,
-                'registrado_por'          => auth()->id(),
+                'monto_pagado_real' => $montoPagadoUSD,
+                'saldo_aplicado' => $saldoAplicado > 0.001 ? $saldoAplicado : null,
+                'registrado_por' => auth()->id(),
             ]);
             // ─────────────────────────────────────────────────────────────────
 
@@ -502,10 +502,10 @@ class ComisionVendedorController extends Controller
             $saldoFinal = ComisionMovimiento::saldoActual($correoVendedor);
 
             return response()->json([
-                'success'       => true,
-                'message'       => 'Pago de comisiones registrado y aprobado correctamente',
+                'success' => true,
+                'message' => 'Pago de comisiones registrado y aprobado correctamente',
                 'updated_count' => $comisiones->count(),
-                'saldo_final'   => $saldoFinal,
+                'saldo_final' => $saldoFinal,
                 'grupo_pago_id' => $grupoPagoId,
             ]);
         } catch (\Exception $e) {
@@ -561,7 +561,7 @@ class ComisionVendedorController extends Controller
     public function getPagoDestinos()
     {
         $destinos = PagoDestino::orderBy('nombre')->get(['id', 'nombre']);
-        
+
         return response()->json([
             'success' => true,
             'destinos' => $destinos
@@ -578,7 +578,7 @@ class ComisionVendedorController extends Controller
             ->select('id', 'nombre')
             ->orderBy('nombre')
             ->get();
-        
+
         return response()->json([
             'success' => true,
             'bancos' => $bancos
@@ -626,9 +626,9 @@ class ComisionVendedorController extends Controller
     {
         // Si el ID no empieza por BPG-, podría ser un pago_id antiguo
         if (!str_starts_with($grupoPagoId, 'BPG-')) {
-            $detallePago = ComisionPago::whereHas('comisionVendedor', function($q) use ($grupoPagoId) {
-                    $q->where('pago_id', $grupoPagoId);
-                })
+            $detallePago = ComisionPago::whereHas('comisionVendedor', function ($q) use ($grupoPagoId) {
+                $q->where('pago_id', $grupoPagoId);
+            })
                 ->with('pagoDestino')
                 ->first();
         } else {
@@ -651,7 +651,7 @@ class ComisionVendedorController extends Controller
                     DB::raw('SUM(monto_bs) as total_bs'),
                     DB::raw('SUM(monto_divisa) as total_divisa')
                 )->first();
-            
+
             $detallePago->monto_bs = $totalesGrupo->total_bs;
             $detallePago->monto_divisa = $totalesGrupo->total_divisa;
         }
@@ -776,9 +776,9 @@ class ComisionVendedorController extends Controller
         }
 
         if ($request->has('producto') && $request->producto) {
-            $query->where(function($q) use ($request) {
+            $query->where(function ($q) use ($request) {
                 $q->where('comision_vendedores.codigo_producto', 'like', '%' . $request->producto . '%')
-                  ->orWhere('comision_vendedores.nombre_producto', 'like', '%' . $request->producto . '%');
+                    ->orWhere('comision_vendedores.nombre_producto', 'like', '%' . $request->producto . '%');
             });
         }
 
@@ -891,12 +891,12 @@ class ComisionVendedorController extends Controller
         $saldoCuenta = ComisionMovimiento::saldoActual($vendedorEmail);
 
         return view('comisiones.recibidas', [
-            'comisiones'     => $comisiones,
+            'comisiones' => $comisiones,
             'totalPendiente' => $totales->total_pendiente ?? 0,
-            'totalPagada'    => $totales->total_pagada ?? 0,
-            'totalConfirmado'=> $totales->total_confirmado ?? 0,
-            'estadoFiltro'   => $estadoFiltro,
-            'saldoCuenta'    => $saldoCuenta,
+            'totalPagada' => $totales->total_pagada ?? 0,
+            'totalConfirmado' => $totales->total_confirmado ?? 0,
+            'estadoFiltro' => $estadoFiltro,
+            'saldoCuenta' => $saldoCuenta,
         ]);
     }
 
@@ -925,8 +925,8 @@ class ComisionVendedorController extends Controller
             DB::raw('SUM(cv.monto_comision) as total_comision'),
             'pgd.created_at as fecha_pedido'
         )
-        ->groupBy('cv.pago_id', 'pgd.pedido_id', 'p.descripcion', 'pgd.created_at')
-        ->get();
+            ->groupBy('cv.pago_id', 'pgd.pedido_id', 'p.descripcion', 'pgd.created_at')
+            ->get();
 
         return response()->json([
             'success' => true,
@@ -940,7 +940,7 @@ class ComisionVendedorController extends Controller
     public function getTodosIds(Request $request)
     {
         $vendedorEmail = auth()->user()->email;
-        
+
         // Build the same query as in index() method
         $query = DB::connection('company')->table('comision_vendedores as cv')
             ->join('pago_grupo_detalles as pgd', 'cv.pago_id', '=', 'pgd.id')
@@ -995,17 +995,17 @@ class ComisionVendedorController extends Controller
      */
     public function saldoVendedor($correo)
     {
-        $correo  = urldecode($correo);
-        $saldo   = ComisionMovimiento::saldoActual($correo);
+        $correo = urldecode($correo);
+        $saldo = ComisionMovimiento::saldoActual($correo);
         $vendedor = ComisionMovimiento::where('correo_vendedor', $correo)
             ->latest('id')
             ->value('nombre_vendedor');
 
         return response()->json([
-            'success'  => true,
-            'correo'   => $correo,
+            'success' => true,
+            'correo' => $correo,
             'vendedor' => $vendedor,
-            'saldo'    => $saldo,
+            'saldo' => $saldo,
             // positivo = admin debe al vendedor | negativo = admin tiene crédito
         ]);
     }
@@ -1020,9 +1020,9 @@ class ComisionVendedorController extends Controller
             ->groupBy('correo_vendedor');
 
         $vendedores = ComisionMovimiento::joinSub($subquery, 'last', function ($join) {
-                $join->on('comision_movimientos.correo_vendedor', '=', 'last.correo_vendedor')
-                     ->on('comision_movimientos.id', '=', 'last.last_id');
-            })
+            $join->on('comision_movimientos.correo_vendedor', '=', 'last.correo_vendedor')
+                ->on('comision_movimientos.id', '=', 'last.last_id');
+        })
             ->select(
                 'comision_movimientos.correo_vendedor',
                 'comision_movimientos.nombre_vendedor',
@@ -1043,8 +1043,8 @@ class ComisionVendedorController extends Controller
 
         $vendedores = $vendedores->map(function ($v) use ($totales) {
             $t = $totales->get($v->correo_vendedor);
-            $v->total_devengado = $t ? (float)$t->total_devengado : 0;
-            $v->total_pagado    = $t ? (float)$t->total_pagado    : 0;
+            $v->total_devengado = $t ? (float) $t->total_devengado : 0;
+            $v->total_pagado = $t ? (float) $t->total_pagado : 0;
             return $v;
         });
 
@@ -1056,9 +1056,9 @@ class ComisionVendedorController extends Controller
      */
     public function estadoCuentaVendedor(Request $request, $correo)
     {
-        $correo       = urldecode($correo);
-        $movimientos  = ComisionMovimiento::where('correo_vendedor', $correo)->orderBy('id')->get();
-        $saldoActual  = ComisionMovimiento::saldoActual($correo);
+        $correo = urldecode($correo);
+        $movimientos = ComisionMovimiento::where('correo_vendedor', $correo)->orderBy('id')->get();
+        $saldoActual = ComisionMovimiento::saldoActual($correo);
         $nombreVendedor = $movimientos->first()->nombre_vendedor ?? $correo;
 
         return view('comisiones.estado_cuenta_vendedor', compact('movimientos', 'saldoActual', 'nombreVendedor', 'correo'));
@@ -1069,7 +1069,7 @@ class ComisionVendedorController extends Controller
      */
     public function miEstadoCuenta()
     {
-        $correo      = auth()->user()->email;
+        $correo = auth()->user()->email;
         $movimientos = ComisionMovimiento::where('correo_vendedor', $correo)->orderBy('id')->get();
         $saldoActual = ComisionMovimiento::saldoActual($correo);
 

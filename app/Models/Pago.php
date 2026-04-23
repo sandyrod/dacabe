@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 class Pago extends Model
 {
     protected $connection = 'company';
-    protected $table = 'dacabe.pagos';
+    protected $table = 'pagos';
     protected $fillable = [
         'fecha',
         'monto',
@@ -30,7 +30,7 @@ class Pago extends Model
         'moneda_pago',
         'pago_grupo_id'
     ];
-     
+
     public function getData($id = null)
     {
         if ($id) {
@@ -43,7 +43,7 @@ class Pago extends Model
     {
         return $this->hasMany(PagoPedido::class)->with('pedido');
     }
-    
+
     public function tipo_pago()
     {
         return $this->belongsTo(OrderTpago::class, 'tpago_id', 'CPAGO');
@@ -53,7 +53,7 @@ class Pago extends Model
     {
         return $this->belongsTo(OrderBanco::class, 'banco_codigo', 'CODIGO');
     }
-    
+
     public function pago_destino()
     {
         return $this->belongsTo(PagoDestino::class, 'pago_destino_id', 'id');
@@ -62,7 +62,7 @@ class Pago extends Model
     public function getReportConfig()
     {
         return [
-            'title' => 'Listado de Pagos', 
+            'title' => 'Listado de Pagos',
             'company' => Auth::user()->company
         ];
     }

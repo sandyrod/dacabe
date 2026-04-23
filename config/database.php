@@ -63,14 +63,14 @@ return [
             ]) : [],
         ],
 
-         'company' => [
-            'driver' => 'mysql',
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => 'dacabe', // Este se llenará dinámicamente
-            'username' => env('DB_USERNAME', 'forge'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
+        'company' => [
+            'driver' => env('DB_COMPANY_CONNECTION', 'mysql'),
+            'host' => env('DB_COMPANY_HOST', '127.0.0.1'),
+            'port' => env('DB_COMPANY_PORT', '3306'),
+            'database' => env('DB_COMPANY_DATABASE', 'dacabe_test'),
+            'username' => env('DB_COMPANY_USERNAME', 'root'),
+            'password' => env('DB_COMPANY_PASSWORD', ''),
+            'unix_socket' => env('DB_COMPANY_SOCKET', ''),
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'prefix' => '',
@@ -138,7 +138,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
         ],
 
         'default' => [

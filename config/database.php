@@ -67,7 +67,7 @@ return [
             'driver' => env('DB_COMPANY_CONNECTION', 'mysql'),
             'host' => env('DB_COMPANY_HOST', '127.0.0.1'),
             'port' => env('DB_COMPANY_PORT', '3306'),
-            'database' => env('DB_COMPANY_DATABASE', 'dacabe_test'),
+            'database' => env('DB_COMPANY_DATABASE', ''),
             'username' => env('DB_COMPANY_USERNAME', 'root'),
             'password' => env('DB_COMPANY_PASSWORD', ''),
             'unix_socket' => env('DB_COMPANY_SOCKET', ''),

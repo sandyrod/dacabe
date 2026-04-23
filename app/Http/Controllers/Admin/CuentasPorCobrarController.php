@@ -31,7 +31,9 @@ class CuentasPorCobrarController extends Controller
                 'p.id'
             )
             ->whereRaw('BINARY p.estatus NOT IN (BINARY ?, BINARY ?)', ['CANCELADO', 'PAGADO'])
-            ->whereRaw('(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)) > 0.01');
+            ->whereRaw('(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)) > 0.01')
+            ->whereNotNull('p.fecha_despacho')
+            ->whereRaw('TRIM(COALESCE(p.fecha_despacho, "")) != ""');
 
         if ($request->filled('search')) {
             $search = trim((string) $request->search);
@@ -68,7 +70,7 @@ class CuentasPorCobrarController extends Controller
 
         if ($request->boolean('solo_vencidos')) {
             $baseQuery->where('p.dias_credito', '>', 0)
-                ->whereRaw('DATE_ADD(p.fecha, INTERVAL p.dias_credito DAY) < CURDATE()');
+                ->whereRaw('DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) < CURDATE()');
         }
 
         $statsBase = clone $baseQuery;
@@ -83,12 +85,24 @@ class CuentasPorCobrarController extends Controller
 
         $vencidosCount = (clone $statsBase)
             ->where('p.dias_credito', '>', 0)
-            ->whereRaw('DATE_ADD(p.fecha, INTERVAL p.dias_credito DAY) < CURDATE()')
+            ->whereRaw('DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) < CURDATE()')
             ->count();
 
         $hoyCount = (clone $statsBase)
             ->whereDate('p.fecha', Carbon::today()->toDateString())
             ->count();
+
+        $proxVencerCount = (clone $statsBase)
+            ->where('p.dias_credito', '>', 0)
+            ->whereRaw('DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) >= CURDATE()')
+            ->whereRaw('DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) <= DATE_ADD(CURDATE(), INTERVAL 7 DAY)')
+            ->count();
+
+        $diasVencidosPromedio = (clone $statsBase)
+            ->where('p.dias_credito', '>', 0)
+            ->whereRaw('DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) < CURDATE()')
+            ->selectRaw('COALESCE(AVG(DATEDIFF(CURDATE(), DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY))), 0) as promedio')
+            ->value('promedio');
 
         $antiguedad = (clone $statsBase)
             ->selectRaw('COALESCE(AVG(DATEDIFF(CURDATE(), p.fecha)), 0) as dias_promedio')
@@ -118,6 +132,7 @@ class CuentasPorCobrarController extends Controller
             ->select(
                 'p.id',
                 'p.fecha',
+                'p.fecha_despacho',
                 'p.referencia',
                 'p.descripcion',
                 'p.rif',
@@ -141,13 +156,18 @@ class CuentasPorCobrarController extends Controller
                 DB::raw('(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)) as saldo_total'),
                 DB::raw('CASE
                     WHEN COALESCE(p.dias_credito, 0) > 0
-                    THEN DATE_ADD(p.fecha, INTERVAL p.dias_credito DAY)
+                    THEN DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY)
                     ELSE NULL
                 END as fecha_vencimiento'),
                 DB::raw('DATEDIFF(CURDATE(), p.fecha) as antiguedad_dias'),
                 DB::raw('CASE
-                    WHEN COALESCE(p.dias_credito, 0) > 0 AND DATE_ADD(p.fecha, INTERVAL p.dias_credito DAY) < CURDATE()
-                    THEN DATEDIFF(CURDATE(), DATE_ADD(p.fecha, INTERVAL p.dias_credito DAY))
+                    WHEN COALESCE(p.dias_credito, 0) > 0
+                    THEN DATEDIFF(DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY), CURDATE())
+                    ELSE NULL
+                END as dias_restantes'),
+                DB::raw('CASE
+                    WHEN COALESCE(p.dias_credito, 0) > 0 AND DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY) < CURDATE()
+                    THEN DATEDIFF(CURDATE(), DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY))
                     ELSE 0
                 END as dias_vencidos')
             )
@@ -183,7 +203,9 @@ class CuentasPorCobrarController extends Controller
             'topVendedores',
             'vendedores',
             'estatuses',
-            'tasaDelDia'
+            'tasaDelDia',
+            'proxVencerCount',
+            'diasVencidosPromedio'
         ));
     }
 }

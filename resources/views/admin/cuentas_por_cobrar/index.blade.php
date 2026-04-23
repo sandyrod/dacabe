@@ -234,6 +234,51 @@
         margin-top: 2px;
     }
 
+    .cxr-kpi-prox {
+        background: linear-gradient(145deg, #fff8e1 0%, #ffffff 72%);
+        border-color: #ffe082;
+    }
+
+    .cxr-kpi-dias {
+        background: linear-gradient(145deg, #fce4ec 0%, #ffffff 72%);
+        border-color: #f48fb1;
+    }
+
+    .cxr-dias-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 0.73rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .cxr-dias-vencido {
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+    }
+
+    .cxr-dias-vigente {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #86efac;
+    }
+
+    .cxr-dias-hoy {
+        background: #fef9c3;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+
+    .cxr-dias-sin {
+        background: #f3f4f6;
+        color: #6b7280;
+        border: 1px solid #e5e7eb;
+    }
+
     @media (max-width: 991px) {
         .cxr-table thead th { font-size: 0.68rem; }
         .cxr-kpi-value { font-size: 1.25rem; }
@@ -290,32 +335,49 @@
     </div>
 
     <div class="row mb-3">
-        <div class="col-xl-3 col-md-6 mb-3">
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-base">
                 <div class="cxr-kpi-title">Saldo Base</div>
                 <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_base ?? 0) }}</div>
                 <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_base ?? 0) }}</div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-3">
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-iva">
                 <div class="cxr-kpi-title">Saldo IVA</div>
                 <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_iva ?? 0) }}</div>
                 <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_iva ?? 0) }}</div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-3">
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-ajustes">
                 <div class="cxr-kpi-title">Saldo Ajustes</div>
                 <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_ajustes ?? 0) }}</div>
                 <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_ajustes ?? 0) }}</div>
             </div>
         </div>
-        <div class="col-xl-3 col-md-6 mb-3">
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-vencidos">
                 <div class="cxr-kpi-title">Pedidos Vencidos</div>
                 <div class="cxr-kpi-value">{{ number_format((int) $vencidosCount) }}</div>
-                <div class="cxr-kpi-sub">{{ number_format((int) $hoyCount) }} registrados hoy</div>
+                <div class="cxr-kpi-sub">
+                    <i class="fas fa-clock mr-1"></i>Prom.
+                    {{ number_format((float) ($diasVencidosPromedio ?? 0), 0, ',', '.') }} días vencidos
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="cxr-kpi cxr-kpi-prox">
+                <div class="cxr-kpi-title">Vencen en 7 días</div>
+                <div class="cxr-kpi-value">{{ number_format((int) ($proxVencerCount ?? 0)) }}</div>
+                <div class="cxr-kpi-sub">Con crédito próximo</div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 col-6 mb-3">
+            <div class="cxr-kpi cxr-kpi-dias">
+                <div class="cxr-kpi-title">Antigüedad Promedio</div>
+                <div class="cxr-kpi-value">{{ number_format((float) ($antiguedad->dias_promedio ?? 0), 0, ',', '.') }} días</div>
+                <div class="cxr-kpi-sub">Máx. {{ number_format((float) ($antiguedad->dias_maximos ?? 0), 0, ',', '.') }} días</div>
             </div>
         </div>
     </div>
@@ -443,6 +505,7 @@
                     <tr>
                         <th>Pedido</th>
                         <th>Fecha</th>
+                        <th>Despacho / Crédito</th>
                         <th>Cliente</th>
                         <th>Vendedor</th>
                         <th class="text-right">Saldo Base</th>
@@ -467,7 +530,34 @@
                             </td>
                             <td>
                                 <div>{{ \Carbon\Carbon::parse($pedido->fecha)->format('d/m/Y') }}</div>
-                                <small class="text-muted">{{ number_format((float) $pedido->antiguedad_dias, 0, ',', '.') }} dias</small>
+                                <small class="text-muted">{{ number_format((float) $pedido->antiguedad_dias, 0, ',', '.') }} días</small>
+                            </td>
+                            <td>
+                                @if(!empty($pedido->fecha_despacho))
+                                    <div>{{ \Carbon\Carbon::parse($pedido->fecha_despacho)->format('d/m/Y') }}</div>
+                                @endif
+                                @if($pedido->dias_credito > 0)
+                                    @php $dr = (int) $pedido->dias_restantes; @endphp
+                                    @if($dr > 0)
+                                        <span class="cxr-dias-badge cxr-dias-vigente">
+                                            <i class="fas fa-hourglass-half" style="font-size:.65rem;"></i>
+                                            {{ $dr }} día{{ $dr !== 1 ? 's' : '' }} restante{{ $dr !== 1 ? 's' : '' }}
+                                        </span>
+                                    @elseif($dr === 0)
+                                        <span class="cxr-dias-badge cxr-dias-hoy">
+                                            <i class="fas fa-exclamation-circle" style="font-size:.65rem;"></i>
+                                            Vence hoy
+                                        </span>
+                                    @else
+                                        <span class="cxr-dias-badge cxr-dias-vencido">
+                                            <i class="fas fa-times-circle" style="font-size:.65rem;"></i>
+                                            {{ abs($dr) }} día{{ abs($dr) !== 1 ? 's' : '' }} vencido{{ abs($dr) !== 1 ? 's' : '' }}
+                                        </span>
+                                    @endif
+                                    <div><small class="text-muted">Crédito: {{ $pedido->dias_credito }}d</small></div>
+                                @else
+                                    <span class="cxr-dias-badge cxr-dias-sin">Sin crédito</span>
+                                @endif
                             </td>
                             <td>
                                 <div class="font-weight-bold">{{ $pedido->descripcion }}</div>
@@ -494,7 +584,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="text-center py-4 text-muted">
+                            <td colspan="11" class="text-center py-4 text-muted">
                                 <i class="fas fa-check-circle mr-1 text-success"></i>
                                 No hay pedidos pendientes con saldo para los filtros aplicados.
                             </td>

@@ -373,6 +373,15 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::get('productos/auditoria/export', 'Admin\ProductAuditController@export')->name('admin.productos.auditoria.export');
     Route::get('pedidos/detalle-ajax/{pedidoId}', 'Admin\ProductAuditController@getDetallePedidoAjax')->name('admin.pedidos.detalle.ajax');
     Route::get('pedidos-gestion', 'Admin\PedidoGestionController@index')->name('admin.pedidos.gestion');
+    Route::get('pedidos-editor', 'Admin\PedidoEditorController@index')->name('admin.pedidos_editor.index');
+    Route::get('pedidos-editor/create', 'Admin\PedidoEditorController@create')->name('admin.pedidos_editor.create');
+    Route::post('pedidos-editor', 'Admin\PedidoEditorController@store')->name('admin.pedidos_editor.store');
+    Route::get('pedidos-editor/{pedido}/edit', 'Admin\PedidoEditorController@edit')->name('admin.pedidos_editor.edit');
+    Route::put('pedidos-editor/{pedido}', 'Admin\PedidoEditorController@update')->name('admin.pedidos_editor.update');
+    Route::post('pedidos-editor/productos', 'Admin\PedidoEditorController@productos')->name('admin.pedidos_editor.productos');
+    Route::post('pedidos-editor/{pedido}/items', 'Admin\PedidoEditorController@storeItem')->name('admin.pedidos_editor.items.store');
+    Route::put('pedidos-editor/{pedido}/items/{item}', 'Admin\PedidoEditorController@updateItem')->name('admin.pedidos_editor.items.update');
+    Route::delete('pedidos-editor/{pedido}/items/{item}', 'Admin\PedidoEditorController@destroyItem')->name('admin.pedidos_editor.items.destroy');
     Route::post('toggle-factura-order', 'Admin\PedidoGestionController@toggleFactura')->name('admin.pedidos.toggleFactura');
     Route::post('update-retention-order', 'Admin\PedidoGestionController@updateRetention')->name('admin.pedidos.updateRetention');
     Route::post('update-dias-credito-order', 'Admin\PedidoGestionController@updateDiasCredito')->name('admin.pedidos.updateDiasCredito');

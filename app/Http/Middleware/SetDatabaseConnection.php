@@ -15,7 +15,11 @@ class SetDatabaseConnection
 
             if ($company) {
                 // Configurar la conexión a la base de datos de la empresa
-                $dbName = $company->db_name;
+                if (app()->environment('local') && env('DB_COMPANY_DATABASE')) {
+                    $dbName = env('DB_COMPANY_DATABASE');
+                } else {
+                    $dbName = $company->db_name;
+                }
 
                 config(['database.connections.company.database' => $dbName]);
 

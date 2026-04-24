@@ -774,6 +774,7 @@
                                 </div>
                             </div>
                         </div>
+                        
 
                         <!-- PEDIDOS -->
                         <div class="card">
@@ -781,7 +782,8 @@
                                 <button class="btn btn-header collapsed" type="button" data-toggle="collapse"
                                     data-target="#collapsePedidos" aria-expanded="false"
                                     aria-controls="collapsePedidos">
-                                    <span><i class="fas fa-shopping-bag icon-main"></i> Pedidos</span>
+                                    <span><i class="fas fa-shopping-bag icon-main"></i> Pedidos
+                                    <span class="label-report-new"><i class="fas fa-bell"></i></span></span>
                                     <i class="fas fa-chevron-down"></i>
                                 </button>
                             </div>
@@ -794,7 +796,7 @@
                                             <i class="fas fa-check"></i> Gestión de Pedidos (nuevo)
                                         </a>
                                         <a href="{{ route('admin.pedidos_editor.index') }}"
-                                            class="list-group-item list-group-item-action">
+                                            class="list-group-item list-group-item-action report-highlight">
                                             <i class="fas fa-edit"></i> Editor de Pedidos
                                         </a>
                                         <a href="{{ url('pedidos') }}"

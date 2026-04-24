@@ -35,7 +35,7 @@ class PedidosController extends Controller
 
     public function index(Request $request)
     {
-        if (! hasOrderPermission() && ! hasOrderClientPermission())
+        if (!hasOrderPermission() && !hasOrderClientPermission())
             abort(403);
 
         if (requestAjaxOrJson($request)) {
@@ -55,7 +55,7 @@ class PedidosController extends Controller
 
     public function shoppingcart(Request $request)
     {
-        if (! hasPermission('pedidos')) {
+        if (!hasPermission('pedidos')) {
             abort(403);
         }
 
@@ -158,7 +158,7 @@ class PedidosController extends Controller
         $detalle = (new PedidoDetalle)->find($request->item_id);
         $pedido_id = @$detalle->pedido_id;
         if ((new PedidoDetalle)->deleteProductById($request->item_id)) {
-            if (! (new PedidoDetalle)->where('pedido_id', $pedido_id)->exists()) {
+            if (!(new PedidoDetalle)->where('pedido_id', $pedido_id)->exists()) {
                 (new Pedido)->find($pedido_id)->delete();
             }
             return Response::json([
@@ -251,7 +251,7 @@ class PedidosController extends Controller
         //    abort(403);
 
         $pedido = (new Pedido)->where('id', $request->order_id)->first();
-        if (! $pedido) {
+        if (!$pedido) {
             return Response::json([
                 'type' => 'error',
                 'message' => 'Pedido No Existe...'
@@ -315,7 +315,7 @@ class PedidosController extends Controller
         if (is_array($request->payment_orders) && count($request->payment_orders) > 0) {
             foreach ($request->payment_orders as $order) {
                 if (isset($order['pedido_id']) && isset($order['monto']) && $order['monto'] > 0) {
-                    DB::table('dacabe.pagos_pedidos')->insert([
+                    DB::connection('company')->table('pagos_pedidos')->insert([
                         'pago_id' => $payment->id,
                         'pedido_id' => $order['pedido_id'],
                         'monto' => $order['monto']
@@ -488,7 +488,7 @@ class PedidosController extends Controller
 
     public function store(OrderInvenRequest $request)
     {
-        if (! hasOrderPermission())
+        if (!hasOrderPermission())
             abort(403);
 
         $order_inven = (new OrderInven)->createNew($request);
@@ -499,7 +499,7 @@ class PedidosController extends Controller
 
     public function create()
     {
-        if (! hasOrderPermission())
+        if (!hasOrderPermission())
             abort(403);
 
         $route = $this->module . '.index';
@@ -508,7 +508,7 @@ class PedidosController extends Controller
 
     public function update(OrderInvenRequest $request, $code)
     {
-        if (! hasOrderPermission())
+        if (!hasOrderPermission())
             abort(403);
 
         //$order_inven = (new OrderInven)->updateItem($code, $request);
@@ -536,7 +536,7 @@ class PedidosController extends Controller
 
     public function edit(Request $request, $code)
     {
-        if (! hasOrderPermission()) {
+        if (!hasOrderPermission()) {
             abort(403);
         }
 
@@ -548,7 +548,7 @@ class PedidosController extends Controller
 
     public function destroy(Request $request, $code)
     {
-        if (! hasOrderPermission())
+        if (!hasOrderPermission())
             abort(403);
 
         $order_inven = (new OrderInven)->deleteRecord($code);
@@ -601,7 +601,7 @@ class PedidosController extends Controller
     public function generatePdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -628,7 +628,7 @@ class PedidosController extends Controller
     public function generateEmailPdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -777,7 +777,7 @@ class PedidosController extends Controller
     public function generateSellerBalancePdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -847,10 +847,10 @@ class PedidosController extends Controller
         $pendingOrders = [];
         foreach ($orders as $order) {
             // Sumar todos los pagos asociados a este pedido
-            $pagos = DB::table('dacabe.pagos_pedidos')
-                ->join('dacabe.pagos', 'dacabe.pagos_pedidos.pago_id', '=', 'pagos.id')
-                ->where('dacabe.pagos_pedidos.pedido_id', $order->id)
-                ->sum('dacabe.pagos_pedidos.monto');
+            $pagos = DB::connection('company')->table('pagos_pedidos')
+                ->join('pagos', 'pagos_pedidos.pago_id', '=', 'pagos.id')
+                ->where('pagos_pedidos.pedido_id', $order->id)
+                ->sum('pagos_pedidos.monto');
 
             $saldo = round($order->total - $pagos, 2);
 
@@ -872,7 +872,7 @@ class PedidosController extends Controller
             'type' => 'success',
             'data' => $pendingOrders
         ], 200);
-        if (! $order) {
+        if (!$order) {
             return Response::json([
                 'type' => 'error',
                 'message' => 'Pedido No Existe...'

@@ -34,18 +34,18 @@ class DespachosController extends Controller
 
     public function index(Request $request)
     {
-        if ( ! hasPermission($this->permission)) {
+        if (!hasPermission($this->permission)) {
             abort(403);
         }
-     
+
         if (requestAjaxOrJson($request)) {
             $pedidos = (new Pedido)->getDataDespacho();
             return $this->getJsonOrDatatableResponse($request, $pedidos);
-        }     
-        return view($this->module.'.index');
+        }
+        return view($this->module . '.index');
     }
 
-    public function getProducts (Request $request)
+    public function getProducts(Request $request)
     {
         return Response::json([
             'type' => 'success',
@@ -83,7 +83,7 @@ class DespachosController extends Controller
             abort(403);
         }
         */
-     
+
         $pedido = (new Pedido)->searchPendingOrder();
         $detalle = null;
         if ($pedido) {
@@ -91,7 +91,7 @@ class DespachosController extends Controller
         }
         $clients = (new OrderClient)->getData();
         $descuento = obtenerDescuentoGlobal() ?? 0;
-     
+
         return view('order_inven.view_cart', compact(['pedido', 'detalle', 'clients', 'descuento']));
     }
 
@@ -102,10 +102,10 @@ class DespachosController extends Controller
             abort(403);
         }
         */
-     
+
         $pedido = (new Pedido)->getOrderById($order_id);
         $detalle = (new PedidoDetalle)->searchOrderDetail($pedido->id);
-        
+
         return view('order_inven.view_order', compact(['pedido', 'detalle']));
     }
 
@@ -132,7 +132,7 @@ class DespachosController extends Controller
                         $dif = $artdepos->RESERVA - $detalle->cantidad;
                         //dd($request->cantidad);
                         (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $qty + $dif]);
-                    } 
+                    }
                 }
 
                 $edit = (new PedidoDetalle)->updateItem($request->item_id, 'cantidad', $qty);
@@ -152,7 +152,7 @@ class DespachosController extends Controller
                 ], 200);
             }
         }
-        
+
         return Response::json([
             'type' => 'error',
             'message' => 'Producto no encontrado...'
@@ -166,7 +166,7 @@ class DespachosController extends Controller
         $detalle = (new PedidoDetalle)->find($request->item_id);
         $pedido_id = @$detalle->pedido_id;
         if ((new PedidoDetalle)->deleteProductById($request->item_id)) {
-            if (! (new PedidoDetalle)->where('pedido_id', $pedido_id)->exists()) {
+            if (!(new PedidoDetalle)->where('pedido_id', $pedido_id)->exists()) {
                 (new Pedido)->find($pedido_id)->delete();
             }
             return Response::json([
@@ -174,14 +174,14 @@ class DespachosController extends Controller
                 'text' => 'Item Eliminado...',
                 'data' => (new PedidoDetalle)->searchOrderDetail($detalle->pedido_id),
                 'type' => 'success'
-            ], 200);            
+            ], 200);
         }
         return Response::json([
-                'type' => 'error'
-            ], 200);
+            'type' => 'error'
+        ], 200);
     }
 
-    public function addToCart(Request $request) 
+    public function addToCart(Request $request)
     {
         //if (! hasOrderPermission()) 
         //    abort(403);
@@ -191,7 +191,7 @@ class DespachosController extends Controller
         if (!$pedido) {
             $pedido = (new Pedido)->createNew('', '', '', auth()->user()->name, '', '', 'CARGANDO', $request->cdepos, '', '', $descuento);
         }
-        $pedido->descuento=$descuento;
+        $pedido->descuento = $descuento;
         $pedido->save();
         if ($pedido->cdepos != $request->cdepos) {
             return Response::json([
@@ -227,7 +227,7 @@ class DespachosController extends Controller
                 //$qty += $request->cantidad;
                 (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $qty]);
                 $disp = $artdepos->EUNIDAD - $qty;
-            } 
+            }
         }
 
         return Response::json([
@@ -244,7 +244,7 @@ class DespachosController extends Controller
         //    abort(403);
 
         $pedido = (new Pedido)->where('id', $request->order_id)->first();
-        if (! $pedido) {
+        if (!$pedido) {
             return Response::json([
                 'type' => 'error',
                 'message' => 'Pedido No Existe...'
@@ -256,19 +256,19 @@ class DespachosController extends Controller
 
         $detalle = (new PedidoDetalle)->where('pedido_id', $pedido->id)->get();
         $cdepos = $pedido->cdepos;
-        foreach($detalle as $item) {
+        foreach ($detalle as $item) {
             $artdepos = (new ArtDepos)->where('CODIGO', $item->codigo_inven)->where('CDEPOS', $cdepos)->first();
-                if ($artdepos && ($request->estatus=='APROBADO' || $request->estatus=='RECHAZADO')) {
-                    $eunidad = $request->estatus=='APROBADO' ? $artdepos->EUNIDAD - $item->cantidad : $artdepos->EUNIDAD;
-                    $reserva = $artdepos->RESERVA - $item->cantidad;
-                    (new ArtDepos)->where('CODIGO', $item->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $reserva, 'EUNIDAD' => $eunidad]);
-                } 
+            if ($artdepos && ($request->estatus == 'APROBADO' || $request->estatus == 'RECHAZADO')) {
+                $eunidad = $request->estatus == 'APROBADO' ? $artdepos->EUNIDAD - $item->cantidad : $artdepos->EUNIDAD;
+                $reserva = $artdepos->RESERVA - $item->cantidad;
+                (new ArtDepos)->where('CODIGO', $item->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $reserva, 'EUNIDAD' => $eunidad]);
+            }
         }
 
 
         $this->sendEstatusOrderEmail($pedido);
-        
-        if ($request->estatus=='APROBADO'){
+
+        if ($request->estatus == 'APROBADO') {
             $this->sendEstatusOrderEmailAdmin($pedido);
         }
 
@@ -307,20 +307,30 @@ class DespachosController extends Controller
         ]);
 
         if (is_array($request->payment_orders) && count($request->payment_orders) > 0) {
-            foreach ($request->payment_orders as $order) {
-                if (isset($order['pedido_id']) && isset($order['monto']) && $order['monto']>0) {
-                    DB::table('dacabe.pagos_pedidos')->insert([
-                        'pago_id' => $payment->id,
-                        'pedido_id' => $order['pedido_id'],
-                        'monto' => $order['monto']
-                    ]);
+            DB::connection('company')->beginTransaction();
+            try {
+                foreach ($request->payment_orders as $order) {
+                    if (isset($order['pedido_id']) && isset($order['monto']) && $order['monto'] > 0) {
+                        DB::table('pagos_pedidos')->insert([
+                            'pago_id' => $payment->id,
+                            'pedido_id' => $order['pedido_id'],
+                            'monto' => $order['monto']
+                        ]);
+                    }
                 }
+                DB::connection('company')->commit();
+            } catch (\Exception $e) {
+                DB::connection('company')->rollBack();
+                \Log::error("Error en inserción de pagos_pedidos: " . $e->getMessage());
+
+                throw $e;
             }
+
         }
         return Response::json([
             'type' => 'success',
             'text' => 'Pago Guardado...',
-            'title' => 'Genial!',            
+            'title' => 'Genial!',
             'data' => (new Vendedor)->getSellerBalance($request->seller_id),
             'payment' => $payment
         ], 200);
@@ -346,11 +356,11 @@ class DespachosController extends Controller
         //    abort(403);
 
         $client = (new OrderClient)->select('NOMBRE', 'TELEFONO', 'EMAIL')->where('RIF', $request->rif)->first();
-        if (!$client){
+        if (!$client) {
             $client = (new OrderClient)->select('NOMBRE', 'TELEFONO', 'EMAIL')->where('CODCLI', $request->rif)->first();
-        }    
+        }
         //$name = $client ? $client->NOMBRE : '';
-        
+
         return Response::json([
             'type' => 'success',
             'data' => $client
@@ -363,11 +373,11 @@ class DespachosController extends Controller
         //    abort(403);
 
         $pedido = (new Pedido)->dropOrder();
-        
+
         return redirect()->route('shoppingcart');
     }
 
-    private function sendNotification($template='notificacion_pedido', $cliente='Dacabe', $pedido_id=null, $phone='584129003985')
+    private function sendNotification($template = 'notificacion_pedido', $cliente = 'Dacabe', $pedido_id = null, $phone = '584129003985')
     {
         /*
         $response = file_get_contents('https://santiscodes.com/send-whatsapp?to=' . urlencode($phone) . 
@@ -375,7 +385,7 @@ class DespachosController extends Controller
            '&cliente=' . urlencode($cliente) . 
            '&pedido_id=' . urlencode($pedido));
         */
-        $url = 'https://santiscodes.com/send-whatsapp?to='.$phone.'&template='.$template.'&pedido_id='.$pedido_id.'&cliente='.$cliente;
+        $url = 'https://santiscodes.com/send-whatsapp?to=' . $phone . '&template=' . $template . '&pedido_id=' . $pedido_id . '&cliente=' . $cliente;
         $response = file_get_contents($url);
         /*
         return Response::json([
@@ -405,14 +415,14 @@ class DespachosController extends Controller
                 $pedido->rif_foto = $rif;
                 $pedido->save();
             }
-        }       
-    
+        }
+
         $detalle = (new PedidoDetalle)->searchOrderDetail($pedido->id);
         if ($detalle) {
             return Response::json([
                 'type' => 'success',
                 'text' => 'Pedido Guardado...',
-                'title' => 'Genial!',            
+                'title' => 'Genial!',
             ], 200);
         }
         return Response::json([
@@ -427,7 +437,7 @@ class DespachosController extends Controller
         //if (! hasOrderPermission()) 
         //    abort(403);
 
-        $detalle = (new PedidoDetalle)->where('pedido_id', $request->order_id)->where('codigo_inven', $request->codigo_inven)->first();                
+        $detalle = (new PedidoDetalle)->where('pedido_id', $request->order_id)->where('codigo_inven', $request->codigo_inven)->first();
         if ($detalle) {
             $pedido = (new Pedido)->find($request->order_id);
             $user = (new User)->find($pedido->user_id);
@@ -442,7 +452,7 @@ class DespachosController extends Controller
                     $dif = $artdepos->RESERVA - $detalle->cantidad;
                     $qty = $request->cantidad;
                     (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $qty + $dif]);
-                } 
+                }
             }
 
             $detalle->cantidad = $request->cantidad;
@@ -450,15 +460,15 @@ class DespachosController extends Controller
             $detalle->save();
 
             $totales = (new PedidoDetalle)
-            ->where('pedido_id', $request->order_id)
-            ->selectRaw('SUM(cantidad * precio_dolar) as total_precio, SUM(cantidad) as total_cantidad')
-            ->first();
+                ->where('pedido_id', $request->order_id)
+                ->selectRaw('SUM(cantidad * precio_dolar) as total_precio, SUM(cantidad) as total_cantidad')
+                ->first();
 
             return Response::json([
                 'type' => 'success',
                 'text' => 'Pedido Guardado...',
-                'title' => 'Genial!', 
-                'totales' => $totales, 
+                'title' => 'Genial!',
+                'totales' => $totales,
                 'data' => $detalle,
             ], 200);
         }
@@ -476,38 +486,38 @@ class DespachosController extends Controller
 
     public function store(OrderInvenRequest $request)
     {
-        if (! hasOrderPermission()) 
+        if (!hasOrderPermission())
             abort(403);
 
         $order_inven = (new OrderInven)->createNew($request);
-       
-        return redirect()->route($this->module.'.index')
-                ->with('info', 'El registro ha sido creado satisfactoriamente');
+
+        return redirect()->route($this->module . '.index')
+            ->with('info', 'El registro ha sido creado satisfactoriamente');
     }
 
     public function create()
     {
-        if (! hasOrderPermission()) 
+        if (!hasOrderPermission())
             abort(403);
 
-        $route = $this->module.'.index';
-        return view($this->module.'.create', compact(['route']));
+        $route = $this->module . '.index';
+        return view($this->module . '.create', compact(['route']));
     }
 
     public function update(OrderInvenRequest $request, $code)
     {
-        if (! hasOrderPermission()) 
+        if (!hasOrderPermission())
             abort(403);
-        
+
         //$order_inven = (new OrderInven)->updateItem($code, $request);
         $order_inven = (new OrderInven)->getProduct($code);
 
         if ($order_inven && $request->file('photo')) {
             $this->savePhoto($request, $order_inven);
         }
-       
-        return redirect()->route($this->permission.'.index')
-                ->with('info', 'El registro ha sido modificado satisfactoriamente');
+
+        return redirect()->route($this->permission . '.index')
+            ->with('info', 'El registro ha sido modificado satisfactoriamente');
     }
 
     private function savePhoto($request, $order_inven)
@@ -519,24 +529,24 @@ class DespachosController extends Controller
     private function uploadPhoto($request)
     {
         $name = Storage::disk('local')->put('public/products', $request->photo);
-        return substr($name, 16); 
+        return substr($name, 16);
     }
 
     public function edit(Request $request, $code)
     {
-        if (! hasOrderPermission())  {
+        if (!hasOrderPermission()) {
             abort(403);
         }
 
         $order_inven = (new OrderInven)->getData($code);
 
-        $route = $this->permission.'.index';
-        return view($this->module.'.edit', compact(['order_inven', 'route']));
+        $route = $this->permission . '.index';
+        return view($this->module . '.edit', compact(['order_inven', 'route']));
     }
 
     public function destroy(Request $request, $code)
     {
-        if (! hasOrderPermission()) 
+        if (!hasOrderPermission())
             abort(403);
 
         $order_inven = (new OrderInven)->deleteRecord($code);
@@ -555,8 +565,8 @@ class DespachosController extends Controller
 
         $today = Carbon::now()->format('d/m/Y');
 
-        $pdf = Pdf::loadView($this->module.'.partials.print', compact('order_invens', 'today'));
- 
+        $pdf = Pdf::loadView($this->module . '.partials.print', compact('order_invens', 'today'));
+
         return $pdf->download('lista_unidades.pdf');
     }
 
@@ -565,10 +575,10 @@ class DespachosController extends Controller
         $order_inven = new OrderInven();
         $order_invens = $order_inven->getData();
         $print = 1;
-        
+
         $report_data = $order_inven->getReportConfig();
 
-        return view($this->module.'.partials.print', compact(['order_invens', 'print', 'report_data']));
+        return view($this->module . '.partials.print', compact(['order_invens', 'print', 'report_data']));
     }
 
     public function printOrder(Request $request, $order_id)
@@ -580,7 +590,7 @@ class DespachosController extends Controller
             $client = (new OrderClient)->where('RIF', $order->rif)->first();
         }
         $print = 1;
-        
+
         $report_data = $modelo->getReportConfig();
 
         return view('orders.partials.print_order', compact(['order', 'print', 'report_data', 'client']));
@@ -589,7 +599,7 @@ class DespachosController extends Controller
     public function generatePdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -601,23 +611,23 @@ class DespachosController extends Controller
         if ($order->rif) {
             $client = (new OrderClient)->where('RIF', $order->rif)->first();
         }
-        
-        $pdf = PDF::loadView($this->module.'.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
+
+        $pdf = PDF::loadView($this->module . '.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
         $pdf->setPaper('a4', 'portrait');
 
         $id = str_pad($order->id, 5, '0', STR_PAD_LEFT);
 
-        $ruta_pdf = storage_path('app/public/pedidos/').'Pedido_'. $id .'.pdf';
+        $ruta_pdf = storage_path('app/public/pedidos/') . 'Pedido_' . $id . '.pdf';
         $pdf->save($ruta_pdf)->download();
-        
-        return $pdf->download('pedido'.$id.'.pdf');
-        
+
+        return $pdf->download('pedido' . $id . '.pdf');
+
     }
 
     public function generateEmailPdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -628,7 +638,7 @@ class DespachosController extends Controller
                 'text' => 'El cliente no tiene email registrado...'
             ], 200);
         }
-        
+
         $print = null;
 
         $report_data = (new Pedido)->getReportConfig();
@@ -637,14 +647,14 @@ class DespachosController extends Controller
         if ($order->rif) {
             $client = (new OrderClient)->where('RIF', $order->rif)->first();
         }
-        
+
         $data = $order->toArray();
 
         if ($order->estatus == 'APROBADO') {
-            $pdf = PDF::loadView($this->module.'.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
+            $pdf = PDF::loadView($this->module . '.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
             $pdf->setPaper('a4', 'portrait');
 
-            $ruta_pdf = storage_path('app/public/pedidos/').'Pedido_'.uniqid().'.pdf';
+            $ruta_pdf = storage_path('app/public/pedidos/') . 'Pedido_' . uniqid() . '.pdf';
             $pdf->save($ruta_pdf)->download();
             $data['estatus_message'] = 'nos complace notificarle que su pedido ha sido <b>APROBADO</b> con éxito!<br /><br /> Le invitamos a conocer los detalles de su pedido en el documento adjunto a este correo.';
             $data['ruta_pdf'] = $ruta_pdf;
@@ -652,8 +662,8 @@ class DespachosController extends Controller
             $data['estatus_message'] = 'le informamos que su pedido lamentablemente <b>NO</b> ha sido APROBADO.<br /><br /> Le invitamos ha visualizar nuestras promociones y galeria de productos.';
         }
 
-        $seller = (new User)->find($order->user_id);        
-        $data['seller'] = @$seller && $seller->email ? $seller->email : null ;
+        $seller = (new User)->find($order->user_id);
+        $data['seller'] = @$seller && $seller->email ? $seller->email : null;
         $data['company'] = $company;
         $data['email'] = $order->email;
         $data['name'] = $order->descripcion;
@@ -667,7 +677,7 @@ class DespachosController extends Controller
             'title' => 'Pedido enviado!',
             'text' => 'El Pedido ha sido enviado por email satisfactoriamente.'
         ], 200);
-        
+
     }
 
     private function sendEstatusOrderEmail($order)
@@ -679,7 +689,7 @@ class DespachosController extends Controller
                 'text' => 'El cliente no tiene email registrado...'
             ], 200);
         }
-        
+
         $data = $order->toArray();
 
         $print = null;
@@ -687,25 +697,25 @@ class DespachosController extends Controller
         $company = (new Company)->getMyCompany();
         $ruta_pdf = null;
         if ($order->estatus == 'APROBADO') {
-            $pdf = PDF::loadView($this->module.'.partials.pdf', compact(['order', 'print', 'report_data', 'company']));
+            $pdf = PDF::loadView($this->module . '.partials.pdf', compact(['order', 'print', 'report_data', 'company']));
             $pdf->setPaper('a4', 'portrait');
 
-            $ruta_pdf = storage_path('app/public/pedidos/').'Pedido_'.uniqid().'.pdf';
-            $pdf->save($ruta_pdf)->download();            
+            $ruta_pdf = storage_path('app/public/pedidos/') . 'Pedido_' . uniqid() . '.pdf';
+            $pdf->save($ruta_pdf)->download();
             $data['estatus_message'] = 'nos complace notificarle que su pedido ha sido <b>APROBADO</b> con éxito!<br /><br /> Le invitamos a conocer los detalles de su pedido en el documento adjunto a este correo.';
         } else {
             $data['estatus_message'] = 'le informamos que su pedido lamentablemente <b>NO</b> ha sido APROBADO.<br /><br /> Le invitamos ha visualizar nuestras promociones y galeria de productos.';
         }
-        
-        $seller = (new User)->find($order->user_id);        
-        $data['seller'] = @$seller && $seller->email ? $seller->email : null ;
+
+        $seller = (new User)->find($order->user_id);
+        $data['seller'] = @$seller && $seller->email ? $seller->email : null;
         $data['company'] = $company;
         $data['email'] = $order->email;
         $data['name'] = $order->descripcion;
         $data['id'] = str_pad($order->id, 5, '0', STR_PAD_LEFT);
         $data['url'] = url('inicio');
         $data['ruta_pdf'] = $ruta_pdf;
-        
+
         dispatch(new \App\Jobs\SendEmailInvoice($data));
 
         return Response::json([
@@ -713,7 +723,7 @@ class DespachosController extends Controller
             'title' => 'Pedido enviado!',
             'text' => 'El Pedido ha sido enviado por email satisfactoriamente.'
         ], 200);
-        
+
     }
 
     private function sendEstatusOrderEmailAdmin($order)
@@ -723,15 +733,15 @@ class DespachosController extends Controller
         $report_data = (new Pedido)->getReportConfig();
         $company = (new Company)->getMyCompany();
         $ruta_pdf = null;
-        $pdf = PDF::loadView($this->module.'.partials.pdf', compact(['order', 'print', 'report_data', 'company']));
+        $pdf = PDF::loadView($this->module . '.partials.pdf', compact(['order', 'print', 'report_data', 'company']));
         $pdf->setPaper('a4', 'portrait');
-        
-        $ruta_pdf = storage_path('app/public/pedidos/').'Pedido_'.uniqid().'.pdf';
-        $pdf->save($ruta_pdf)->download();            
+
+        $ruta_pdf = storage_path('app/public/pedidos/') . 'Pedido_' . uniqid() . '.pdf';
+        $pdf->save($ruta_pdf)->download();
         $data['estatus_message'] = 'nos complace notificarle que tenemos un nuevo pedido ha sido <b>APROBADO</b> con éxito!<br /><br /> Le invitamos a conocer los detalles de su pedido en el documento adjunto a este correo.';
-        
+
         $seller = (new User)->find($order->user_id);
-        $data['seller'] = @$seller && $seller->email ? $seller->email : null ;
+        $data['seller'] = @$seller && $seller->email ? $seller->email : null;
         $data['company'] = $company;
         $data['email'] = 'facturaciondacabe@gmail.com';
         $data['name'] = 'Facturación DACABE';
@@ -743,7 +753,7 @@ class DespachosController extends Controller
         $data['rif_foto'] = $order->rif_foto;
         $data['observations'] = $order->observations;
         $data['conditions'] = $order->conditions;
-        
+
         dispatch(new \App\Jobs\SendEmailInvoiceAdmin($data));
 
         return Response::json([
@@ -751,16 +761,16 @@ class DespachosController extends Controller
             'title' => 'Pedido enviado!',
             'text' => 'El Pedido ha sido enviado por email satisfactoriamente.'
         ], 200);
-        
+
     }
 
     public function sellerBalancePrint(Request $request, $seller_id)
     {
-        
+
         $modelo = new Vendedor();
         $balance = $modelo->getSellerBalance($seller_id);
         $print = 1;
-        
+
         $report_data = $modelo->getReportConfig();
 
         return view('orders.partials.print_seller_balance', compact(['balance', 'print', 'report_data']));
@@ -769,7 +779,7 @@ class DespachosController extends Controller
     public function generateSellerBalancePdf($id)
     {
         $order = (new Pedido)->getData($id);
-        if (! $order) {
+        if (!$order) {
             abort(404);
         }
 
@@ -781,24 +791,24 @@ class DespachosController extends Controller
         if ($order->rif) {
             $client = (new OrderClient)->where('RIF', $order->rif)->first();
         }
-        
-        $pdf = PDF::loadView($this->module.'.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
+
+        $pdf = PDF::loadView($this->module . '.partials.pdf', compact(['order', 'print', 'report_data', 'company', 'client']));
         $pdf->setPaper('a4', 'portrait');
 
         $id = str_pad($order->id, 5, '0', STR_PAD_LEFT);
 
-        $ruta_pdf = storage_path('app/public/pedidos/').'Pedido_'. $id .'.pdf';
+        $ruta_pdf = storage_path('app/public/pedidos/') . 'Pedido_' . $id . '.pdf';
         $pdf->save($ruta_pdf)->download();
-        
-        return $pdf->download('pedido'.$id.'.pdf');
-        
+
+        return $pdf->download('pedido' . $id . '.pdf');
+
     }
 
 
     public function verifyClient(Request $request)
     {
         $pedido = (new Pedido)->where('id', $request->id)->first();
-        if (! $pedido) {
+        if (!$pedido) {
             return Response::json([
                 'type' => 'error',
                 'message' => 'Pedido No Existe...'
@@ -830,9 +840,9 @@ class DespachosController extends Controller
         // Agregar el total calculado a cada pedido
         foreach ($orders as $order) {
             $total = (new PedidoDetalle)
-            ->where('pedido_id', $order->id)
-            ->selectRaw('SUM(cantidad * precio_dolar) as total')
-            ->value('total');
+                ->where('pedido_id', $order->id)
+                ->selectRaw('SUM(cantidad * precio_dolar) as total')
+                ->value('total');
             $order->total = $total ?? 0;
         }
 
@@ -840,24 +850,24 @@ class DespachosController extends Controller
         $pendingOrders = [];
         foreach ($orders as $order) {
             // Sumar todos los pagos asociados a este pedido
-            $pagos = DB::table('dacabe.pagos_pedidos')
-            ->join('dacabe.pagos', 'dacabe.pagos_pedidos.pago_id', '=', 'pagos.id')
-            ->where('dacabe.pagos_pedidos.pedido_id', $order->id)
-            ->sum('dacabe.pagos_pedidos.monto');
+            $pagos = DB::connection('company')->table('pagos_pedidos')
+                ->join('pagos', 'pagos_pedidos.pago_id', '=', 'pagos.id')
+                ->where('pagos_pedidos.pedido_id', $order->id)
+                ->sum('pagos_pedidos.monto');
 
             $saldo = round($order->total - $pagos, 2);
 
             // Considerar pendiente si el saldo es mayor a 0.01 (para evitar problemas de redondeo)
             if ($saldo > 0.01) {
-            $order->saldo_pendiente = number_format($saldo, 2, '.', '');
-            $pendingOrders[] = $order;
+                $order->saldo_pendiente = number_format($saldo, 2, '.', '');
+                $pendingOrders[] = $order;
             }
         }
 
         if (empty($pendingOrders)) {
             return Response::json([
-            'type' => 'error',
-            'message' => 'No hay pedidos pendientes...'
+                'type' => 'error',
+                'message' => 'No hay pedidos pendientes...'
             ], 200);
         }
 
@@ -865,7 +875,7 @@ class DespachosController extends Controller
             'type' => 'success',
             'data' => $pendingOrders
         ], 200);
-        if (! $order) {
+        if (!$order) {
             return Response::json([
                 'type' => 'error',
                 'message' => 'Pedido No Existe...'
@@ -879,17 +889,17 @@ class DespachosController extends Controller
     }
 
     public function verifyClientSeniat($rif)
-    {        
-        $response = file_get_contents('http://host2.ingenix21.com.ve:6080/cgi-bin/sinfonix_sql.pl?%5ERIF.wwm%20'.$rif);
+    {
+        $response = file_get_contents('http://host2.ingenix21.com.ve:6080/cgi-bin/sinfonix_sql.pl?%5ERIF.wwm%20' . $rif);
         if ($response) {
             $respuestaString = mb_convert_encoding($response, 'UTF-8', 'UTF-8');
             // Decodificar la cadena JSON
             $datos = json_decode($respuestaString, true);
             // Verificar si la decodificación fue exitosa
             if (json_last_error() === JSON_ERROR_NONE) {
-               // Aquí puedes trabajar con los datos decodificados
-               //$cliente = response()->json($datos);
-               //dd($cliente);
+                // Aquí puedes trabajar con los datos decodificados
+                //$cliente = response()->json($datos);
+                //dd($cliente);
                 if (isset($datos['nombre'])) {
                     // Acceder al campo 'nombre' de la respuesta
                     $nombre = $datos['nombre'];
@@ -904,10 +914,10 @@ class DespachosController extends Controller
                 return response()->json($datos);
             } else {
                 // Manejar el error de decodificación
-               return response()->json(['error' => 'Error al decodificar JSON'], 500);
+                return response()->json(['error' => 'Error al decodificar JSON'], 500);
             }
         } else {
-            return response()->json(['error' => 'No se pudo obtener la respuesta del servicio'], 500);  
+            return response()->json(['error' => 'No se pudo obtener la respuesta del servicio'], 500);
         }
     }
 

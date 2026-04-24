@@ -36,9 +36,9 @@ class PedidoGestionController extends Controller
         }
 
         if ($request->filled('vendedor')) {
-            $query->where(function($q) use ($request) {
+            $query->where(function ($q) use ($request) {
                 $q->where('pedidos.email', 'like', '%' . $request->vendedor . '%')
-                  ->orWhere('pedidos.seller_code', 'like', '%' . $request->vendedor . '%');
+                    ->orWhere('pedidos.seller_code', 'like', '%' . $request->vendedor . '%');
             });
         }
 
@@ -93,12 +93,12 @@ class PedidoGestionController extends Controller
             return response()->json(['type' => 'error', 'message' => 'Pedido no encontrado'], 404);
         }
 
-        $retencion_porc = (float)$request->retencion;
+        $retencion_porc = (float) $request->retencion;
         $pedido->porc_retencion = $retencion_porc;
         $pedido->cliageret = $retencion_porc > 0 ? 1 : 0;
 
         // Recalcular el monto absoluto de la retención
-        $ivaTotal = DB::table('dacabe.pedido_detalle')
+        $ivaTotal = DB::connection('company')->table('pedido_detalle')
             ->where('pedido_id', $pedido->id)
             ->selectRaw('SUM(cantidad * precio_dolar * (iva / 100)) as total_iva')
             ->value('total_iva') ?? 0;
@@ -133,7 +133,7 @@ class PedidoGestionController extends Controller
             if (!$pedido) {
                 DB::connection('company')->rollBack();
                 return response()->json([
-                    'type' => 'error', 
+                    'type' => 'error',
                     'message' => 'Pedido no encontrado'
                 ], 404);
             }
@@ -141,7 +141,7 @@ class PedidoGestionController extends Controller
             if ($pedido->estatus !== 'APROBADO') {
                 DB::connection('company')->rollBack();
                 return response()->json([
-                    'type' => 'error', 
+                    'type' => 'error',
                     'message' => 'Solo se pueden anular pedidos con estatus APROBADO'
                 ], 400);
             }
@@ -199,7 +199,7 @@ class PedidoGestionController extends Controller
                 // Verificar si todos los errores son de reserva insuficiente
                 $todosReservaInsuficiente = true;
                 $productosConReservaInsuficiente = [];
-                
+
                 foreach ($productosInvalidos as $producto) {
                     if (strpos($producto['motivo'], 'Reserva insuficiente') !== false) {
                         $productosConReservaInsuficiente[] = $producto;
@@ -208,11 +208,11 @@ class PedidoGestionController extends Controller
                         break;
                     }
                 }
-                
+
                 // Si todos son de reserva insuficiente, permitir opción de continuar
                 if ($todosReservaInsuficiente) {
                     DB::connection('company')->rollBack();
-                    
+
                     $mensajeError = 'Los siguientes productos tienen reserva insuficiente:<br><br>';
                     foreach ($productosConReservaInsuficiente as $producto) {
                         $mensajeError .= '<strong>' . $producto['codigo'] . ':</strong> ' . $producto['motivo'] . '<br>';
@@ -229,7 +229,7 @@ class PedidoGestionController extends Controller
                 } else {
                     // Si hay otros errores (productos no encontrados), no permitir continuar
                     DB::connection('company')->rollBack();
-                    
+
                     $mensajeError = 'No se puede anular el pedido por los siguientes productos:<br><br>';
                     foreach ($productosInvalidos as $producto) {
                         $mensajeError .= '<strong>' . $producto['codigo'] . ':</strong> ' . $producto['motivo'] . '<br>';
@@ -290,12 +290,12 @@ class PedidoGestionController extends Controller
             ->get()
             ->map(function ($a) {
                 return [
-                    'id'       => $a->id,
-                    'tipo'     => $a->tipo,
+                    'id' => $a->id,
+                    'tipo' => $a->tipo,
                     'concepto' => $a->concepto,
-                    'monto'    => $a->monto,
-                    'pagado'   => $a->pagado,
-                    'fecha'    => $a->created_at ? $a->created_at->format('d/m/Y') : '',
+                    'monto' => $a->monto,
+                    'pagado' => $a->pagado,
+                    'fecha' => $a->created_at ? $a->created_at->format('d/m/Y') : '',
                 ];
             });
 
@@ -309,27 +309,30 @@ class PedidoGestionController extends Controller
     public function storeAjuste(Request $request, $pedidoId)
     {
         $request->validate([
-            'tipo'     => 'required|in:cargo,descuento',
+            'tipo' => 'required|in:cargo,descuento',
             'concepto' => 'required|string|max:255',
-            'monto'    => 'required|numeric|min:0.01',
+            'monto' => 'required|numeric|min:0.01',
         ]);
 
         $ajuste = PedidoAjuste::create([
-            'pedido_id'      => $pedidoId,
-            'tipo'           => $request->tipo,
-            'concepto'       => $request->concepto,
-            'monto'          => $request->monto,
+            'pedido_id' => $pedidoId,
+            'tipo' => $request->tipo,
+            'concepto' => $request->concepto,
+            'monto' => $request->monto,
             'registrado_por' => auth()->id(),
         ]);
 
-        return response()->json(['success' => true, 'ajuste' => [
-            'id'       => $ajuste->id,
-            'tipo'     => $ajuste->tipo,
-            'concepto' => $ajuste->concepto,
-            'monto'    => $ajuste->monto,
-            'pagado'   => $ajuste->pagado,
-            'fecha'    => $ajuste->created_at->format('d/m/Y'),
-        ]]);
+        return response()->json([
+            'success' => true,
+            'ajuste' => [
+                'id' => $ajuste->id,
+                'tipo' => $ajuste->tipo,
+                'concepto' => $ajuste->concepto,
+                'monto' => $ajuste->monto,
+                'pagado' => $ajuste->pagado,
+                'fecha' => $ajuste->created_at->format('d/m/Y'),
+            ]
+        ]);
     }
 
     public function destroyAjuste($ajusteId)
@@ -358,14 +361,14 @@ class PedidoGestionController extends Controller
 
             if (!$pedido) {
                 return response()->json([
-                    'type' => 'error', 
+                    'type' => 'error',
                     'message' => 'Pedido no encontrado'
                 ], 404);
             }
 
             if ($pedido->estatus !== 'APROBADO') {
                 return response()->json([
-                    'type' => 'error', 
+                    'type' => 'error',
                     'message' => 'Solo se pueden anular pedidos con estatus APROBADO'
                 ], 400);
             }
@@ -416,11 +419,11 @@ class PedidoGestionController extends Controller
         }
 
         $diasCredito = $request->dias_credito;
-        
+
         // Validar que sea un número entero no negativo
         if ($diasCredito !== null && (!is_numeric($diasCredito) || $diasCredito < 0 || floor($diasCredito) != $diasCredito)) {
             return response()->json([
-                'type' => 'error', 
+                'type' => 'error',
                 'message' => 'Los días de crédito deben ser un número entero no negativo'
             ], 400);
         }

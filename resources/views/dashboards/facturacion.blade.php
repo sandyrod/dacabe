@@ -284,6 +284,31 @@
             </a>
         </div>
 
+        <div class="col-12 col-sm-6 col-xl-3 mb-4">
+            <a href="{{ route('admin.pedidos_editor.index') }}" class="text-decoration-none">
+                <div class="card manager-card h-100">
+                    <div class="card-body" style="background: linear-gradient(135deg, #7f5539 0%, #b08968 100%);">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="text-white font-weight-bold mb-0">
+                                <i class="fas fa-edit mr-1"></i> Editor de Pedidos
+                            </h6>
+                            <i class="fas fa-pen-square fa-2x" style="opacity:.2; color:#fff;"></i>
+                        </div>
+                        <div class="stat-number text-white mb-1">CRUD</div>
+                        <div class="stat-label text-white">crear y modificar líneas</div>
+                        <div class="progress mt-3">
+                            <div class="progress-bar" role="progressbar" style="width: 100%"></div>
+                        </div>
+                        <div class="mt-2">
+                            <small class="text-white" style="opacity:.8;">
+                                <i class="fas fa-arrow-right mr-1"></i> Ir al editor avanzado
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+
         {{-- Pagos --}}
         <div class="col-12 col-sm-6 col-xl-3 mb-4">
             <a href="{{ url('/admin/pedidos-iva-modificar') }}" class="text-decoration-none">
@@ -415,6 +440,14 @@
                     <i class="fas fa-balance-scale btn-icon"></i>
                     <div class="btn-title">Cuentas por Cobrar</div>
                     <div class="btn-subtitle">Cartera pendiente</div>
+                </a>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
+                <a href="{{ route('admin.pedidos_editor.index') }}" class="action-btn btn-emerald p-3 text-center">
+                    <i class="fas fa-edit btn-icon"></i>
+                    <div class="btn-title">Editor de Pedidos</div>
+                    <div class="btn-subtitle">Crear y modificar</div>
                 </a>
             </div>
 

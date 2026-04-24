@@ -675,14 +675,17 @@
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-xs-12 col-sm-12 col-md-4 pt-2">
+                                    <div class="col-xs-12 col-sm-12 col-md-3 pt-2">
+                                        <a href="{{ route('admin.pedidos_editor.edit', @$firstOrder->id) }}" class="btn btn-outline-primary btn-block pt-2 hint--top" aria-label="Editar Pedido"><i class="fa fa-edit"></i> Editar Pedido</a>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-12 col-md-3 pt-2">
 
                                         <a id="btn_APROBADO_{{@$firstOrder->id}}" href="javascript:void(0)" onclick="event.preventDefault(); approveOrCancelOrder('{{@$firstOrder->id}}', 'APROBADO')" class="btn btn-outline-success btn-block pt-2 hint--top" aria-label="Aprobar Pedido"><i class="fa fa-check"></i> Aprobar</a>
                                     </div>
-                                    <div class="col-xs-12 col-sm-12 col-md-4 pt-2">
+                                    <div class="col-xs-12 col-sm-12 col-md-3 pt-2">
                                         <a id="btn_RECHAZADO_{{@$firstOrder->id}}" href="javascript:void(0)" onclick="event.preventDefault(); approveOrCancelOrder('{{@$firstOrder->id}}', 'RECHAZADO')" class="btn btn-outline-danger btn-block pt-2 hint--top" aria-label="Rechazar Pedido"><i class="fa fa-trash"></i> Rechazar</a>
                                     </div>
-                                    <div class="col-xs-12 col-sm-12 col-md-4 pt-2">
+                                    <div class="col-xs-12 col-sm-12 col-md-3 pt-2">
                                         <a target="_blank" href="{{url('print-order/' . @$firstOrder->id)}}" class="btn btn-outline-info btn-block pt-2 hint--top" aria-label="Imprimir Pedido"><i class="fa fa-print"></i> Imprimir</a>
                                     </div>
                                 </div>
@@ -789,6 +792,10 @@
                                         <a href="{{ url('admin/pedidos-gestion') }}"
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-check"></i> Gestión de Pedidos (nuevo)
+                                        </a>
+                                        <a href="{{ route('admin.pedidos_editor.index') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-edit"></i> Editor de Pedidos
                                         </a>
                                         <a href="{{ url('pedidos') }}"
                                             class="list-group-item list-group-item-action">

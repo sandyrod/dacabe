@@ -244,6 +244,9 @@
             </div>
             <div class="row mt-2">
                 <div class="col-12 text-right">
+                    <a href="{{ route('admin.pedidos_editor.index') }}" class="btn btn-outline-primary mr-2">
+                        <i class="fas fa-edit mr-1"></i> Editor de Pedidos
+                    </a>
                     <a href="{{ route('admin.pedidos.gestion') }}" class="btn btn-outline-secondary mr-2">
                         <i class="fas fa-undo mr-1"></i> Limpiar
                     </a>

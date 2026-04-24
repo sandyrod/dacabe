@@ -134,6 +134,7 @@ class PedidoEditorController extends Controller
             $clientes = (new OrderClient)->getData(null, $vendedor->email);
         }
 
+        // obtener depositos
         $depositoNombrePedido = DB::connection('company')->table('DEPOSITO')
             ->where('CDEPOS', $pedidoModel->cdepos)
             ->value('DDEPOS');

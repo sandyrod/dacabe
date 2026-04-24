@@ -380,6 +380,26 @@ class PagosController extends Controller
         $totalDescuentosAjustesBs = round($totalDescuentosAjustes * $tasaPago, 2);
         $netoAjustesBs = round($netoAjustes * $tasaPago, 2);
 
+        $montoPagoUsd = round((float) ($pago->monto ?? $detalles->sum('monto')), 2);
+        $totalPagoBs = round((float) ($pago->monto_bs ?? 0), 2);
+        if ($totalPagoBs <= 0 && $montoPagoUsd > 0 && $tasaPago > 0) {
+            $totalPagoBs = round($montoPagoUsd * $tasaPago, 2);
+        }
+
+        if ($totalPagoBs <= 0) {
+            $totalPagoBs = round(
+                $detalles->sum('monto_bs') +
+                $netoAjustesBs +
+                $detalles->sum(function ($detalle) {
+                    return (float) ($detalle['iva'] ?? 0);
+                }) -
+                $detalles->sum(function ($detalle) {
+                    return (float) ($detalle['retencion'] ?? 0);
+                }),
+                2
+            );
+        }
+
         $resumenCalculos = [
             'subtotal_bs' => round($detalles->sum('monto_bs') + $netoAjustesBs, 2),
             'exento_bs' => 0,
@@ -390,17 +410,7 @@ class PagosController extends Controller
             'retencion_bs' => round($detalles->sum(function ($detalle) {
                 return (float) ($detalle['retencion'] ?? 0);
             }), 2),
-            'total_bs' => round(
-                $detalles->sum('monto_bs') +
-                $netoAjustesBs +
-                $detalles->sum(function ($detalle) {
-                    return (float) ($detalle['iva'] ?? 0);
-                }) -
-                $detalles->sum(function ($detalle) {
-                    return (float) ($detalle['retencion'] ?? 0);
-                }),
-                2
-            ),
+            'total_bs' => $totalPagoBs,
             'tasa' => $tasaPago,
             'ajustes' => $detalles->filter(function ($detalle) {
                 return abs((float) ($detalle['ajustes_monto'] ?? 0)) > 0.001;

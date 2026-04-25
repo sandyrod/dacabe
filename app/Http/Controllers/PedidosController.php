@@ -10,7 +10,7 @@ use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 
 use App\Http\Requests\OrderInvenRequest;
-use App\Models\{Pedido, PedidoDetalle, OrderInven, OrderGrupo, OrderClient, Vendedor, Pago, Company, ArtDepos, PagoPedido, Tasa};
+use App\Models\{Pedido, PedidoDetalle, OrderInven, OrderGrupo, OrderClient, Vendedor, Pago, Company, ArtDepos, PagoPedido, Tasa, ClienteVendedor};
 use App\User;
 use App\Traits\PedidosTrait;
 use App\Jobs\SendEmailInvoice;
@@ -381,7 +381,7 @@ class PedidosController extends Controller
         */
 
         $url = 'https://santiscodes.com/send-whatsapp?to=' . $phone . '&template=' . $template . '&pedido_id=' . $pedido_id . '&cliente=' . $cliente;
-        $response = file_get_contents($url);
+        //$response = file_get_contents($url);
 
         /*
         return Response::json([
@@ -395,6 +395,8 @@ class PedidosController extends Controller
     {
         //if (! hasOrderPermission()) 
         //    abort(403);
+
+        $esClienteNuevo = $request->boolean('is_new_client');
 
         $pedido = (new Pedido)->searchPendingOrder();
         if (!$pedido) {
@@ -415,6 +417,22 @@ class PedidosController extends Controller
 
         $detalle = (new PedidoDetalle)->searchOrderDetail($pedido->id);
         if ($detalle) {
+            $alertaAsociacion = $this->getClienteAsociadoAOtroVendedor($request->rif, auth()->user()->email, $esClienteNuevo);
+
+            if ($alertaAsociacion) {
+                return Response::json([
+                    'type' => 'success',
+                    'title' => 'Pedido Guardado',
+                    'text' => 'Pedido Guardado...',
+                    'association_warning' => true,
+                    'alert_icon' => 'warning',
+                    'alert_title' => 'Atención',
+                    'alert_html' => '<div style="font-size:1rem;line-height:1.5"><strong>El cliente ingresado está asociado al vendedor:</strong><br><span style="display:inline-block;margin-top:8px;padding:6px 12px;border-radius:999px;background:#fff4e5;color:#7a4b00;font-weight:700">' . e($alertaAsociacion['nombre_vendedor']) . '</span></div>',
+                    'vendedor_asociado' => $alertaAsociacion['nombre_vendedor'],
+                    'email_vendedor_asociado' => $alertaAsociacion['email_vendedor'],
+                ], 200);
+            }
+
             return Response::json([
                 'type' => 'success',
                 'text' => 'Pedido Guardado...',
@@ -426,6 +444,52 @@ class PedidosController extends Controller
             'text' => 'Debe cargar productos al pedido...',
             'title' => 'Oopss!'
         ], 404);
+    }
+
+    private function getClienteAsociadoAOtroVendedor(?string $rif, ?string $emailVendedorActual, bool $esClienteNuevo = false): ?array
+    {
+        if (!$esClienteNuevo || !$rif || !$emailVendedorActual) {
+            return null;
+        }
+
+        $rifNormalizado = strtoupper(trim($rif));
+        $emailVendedorActual = strtolower(trim($emailVendedorActual));
+
+        if ($rifNormalizado === '' || $emailVendedorActual === '') {
+            return null;
+        }
+
+        $clienteExiste = (new OrderClient)
+            ->whereRaw('UPPER(RIF) = ?', [$rifNormalizado])
+            ->exists();
+
+        if (!$clienteExiste) {
+            return null;
+        }
+
+        $asociacion = ClienteVendedor::query()
+            ->whereRaw('UPPER(rif) = ?', [$rifNormalizado])
+            ->whereRaw('LOWER(email_vendedor) <> ?', [$emailVendedorActual])
+            ->orderBy('id', 'desc')
+            ->first();
+
+        if (!$asociacion) {
+            return null;
+        }
+
+        $usuarioVendedor = User::query()
+            ->whereRaw('LOWER(email) = ?', [strtolower($asociacion->email_vendedor)])
+            ->first(['name', 'last_name', 'email']);
+
+        $nombreVendedor = trim((string) ($usuarioVendedor->name ?? '') . ' ' . (string) ($usuarioVendedor->last_name ?? ''));
+        if ($nombreVendedor === '') {
+            $nombreVendedor = $asociacion->email_vendedor;
+        }
+
+        return [
+            'nombre_vendedor' => $nombreVendedor,
+            'email_vendedor' => $asociacion->email_vendedor,
+        ];
     }
 
     public function updateOrderProducts(Request $request)

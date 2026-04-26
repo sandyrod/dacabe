@@ -371,6 +371,7 @@
         let saveInvoice = () => {
             let factura = window.lleva_factura;
             let porc_retencion = window.porc_retencion;
+            let esClienteNuevo = !$('#search_client').val();
             
             $('#btn_send').prop('disabled', true);
             $('#btn_send').text('Procesando...');
@@ -397,6 +398,7 @@
                 formData.append('factura', factura);
                 formData.append('porc_retencion', porc_retencion);
                 formData.append('cliageret', cliageret);
+                formData.append('is_new_client', esClienteNuevo ? '1' : '0');
                 if (photo) {
                     formData.append('photo', photo); // Añade la imagen
                 }
@@ -410,14 +412,23 @@
                     dataType: 'json',
                     success: function(response) {
                         Livewire.emit('updateCarts');
+
+                        let title = (response && response.alert_title) ? response.alert_title : ((response && response.title) ? response.title : 'Genial!');
+                        let icon = (response && response.alert_icon) ? response.alert_icon : 'success';
+                        let html = (response && response.alert_html) ? response.alert_html : ((response && response.text) ? response.text : 'Pedido Guardado');
+
                         Swal.fire({
-                            title: 'Genial!',
-                            text: 'Pedido Guardado',
-                            icon: 'success'
+                            title: title,
+                            html: html,
+                            icon: icon,
+                            confirmButtonText: 'Aceptar',
+                            allowOutsideClick: false,
+                            allowEscapeKey: false
+                        }).then((result) => {
+                            if (!result || result.isConfirmed || result.value === true) {
+                                $(location).attr('href', URL_BACK);
+                            }
                         });
-                        setTimeout(function() {
-                            $(location).attr('href', URL_BACK);
-                        }, 1000);
                     },
                     error: function(xhr, status) {
                         console.log('error: ', xhr, status);

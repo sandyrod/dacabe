@@ -585,6 +585,14 @@
                                         title="Ver detalle del pago y comisiones">
                                         <i class="fas fa-eye me-1"></i> Detalle
                                     </button>
+                                    @if($p->comprobante_retencion)
+                                        <a href="{{ asset('storage/' . $p->comprobante_retencion) }}"
+                                            target="_blank"
+                                            class="btn-detail"
+                                            title="Ver comprobante de retención">
+                                            <i class="fas fa-eye me-1"></i> Comprobante
+                                        </a>
+                                    @endif
                                     <button type="button"
                                         class="btn-approve"
                                         data-id="{{ $p->id }}"

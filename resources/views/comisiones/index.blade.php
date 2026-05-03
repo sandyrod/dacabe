@@ -15,7 +15,7 @@
                             <input type="hidden" name="pago_id" id="editar_monto_pago_id">
                             <div class="modal-body p-4 bg-light">
                                 <div class="form-group">
-                                    <label class="font-weight-bold text-navy"><i class="fas fa-tag mr-1"></i> % Descuento aplicado al pedido</label>
+                                    <label class="font-weight-bold text-navy"><i class="fas fa-tag mr-1"></i> % Comisión aplicada</label>
                                     <div class="input-group">
                                         <input type="text" id="dcto_display" class="form-control" readonly
                                                style="background:#fff; font-weight:600; color:#495057;">
@@ -23,7 +23,7 @@
                                             <span class="input-group-text">%</span>
                                         </div>
                                     </div>
-                                    <small class="form-text text-muted">Descuento con que se calculó la comisión. Solo aplica para pagos en divisa ($).</small>
+                                    <small class="form-text text-muted">Porcentaje promedio de comisión usado para este pedido.</small>
                                 </div>
                                 <div class="form-group">
                                     <label class="font-weight-bold text-navy"><i class="fas fa-dollar-sign mr-1"></i> Nuevo Monto de Comisión ($)</label>
@@ -568,7 +568,7 @@
                                                                             class="btn btn-sm btn-warning btn-editar-monto"
                                                                             data-pedido-id="{{ $comision->pedido_id }}"
                                                                             data-monto="{{ $comision->total_comision }}"
-                                                                            data-descuento="{{ $comision->descuento_pedido ?? 0 }}"
+                                                                            data-porcentaje="{{ number_format((float)($comision->porcentaje_comision ?? 0), 2, '.', '') }}"
                                                                             data-moneda="{{ $comision->moneda_pago ?? '' }}"
                                                                             data-toggle="tooltip"
                                                                             title="Editar monto de comisión"
@@ -1946,17 +1946,15 @@
                 // --- Lógica para editar monto de comisión ---
                 $(document).on('click', '.btn-editar-monto', function(event) {
                     event.preventDefault();
-                    const pagoId   = $(this).data('pago-id');
+                    const pagoId   = $(this).data('pedido-id');
                     const monto    = $(this).data('monto');
-                    const descuento = parseFloat($(this).data('descuento')) || 0;
+                    const porcentaje = parseFloat($(this).data('porcentaje')) || 0;
                     const moneda   = $(this).data('moneda') || '';
 
                     $('#editar_monto_pago_id').val(pagoId);
                     $('#nuevo_monto_comision').val(monto);
 
-                    // Mostrar descuento solo si el pago fue en divisa ($)
-                    const esDivisa = moneda !== '' && moneda.toLowerCase() !== 'bolívares' && moneda.toLowerCase() !== 'bolivares';
-                    $('#dcto_display').val(esDivisa ? descuento : '0');
+                    $('#dcto_display').val(porcentaje.toFixed(2));
 
                     $('#modalEditarMonto').modal('show');
                 });
@@ -1965,7 +1963,12 @@
                     e.preventDefault();
                     const pagoId = $('#editar_monto_pago_id').val();
                     const nuevoMonto = $('#nuevo_monto_comision').val();
-                    const url = '{{ url('comisiones') }}/' + pagoId + '/editar-monto';
+                    if (!pagoId) {
+                        toastr.error('No se pudo identificar el pedido para actualizar el monto.');
+                        return;
+                    }
+                    const urlTemplate = "{{ route('comisiones.editar_monto', ['pedidoId' => '__ID__']) }}";
+                    const url = urlTemplate.replace('__ID__', encodeURIComponent(pagoId));
                     const submitBtn = $(this).find('button[type="submit"]');
                     submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Actualizando...');
 

@@ -30,6 +30,7 @@ class ComisionVendedorController extends Controller
             ->leftJoin(DB::raw('(SELECT 
                 pgd_sub.pedido_id,
                 SUM(cv.monto_comision) as total_comision,
+                AVG(cv.porcentaje_comision) as porcentaje_comision,
                 MIN(cv.estatus_comision) as estatus_comision,
                 cv.nombre_vendedor,
                 cv.correo_vendedor,
@@ -60,6 +61,7 @@ class ComisionVendedorController extends Controller
                 'comision_agrupada.nombre_vendedor',
                 'comision_agrupada.correo_vendedor',
                 'comision_agrupada.total_comision',
+                'comision_agrupada.porcentaje_comision',
                 'comision_agrupada.estatus_comision',
                 'comision_agrupada.recibido',
                 'pd_count.total_productos as cantidad_productos',
@@ -72,7 +74,7 @@ class ComisionVendedorController extends Controller
                     ELSE "SIN PAGO REGISTRADO"
                 END as moneda_pago')
             )
-            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
+            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.porcentaje_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
 
         // Filtros
         if ($request->has('vendedor') && $request->vendedor) {
@@ -276,18 +278,24 @@ class ComisionVendedorController extends Controller
     }
 
     /**
-     * Actualiza el monto de comisión (total) para un pago_id.
+     * Actualiza el monto total de comisión para un pedido_id.
      */
-    public function updateMontoComision(Request $request, $pagoId)
+    public function updateMontoComision(Request $request, $pedidoId)
     {
         $request->validate([
             'nuevo_monto' => 'required|numeric|min:0',
         ]);
 
-        // Obtener todas las comisiones de ese pago_id
-        $comisiones = \App\Models\ComisionVendedor::where('pago_id', $pagoId)->get();
+        // Resolver los pagos del pedido y actualizar sus comisiones asociadas.
+        $pagoIds = DB::connection('company')
+            ->table('pago_grupo_detalles')
+            ->where('pedido_id', $pedidoId)
+            ->pluck('id');
+
+        $comisiones = \App\Models\ComisionVendedor::whereIn('pago_id', $pagoIds)->get();
+
         if ($comisiones->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No se encontraron comisiones para este pago.']);
+            return response()->json(['success' => false, 'message' => 'No se encontraron comisiones para este pedido.']);
         }
 
         // Repartir el nuevo monto proporcionalmente según el monto original de cada registro

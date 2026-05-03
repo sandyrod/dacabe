@@ -84,7 +84,8 @@ class PedidoEditorController extends Controller
             return back()->withErrors(['vendedor_id' => 'El vendedor no tiene usuario asociado.'])->withInput();
         }
 
-        $sellerNombre = trim((string) (($sellerUser->name ?? '') . ' ' . ($sellerUser->last_name ?? '')));
+        //$sellerNombre = trim((string) (($sellerUser->name ?? '') . ' ' . ($sellerUser->last_name ?? '')));
+        $sellerNombre = trim((string) (($sellerUser->name ?? '')));
         if ($sellerNombre === '') {
             $sellerNombre = (string) $vendedor->codigo;
         }
@@ -180,7 +181,7 @@ class PedidoEditorController extends Controller
             return back()->withErrors(['vendedor_id' => 'El vendedor no tiene usuario asociado.'])->withInput();
         }
 
-        $sellerNombre = trim((string) (($sellerUser->name ?? '') . ' ' . ($sellerUser->last_name ?? '')));
+        $sellerNombre = trim((string) (($sellerUser->name ?? '')));
         if ($sellerNombre === '') {
             $sellerNombre = (string) $vendedor->codigo;
         }

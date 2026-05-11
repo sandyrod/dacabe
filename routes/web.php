@@ -401,6 +401,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::get('retenciones', 'Admin\RetencionController@index')->name('admin.retenciones.index');
     Route::get('retenciones/{pedido}/detalle', 'Admin\RetencionController@detalle')->name('admin.retenciones.detalle');
     Route::post('retenciones/{pedido}/aprobar', 'Admin\RetencionController@aprobar')->name('admin.retenciones.aprobar');
+    Route::post('retenciones/{pedido}/rechazar', 'Admin\RetencionController@rechazar')->name('admin.retenciones.rechazar');
 
     // Configuración de bultos por producto
     Route::get('producto-bultos', 'Admin\ProductoBultoController@index')->name('admin.producto_bultos.index');

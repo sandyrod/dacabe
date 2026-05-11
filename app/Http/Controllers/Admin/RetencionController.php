@@ -203,4 +203,26 @@ class RetencionController extends Controller
 
         return response()->json(['success' => true, 'message' => $message, 'pagado' => isset($update['estatus'])]);
     }
+
+    public function rechazar($pedidoId)
+    {
+        $pedido = Pedido::on('company')->findOrFail($pedidoId);
+
+        if (!$pedido->comprobante_retencion) {
+            return response()->json(['error' => 'Este pedido no tiene comprobante de retención cargado'], 422);
+        }
+
+        DB::connection('company')
+            ->table('pedidos')
+            ->where('id', $pedidoId)
+            ->update([
+                'comprobante_retencion' => null,
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comprobante rechazado. Se limpió el archivo asociado al pedido.',
+        ]);
+    }
 }

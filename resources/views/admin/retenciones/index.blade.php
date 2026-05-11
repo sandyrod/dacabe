@@ -141,6 +141,12 @@
         transition: all .2s;
     }
     .btn-approve:hover { background: var(--ret-success); color: #fff; }
+    .btn-reject {
+        border: 1.5px solid #dc2626; color: #dc2626; background: transparent;
+        border-radius: 8px; padding: 5px 12px; font-size: 12px; font-weight: 600;
+        transition: all .2s;
+    }
+    .btn-reject:hover { background: #dc2626; color: #fff; }
 
     /* ── Fila comprobante listo por validar ── */
     .row-comprobante-listo {
@@ -602,6 +608,16 @@
                                         title="Validar comprobante de retención recibido">
                                         <i class="fas fa-stamp me-1"></i> Validar
                                     </button>
+                                    @if($p->comprobante_retencion)
+                                        <button type="button"
+                                            class="btn-reject"
+                                            data-id="{{ $p->id }}"
+                                            data-cliente="{{ addslashes($p->cliente) }}"
+                                            onclick="rechazarRetencion(this.dataset.id, this.dataset.cliente)"
+                                            title="Rechazar comprobante y limpiar archivo cargado">
+                                            <i class="fas fa-ban me-1"></i> Rechazar
+                                        </button>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -655,6 +671,7 @@
 const CSRF = '{{ csrf_token() }}';
 const URL_DETALLE  = "{{ url('admin/retenciones') }}/";
 const URL_APROBAR  = "{{ url('admin/retenciones') }}/";
+const URL_RECHAZAR = "{{ url('admin/retenciones') }}/";
 const STORAGE_URL  = "{{ asset('storage') }}";
 
 function formatBS(v) {
@@ -871,6 +888,50 @@ function aprobarRetencion(pedidoId, cliente, montoStr) {
             if (data.success) {
                 Swal.fire({
                     title: '¡Validado!',
+                    text: data.message,
+                    icon: 'success',
+                    confirmButtonColor: '#16a34a',
+                }).then(() => window.location.reload());
+            } else {
+                Swal.fire('Error', data.error || 'No se pudo procesar la solicitud.', 'error');
+            }
+        })
+        .catch(() => Swal.fire('Error', 'Error de conexión. Intente nuevamente.', 'error'));
+    });
+}
+
+function rechazarRetencion(pedidoId, cliente) {
+    Swal.fire({
+        title: 'Rechazar comprobante',
+        html: `
+            <p style="color:#475569; margin-bottom:14px;">
+                Vas a rechazar el comprobante de retención del pedido
+                <strong>#${pedidoId}</strong> — <em>${cliente}</em>.
+            </p>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:12px; margin-bottom:8px; color:#991b1b; font-size:13px;">
+                Esta acción limpiará el campo de comprobante en el pedido. El vendedor deberá volver a cargarlo.
+            </div>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fas fa-ban me-2"></i>Sí, rechazar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#64748b',
+        reverseButtons: true,
+        focusCancel: true,
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        fetch(URL_RECHAZAR + pedidoId + '/rechazar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            body: JSON.stringify({}),
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({
+                    title: 'Comprobante rechazado',
                     text: data.message,
                     icon: 'success',
                     confirmButtonColor: '#16a34a',

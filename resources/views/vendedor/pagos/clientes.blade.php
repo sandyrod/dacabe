@@ -1004,6 +1004,28 @@
 
                         const pedidosConRetencionPendiente = [];
 
+                        function buildRetencionButtonHtml(pedido, compact = false) {
+                            const comprobanteActual = pedido && pedido.comprobante_retencion
+                                ? encodeURIComponent(String(pedido.comprobante_retencion))
+                                : '';
+                            const etiquetaBoton = pedido && pedido.comprobante_retencion
+                                ? 'Actualizar comprobante'
+                                : 'Subir comprobante';
+                            const estilo = compact
+                                ? 'border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;'
+                                : 'font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;';
+                            const clases = compact ? 'btn btn-sm js-abrir-modal-retencion' : 'btn btn-sm mt-1 js-abrir-modal-retencion';
+
+                            return `<button type="button"
+                                class="${clases}"
+                                style="${estilo}"
+                                data-pedido-id="${pedido.id}"
+                                data-pedido-num="${pedido.numero}"
+                                data-comprobante="${comprobanteActual}">
+                                <i class="fas fa-upload me-1"></i>${etiquetaBoton}
+                            </button>`;
+                        }
+
                         pedidos.forEach((pedido, index) => {
                             const saldoBase = parseFloat(pedido.saldo_base) || 0;
                             const saldoIvaBs = parseFloat(pedido.saldo_iva_bs) || 0;
@@ -1093,7 +1115,7 @@
                                     <td class="text-end" data-label="IVA (Bs.)">
                                          <span class="fw-bold ${tieneRetencionPendiente ? 'text-warning' : 'text-success'}">${formatBS(pedido.saldo_iva_bs)}</span>
                                          ${tieneRetencionPendiente ? '<br><small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Retención pendiente</small>' : ''}
-                                         ${tieneRetencionPendiente ? `<br><button type="button" class="btn btn-sm mt-1" style="font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;" onclick="abrirModalSubirRetencion(${pedido.id}, ${pedido.numero}, ${JSON.stringify(pedido.comprobante_retencion || null)})"><i class="fas fa-upload me-1"></i>${pedido.comprobante_retencion ? 'Actualizar comprobante' : 'Subir comprobante'}</button>` : ''}
+                                         ${tieneRetencionPendiente ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
                                     </td>
                                 </tr>
                             `);
@@ -1107,18 +1129,13 @@
 
                             const ordenesHtml = pedidosConRetencionPendiente.map(p => {
                                 const tieneComprobante = p.comprobante_retencion && p.comprobante_retencion !== 'null';
-                                const btnLabel = tieneComprobante ? 'Actualizar comprobante' : 'Subir comprobante';
                                 const badge = tieneComprobante
                                     ? `<span style="font-size:11px;color:#16a34a;font-weight:700;margin-right:8px;"><i class="fas fa-check-circle me-1"></i>Cargado</span>`
                                     : '';
                                 return `
                                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:8px;flex-wrap:wrap;gap:6px;">
                                         <span style="font-size:13px;color:#92400e;font-weight:600;">Pedido #${p.numero} — Bs. ${formatBS(p.saldo_iva_bs)} ${badge}</span>
-                                        <button type="button"
-                                            style="border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;"
-                                            onclick="abrirModalSubirRetencion(${p.id}, ${p.numero}, ${JSON.stringify(p.comprobante_retencion || null)})">
-                                            <i class="fas fa-upload me-1"></i>${btnLabel}
-                                        </button>
+                                        ${buildRetencionButtonHtml(p, true)}
                                     </div>`;
                             }).join('');
 
@@ -1380,6 +1397,15 @@
 
                 // ── Comprobante de retención ─────────────────────────────────────────
                 let pedidoRetencionActual = null;
+
+                $(document).on('click', '.js-abrir-modal-retencion', function() {
+                    const pedidoId = $(this).data('pedido-id');
+                    const pedidoNum = $(this).data('pedido-num');
+                    const comprobanteCodificado = $(this).attr('data-comprobante') || '';
+                    const comprobanteActual = comprobanteCodificado ? decodeURIComponent(comprobanteCodificado) : null;
+
+                    abrirModalSubirRetencion(pedidoId, pedidoNum, comprobanteActual);
+                });
 
                 function abrirModalSubirRetencion(pedidoId, pedidoNum, comprobanteActual) {
                     pedidoRetencionActual = pedidoId;

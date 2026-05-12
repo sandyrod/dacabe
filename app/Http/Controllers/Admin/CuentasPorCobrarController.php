@@ -15,6 +15,14 @@ class CuentasPorCobrarController extends Controller
         $companyDb = DB::connection('company')->getDatabaseName();
         $mysqlDb = config('database.connections.mysql.database');
         $tasaDelDia = (float) (optional(Tasa::whereDate('fecha', Carbon::today()->toDateString())->first())->valor ?? 0);
+        $tasaSql = $tasaDelDia > 0 ? $tasaDelDia : 0;
+
+        $exprSaldoBaseBs = 'COALESCE(p.saldo_base, 0) * ' . $tasaSql;
+        $exprSaldoAjustesBs = 'COALESCE(p.saldo_ajustes, 0) * ' . $tasaSql;
+        $exprSaldoTotalBs = '(' . $exprSaldoBaseBs . ' + COALESCE(p.saldo_iva_bs, 0) + ' . $exprSaldoAjustesBs . ')';
+        $exprSaldoTotalUsd = $tasaSql > 0
+            ? '(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_ajustes, 0) + (COALESCE(p.saldo_iva_bs, 0) / ' . $tasaSql . '))'
+            : '(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_ajustes, 0))';
 
         $baseQuery = DB::connection('company')
             ->table(DB::raw($companyDb . '.pedidos as p'))
@@ -77,10 +85,13 @@ class CuentasPorCobrarController extends Controller
 
         $resumen = (clone $statsBase)
             ->selectRaw('COUNT(*) as total_pedidos')
-            ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_base, 0)), 0) as total_saldo_base')
+            ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_base, 0)), 0) as total_saldo_base_usd')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoBaseBs . '), 0) as total_saldo_base_bs')
             ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_iva_bs, 0)), 0) as total_saldo_iva')
-            ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_ajustes, 0)), 0) as total_saldo_ajustes')
-            ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)), 0) as total_cartera')
+            ->selectRaw('COALESCE(SUM(COALESCE(p.saldo_ajustes, 0)), 0) as total_saldo_ajustes_usd')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoAjustesBs . '), 0) as total_saldo_ajustes_bs')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoTotalUsd . '), 0) as total_cartera_usd')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoTotalBs . '), 0) as total_cartera_bs')
             ->first();
 
         $vencidosCount = (clone $statsBase)
@@ -117,14 +128,15 @@ class CuentasPorCobrarController extends Controller
             END as codigo_vendedor")
             ->selectRaw('COALESCE(u.name, "Sin asignar") as vendedor_nombre')
             ->selectRaw('COUNT(*) as pedidos_pendientes')
-            ->selectRaw('SUM(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)) as saldo_total')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoTotalUsd . '), 0) as saldo_total_usd')
+            ->selectRaw('COALESCE(SUM(' . $exprSaldoTotalBs . '), 0) as saldo_total_bs')
             ->groupByRaw("CASE
                 WHEN p.seller_code IS NULL OR CHAR_LENGTH(TRIM(p.seller_code)) = 0
                 THEN _utf8mb4'SIN COD' COLLATE utf8mb4_unicode_ci
                 ELSE CONVERT(p.seller_code USING utf8mb4) COLLATE utf8mb4_unicode_ci
             END")
             ->groupByRaw('COALESCE(u.name, "Sin asignar")')
-            ->orderByDesc('saldo_total')
+            ->orderByDesc('saldo_total_bs')
             ->limit(5)
             ->get();
 
@@ -149,11 +161,14 @@ class CuentasPorCobrarController extends Controller
                 'p.saldo_base',
                 'p.saldo_iva_bs',
                 'p.saldo_ajustes',
+                DB::raw($exprSaldoBaseBs . ' as saldo_base_bs'),
+                DB::raw($exprSaldoAjustesBs . ' as saldo_ajustes_bs'),
                 DB::raw('pf.factura_numero as numero_factura'),
                 DB::raw('COALESCE(u.name, "Sin asignar") as vendedor_nombre'),
                 DB::raw('COALESCE(v.email, "") as vendedor_email'),
                 DB::raw('"N/A" as deposito_nombre'),
-                DB::raw('(COALESCE(p.saldo_base, 0) + COALESCE(p.saldo_iva_bs, 0) + COALESCE(p.saldo_ajustes, 0)) as saldo_total'),
+                DB::raw($exprSaldoTotalUsd . ' as saldo_total_usd'),
+                DB::raw($exprSaldoTotalBs . ' as saldo_total_bs'),
                 DB::raw('CASE
                     WHEN COALESCE(p.dias_credito, 0) > 0
                     THEN DATE_ADD(p.fecha_despacho, INTERVAL p.dias_credito DAY)

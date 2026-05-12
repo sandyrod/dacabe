@@ -148,16 +148,18 @@
     }
 
     .cxr-amount {
-        font-weight: 700;
-        color: #122b45;
+        font-weight: 400;
+        color: #888;
+        font-size: 0.85rem;
         white-space: nowrap;
     }
 
     .cxr-amount-usd {
         display: block;
-        font-size: 0.76rem;
-        color: #5e6b78;
-        font-weight: 600;
+        font-size: 1.15rem;
+        color: #1ca14b;
+        font-weight: 800;
+        line-height: 1.1;
     }
 
     .cxr-status {
@@ -299,6 +301,9 @@
         }
         return '$ ' . number_format(((float) $value) / $tasa, 2, ',', '.');
     };
+    $fmtUsdDirect = function ($value) {
+        return '$ ' . number_format((float) $value, 2, ',', '.');
+    };
     $statusClass = function ($estatus) {
         $value = strtoupper(trim((string) $estatus));
         if (strpos($value, 'REV') !== false) return 'cxr-status-revision';
@@ -326,9 +331,9 @@
                 </div>
                 <div style="font-size:.78rem; text-transform:uppercase; letter-spacing:1px; opacity:.8;">Cartera Total</div>
                 <div style="font-size:2rem; font-weight:800; line-height:1.1;">
-                    {{ $fmtBs($resumen->total_cartera ?? 0) }}
+                    {{ $fmtBs($resumen->total_cartera_bs ?? 0) }}
                 </div>
-                <div style="font-size:.9rem; opacity:.9;">{{ $fmtUsd($resumen->total_cartera ?? 0) }}</div>
+                <div style="font-size:.9rem; opacity:.9;">{{ $fmtUsdDirect($resumen->total_cartera_usd ?? 0) }}</div>
                 <small style="opacity:.85;">{{ number_format((int) ($resumen->total_pedidos ?? 0)) }} pedidos en cartera</small>
             </div>
         </div>
@@ -338,22 +343,22 @@
         <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-base">
                 <div class="cxr-kpi-title">Saldo Base</div>
-                <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_base ?? 0) }}</div>
-                <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_base ?? 0) }}</div>
+                <div class="cxr-kpi-value" style="color:#1ca14b; font-size:2rem;">{{ $fmtUsdDirect($resumen->total_saldo_base_usd ?? 0) }}</div>
+                <div class="cxr-kpi-sub" style="color:#888; font-size:1rem;">{{ $fmtBs($resumen->total_saldo_base_bs ?? 0) }}</div>
             </div>
         </div>
         <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-iva">
                 <div class="cxr-kpi-title">Saldo IVA</div>
-                <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_iva ?? 0) }}</div>
-                <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_iva ?? 0) }}</div>
+                <div class="cxr-kpi-value" style="color:#1ca14b; font-size:2rem;">{{ $fmtUsd($resumen->total_saldo_iva ?? 0) }}</div>
+                <div class="cxr-kpi-sub" style="color:#888; font-size:1rem;">{{ $fmtBs($resumen->total_saldo_iva ?? 0) }}</div>
             </div>
         </div>
         <div class="col-xl-2 col-md-4 col-6 mb-3">
             <div class="cxr-kpi cxr-kpi-ajustes">
                 <div class="cxr-kpi-title">Saldo Ajustes</div>
-                <div class="cxr-kpi-value">{{ $fmtBs($resumen->total_saldo_ajustes ?? 0) }}</div>
-                <div class="cxr-kpi-sub">{{ $fmtUsd($resumen->total_saldo_ajustes ?? 0) }}</div>
+                <div class="cxr-kpi-value" style="color:#1ca14b; font-size:2rem;">{{ $fmtUsdDirect($resumen->total_saldo_ajustes_usd ?? 0) }}</div>
+                <div class="cxr-kpi-sub" style="color:#888; font-size:1rem;">{{ $fmtBs($resumen->total_saldo_ajustes_bs ?? 0) }}</div>
             </div>
         </div>
         <div class="col-xl-2 col-md-4 col-6 mb-3">
@@ -397,28 +402,17 @@
                                 <label>Buscar</label>
                                 <input type="text" name="search" value="{{ request('search') }}" class="form-control" placeholder="Pedido, cliente, rif...">
                             </div>
-                            <div class="form-group col-lg-3 col-md-6">
+                            <div class="form-group col-lg-6 col-md-6">
                                 <label>Vendedor</label>
                                 <select name="vendedor" class="form-control">
                                     <option value="">Todos</option>
                                     @foreach($vendedores as $vendedor)
                                         <option value="{{ trim((string) $vendedor->codigo) }}" {{ $selectedVendedor === trim((string) $vendedor->codigo) ? 'selected' : '' }}>
-                                            {{ $vendedor->codigo }} - {{ $vendedor->nombre }}
-                                        </option>
+                                            {{ $vendedor->codigo }}
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="form-group col-lg-3 col-md-6">
-                                <label>Estatus</label>
-                                <select name="estatus" class="form-control">
-                                    <option value="">Todos</option>
-                                    @foreach($estatuses as $estatus)
-                                        <option value="{{ $estatus }}" {{ request('estatus') == $estatus ? 'selected' : '' }}>
-                                            {{ $estatus }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
+                            <!-- Estatus filter removed -->
                         </div>
                         <div class="form-row">
                             <div class="form-group col-lg-3 col-md-4">
@@ -468,8 +462,8 @@
                                     <small class="text-muted">{{ number_format((int) $item->pedidos_pendientes) }} pedidos pendientes</small>
                                 </div>
                                 <div class="text-right">
-                                    <div class="font-weight-bold">{{ $fmtBs($item->saldo_total) }}</div>
-                                    <small class="text-muted">{{ $fmtUsd($item->saldo_total) }}</small>
+                                    <div class="font-weight-bold" style="color:#1ca14b; font-size:1.15rem;">{{ $fmtUsdDirect($item->saldo_total_usd) }}</div>
+                                    <small class="text-muted" style="color:#888; font-size:0.95rem;">{{ $fmtBs($item->saldo_total_bs) }}</small>
                                 </div>
                             </div>
                         </div>
@@ -512,7 +506,7 @@
                         <th class="text-right">Saldo IVA</th>
                         <th class="text-right">Saldo Ajustes</th>
                         <th class="text-right">Saldo Total</th>
-                        <th>Estatus</th>
+                        <!-- Estatus column removed -->
                         <th>Accion</th>
                     </tr>
                 </thead>
@@ -569,13 +563,23 @@
                                     <small class="text-muted">{{ $pedido->vendedor_nombre }}</small>
                                 @endif
                             </td>
-                            <td class="text-right cxr-amount">{{ $fmtBs($pedido->saldo_base) }}<span class="cxr-amount-usd">{{ $fmtUsd($pedido->saldo_base) }}</span></td>
-                            <td class="text-right cxr-amount">{{ $fmtBs($pedido->saldo_iva_bs) }}<span class="cxr-amount-usd">{{ $fmtUsd($pedido->saldo_iva_bs) }}</span></td>
-                            <td class="text-right cxr-amount">{{ $fmtBs($pedido->saldo_ajustes) }}<span class="cxr-amount-usd">{{ $fmtUsd($pedido->saldo_ajustes) }}</span></td>
-                            <td class="text-right cxr-amount">{{ $fmtBs($pedido->saldo_total) }}<span class="cxr-amount-usd">{{ $fmtUsd($pedido->saldo_total) }}</span></td>
-                            <td>
-                                <span class="cxr-status {{ $statusClass($pedido->estatus) }}">{{ $pedido->estatus }}</span>
+                            <td class="text-right">
+                                <span class="cxr-amount-usd">{{ $fmtUsdDirect($pedido->saldo_base) }}</span>
+                                <span class="cxr-amount">{{ $fmtBs($pedido->saldo_base_bs) }}</span>
                             </td>
+                            <td class="text-right">
+                                <span class="cxr-amount-usd">{{ $fmtUsd($pedido->saldo_iva_bs) }}</span>
+                                <span class="cxr-amount">{{ $fmtBs($pedido->saldo_iva_bs) }}</span>
+                            </td>
+                            <td class="text-right">
+                                <span class="cxr-amount-usd">{{ $fmtUsdDirect($pedido->saldo_ajustes) }}</span>
+                                <span class="cxr-amount">{{ $fmtBs($pedido->saldo_ajustes_bs) }}</span>
+                            </td>
+                            <td class="text-right">
+                                <span class="cxr-amount-usd">{{ $fmtUsdDirect($pedido->saldo_total_usd) }}</span>
+                                <span class="cxr-amount">{{ $fmtBs($pedido->saldo_total_bs) }}</span>
+                            </td>
+                            <!-- Estatus cell removed -->
                             <td>
                                 <button type="button" class="btn btn-outline-primary btn-xs js-cxr-trazabilidad" title="Ver trazabilidad" data-pedido-id="{{ $pedido->id }}">
                                     <i class="fas fa-project-diagram"></i>

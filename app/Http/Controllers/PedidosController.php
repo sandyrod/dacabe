@@ -361,6 +361,31 @@ class PedidosController extends Controller
         ], 200);
     }
 
+    public function validateClientAssociation(Request $request)
+    {
+        $rif = (string) $request->rif;
+        $esClienteNuevo = $request->boolean('is_new_client', true);
+
+        $alertaAsociacion = $this->getClienteAsociadoAOtroVendedor($rif, auth()->user()->email, $esClienteNuevo);
+
+        if ($alertaAsociacion) {
+            return Response::json([
+                'type' => 'success',
+                'association_warning' => true,
+                'alert_icon' => 'warning',
+                'alert_title' => 'Atención',
+                'alert_html' => '<div style="font-size:1rem;line-height:1.5"><strong>El cliente ingresado está asociado al vendedor:</strong><br><span style="display:inline-block;margin-top:8px;padding:6px 12px;border-radius:999px;background:#fff4e5;color:#7a4b00;font-weight:700">' . e($alertaAsociacion['nombre_vendedor']) . '</span></div>',
+                'vendedor_asociado' => $alertaAsociacion['nombre_vendedor'],
+                'email_vendedor_asociado' => $alertaAsociacion['email_vendedor'],
+            ], 200);
+        }
+
+        return Response::json([
+            'type' => 'success',
+            'association_warning' => false,
+        ], 200);
+    }
+
     public function dropOrder(Request $request)
     {
         //if (! hasOrderPermission()) 

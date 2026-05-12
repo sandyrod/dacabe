@@ -45,6 +45,12 @@
                             </div>
                             <div class="col-12">
                                 <div class="form-group">
+                                    <div class="mb-2 px-3 py-2" style="border-left:4px solid #17a2b8;background:linear-gradient(90deg,#eef9fc 0%,#f8fdff 100%);border-radius:8px;">
+                                        <small style="display:block;color:#0b5f6d;font-weight:600;line-height:1.45;">
+                                            <i class="fas fa-info-circle mr-1"></i>
+                                            Ingrese el RIF en formato <strong>J-12345678-9</strong> y luego haga click en <strong>Buscar</strong> para validar el cliente.
+                                        </small>
+                                    </div>
                                     {{ Form::label('rif', 'RIF', ['class' => 'control-label']) }}
                                     <div class="input-group input-group">
                                         {!! Form::text('rif', @$pedido->rif, [
@@ -53,11 +59,11 @@
                                             'required',
                                             'id' => 'rif',
                                         ]) !!}
-                                        <span class="input-group-append hint--top" aria-label="Crear nuevo">
+                                        <span class="input-group-append hint--top d-none" aria-label="Crear nuevo">
                                             <button id="btn_new" type="button" class="btn btn-info btn-flat"><i
                                                     class="fa fa-plus"></i></button>
                                         </span>
-                                        <span class="input-group-append hint--top" aria-label="Buscar en SENIAT">
+                                        <span class="input-group-append hint--top" aria-label="Buscar cliente y validar asociación">
                                             <button id="btn_search" type="button" class="btn btn-success btn-flat"><i
                                                     class="fa fa-search"></i></button>
                                         </span>

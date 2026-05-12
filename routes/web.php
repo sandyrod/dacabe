@@ -320,6 +320,8 @@ Route::get('view-cart', ['as' => 'view-cart', 'uses' => 'PedidosController@viewC
 Route::get('view-order/{order_id?}', ['as' => 'view-order', 'uses' => 'PedidosController@viewOrder']);
 Route::post('modify-qty', ['as' => 'modify-qty', 'uses' => 'PedidosController@modifyQty']);
 Route::post('delete-item', ['as' => 'delete-item', 'uses' => 'PedidosController@deleteItem']);
+Route::post('search-client', ['as' => 'search-client', 'uses' => 'PedidosController@searchClient']);
+Route::post('validate-client-association', ['as' => 'validate-client-association', 'uses' => 'PedidosController@validateClientAssociation']);
 Route::post('save-order', ['as' => 'save-order', 'uses' => 'PedidosController@saveOrder']);
 Route::post('update-order-products', ['as' => 'update-order-products', 'uses' => 'PedidosController@updateOrderProducts']);
 Route::get('get-seller-balance/{seller_id?}', ['as' => 'get-seller-balance', 'uses' => 'PedidosController@getSellerBalance']);

@@ -8,7 +8,7 @@
         const URL_PHOTO = '{{ url('store-inven-photo') }}';
         const URL_PRODUCTS = '{{ url('get-order-inven') }}';
         const URL_SEARCH_CLIENT = '{{ url('search-client') }}';
-        const URL_SEARCH_CLIENT_SENIAT = '{{ url('consulta-cliente-seniat') }}';
+        const URL_VALIDATE_CLIENT_ASSOCIATION = '{{ url('validate-client-association') }}';
         const URL_ADDCART = '{{ url('add-to-cart') }}';
         const URL_MODIFY_QTY = '{{ url('modify-qty') }}';
         const URL_DELETE_ITEM = '{{ url('delete-item') }}';
@@ -18,6 +18,23 @@
         let table_id = 'dynamic-table';
         const clients = @json(@$clients);
         let all_inven = null;
+        let lastAssociationWarningRif = null;
+        const BTN_SEARCH_DEFAULT_HTML = '<i class="fa fa-search"></i>';
+
+        let setSearchButtonLoading = (isLoading) => {
+            const $btn = $('#btn_search');
+            if (!$btn.length) {
+                return;
+            }
+
+            if (isLoading) {
+                $btn.prop('disabled', true);
+                $btn.html('<i class="fa fa-spinner fa-spin"></i>');
+            } else {
+                $btn.prop('disabled', false);
+                $btn.html(BTN_SEARCH_DEFAULT_HTML);
+            }
+        };
 
         let init_datatable = () => {
             return {
@@ -250,13 +267,6 @@
                 complete: function(response) {}
             });
         }
-        /*
-        $('#rif').on('blur', function() {
-            let rif = $(this).val();
-            searchByRif(rif);
-        });
-        */
-
         $('#btn_new').on('click', function() {
             $('#search_client').val(null);
             $('#search_client').trigger('change');
@@ -271,56 +281,53 @@
             $('#div_foto_rif').show();
         });
 
-        $('#btn_search').on('click', function() {
-            let rif = $('#rif').val();
-            if (rif) {
-                // Mostrar modal y cargar el contenido de la URL SENIAT
-                // Si la modal no existe, créala dinámicamente
-                if ($('#modal_seniat').length === 0) {
-                    $('body').append(`
-                    <div class="modal fade" id="modal_seniat" tabindex="-1" role="dialog" aria-labelledby="modalSeniatLabel" aria-hidden="true">
-                        <div class="modal-dialog modal-lg" role="document">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title" id="modalSeniatLabel">Información SENIAT</h5>
-                                    <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
-                                        <span aria-hidden="true">&times;</span>
-                                    </button>
-                                </div>
-                                <div class="modal-body">
-                                    <div class="text-center"><i class="fa fa-spinner fa-spin"></i> Cargando información...</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `);
-                }
-                $('#modal_seniat .modal-body').html(
-                    '<div class="text-center"><i class="fa fa-spinner fa-spin"></i> Cargando información...</div>'
-                );
-                $('#modal_seniat').modal('show');
-                $.ajax({
-                    url: URL_SEARCH_CLIENT_SENIAT,
-                    type: 'POST',
-                    data: {
-                        _token: TOKEN,
-                        rif: rif
-                    },
-                    success: function(response) {
-                        console.log(response);
-                        // Mostrar el contenido HTML recibido en la modal
-                        $('#modal_seniat .modal-body').html(response.html);
-                    },
-                    error: function(xhr, status, error) {
-                        $('#modal_seniat .modal-body').html(
-                            '<div class="alert alert-danger">No se pudo cargar la información del SENIAT.</div>'
-                        );
+        let validateClientAssociationWarning = (rif) => {
+            if (!rif) {
+                return;
+            }
+
+            const esClienteNuevo = !$('#search_client').val();
+            $.ajax({
+                url: URL_VALIDATE_CLIENT_ASSOCIATION,
+                type: 'POST',
+                data: {
+                    _token: TOKEN,
+                    rif: rif,
+                    is_new_client: esClienteNuevo ? 1 : 0
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response && response.association_warning) {
+                        const rifNormalizado = (rif || '').toString().trim().toUpperCase();
+                        if (rifNormalizado !== '' && rifNormalizado === lastAssociationWarningRif) {
+                            return;
+                        }
+
+                        lastAssociationWarningRif = rifNormalizado;
+                        Swal.fire({
+                            title: response.alert_title || 'Atención',
+                            html: response.alert_html || 'El cliente ingresado está asociado a otro vendedor.',
+                            icon: response.alert_icon || 'warning',
+                            confirmButtonText: 'Aceptar'
+                        });
+                    } else {
+                        lastAssociationWarningRif = null;
                     }
-                });
+                }
+            });
+        };
+
+        $('#btn_search').on('click', function() {
+            let rif = ($('#rif').val() || '').trim();
+            if (rif) {
+                setSearchButtonLoading(true);
+                searchByRif(rif, true);
+            } else {
+                Swal.fire('Atención', 'Debe ingresar un RIF en formato J-12345678-9 antes de buscar.', 'info');
             }
         });
 
-        let searchByRif = (rif) => {
+        let searchByRif = (rif, validateAssociation = false) => {
             if (rif) {
                 $('#descripcion').val('');
                 $.ajax({
@@ -348,6 +355,9 @@
                                 $('#email').attr('readonly', false);
                             }
                             $('#div_foto_rif').hide();
+                            if (validateAssociation) {
+                                validateClientAssociationWarning(rif);
+                            }
                         } else {
                             Swal.fire("Oops!",
                                 "RIF No encontrado! Si desea solicitar la creación de un nuevo Cliente debe completar toda la información a continuación...",
@@ -359,10 +369,14 @@
                             $('#telefono').attr('readonly', false);
                             $('#email').attr('readonly', false);
                             $('#div_foto_rif').show();
+                            lastAssociationWarningRif = null;
                         }
                     },
                     error: function(xhr, status, error) {
                         console.log('error: ', xhr, status);
+                    },
+                    complete: function() {
+                        setSearchButtonLoading(false);
                     }
                 });
             }
@@ -413,9 +427,9 @@
                     success: function(response) {
                         Livewire.emit('updateCarts');
 
-                        let title = (response && response.alert_title) ? response.alert_title : ((response && response.title) ? response.title : 'Genial!');
-                        let icon = (response && response.alert_icon) ? response.alert_icon : 'success';
-                        let html = (response && response.alert_html) ? response.alert_html : ((response && response.text) ? response.text : 'Pedido Guardado');
+                        let title = (response && response.title) ? response.title : 'Genial!';
+                        let icon = 'success';
+                        let html = (response && response.text) ? response.text : 'Pedido Guardado';
 
                         Swal.fire({
                             title: title,
@@ -736,6 +750,7 @@
                     return false;
                 }
             });
+
             $('#search_client').on('change', function() {
                 let selectedClientId = $(this).val();
                 let selectedClient = clients.find(client => client.RIF == selectedClientId);

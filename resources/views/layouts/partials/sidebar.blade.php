@@ -132,7 +132,7 @@
 
                         {{-- Reportes gerenciales --}}
                         <li class="nav-item has-treeview">
-                            <a href="#" class="nav-link">
+                            <a href="#" class="nav-link {{ request()->routeIs('admin.reportes.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-bar"></i>
                                 <p>
                                     Reportes
@@ -156,6 +156,12 @@
                                     <a href="{{ route('admin.reportes.inventario.deposito') }}" class="nav-link">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Inventario por Depósito</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('admin.reportes.clientes.inactivos') }}" class="nav-link {{ request()->routeIs('admin.reportes.clientes.inactivos') ? 'active' : '' }}">
+                                        <i class="nav-icon fas fa-bell text-warning"></i>
+                                        <p>Clientes Inactivos</p>
                                     </a>
                                 </li>
                                 <li class="nav-item">

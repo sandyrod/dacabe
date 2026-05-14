@@ -941,7 +941,7 @@
                                     data-target="#collapseReport" aria-expanded="false" aria-controls="collapseReport">
                                     <span>
                                         <i class="fas fa-chart-line icon-main"></i> Reportes
-                                        <span class="label-report-new d-none"><i class="fas fa-bell"></i></span>
+                                        <span class="label-report-new"><i class="fas fa-bell"></i></span>
                                     </span>
                                     <i class="fas fa-chevron-down"></i>
                                 </button>
@@ -962,6 +962,10 @@
                                         <a href="{{ url('admin/reportes/inventario-dashboard') }}"
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-chart-bar"></i> Gráficas de Inventario
+                                        </a>
+                                        <a href="{{ route('admin.reportes.clientes.inactivos') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-bell text-warning"></i> Clientes Inactivos <span class="badge badge-warning ml-2">Nuevo</span>
                                         </a>
                                     </div>
                                 </div>

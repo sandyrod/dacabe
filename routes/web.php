@@ -416,6 +416,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::get('reportes/inventario', 'Admin\ReporteInventarioController@index')->name('admin.reportes.inventario');
     Route::get('reportes/inventario-deposito', 'Admin\ReporteInventarioController@porDeposito')->name('admin.reportes.inventario.deposito');
     Route::get('reportes/inventario-dashboard', 'Admin\ReporteInventarioController@dashboard')->name('admin.reportes.inventario.dashboard');
+    Route::get('reportes/clientes-inactivos', 'Admin\ReporteClientesInactivosController@index')->name('admin.reportes.clientes.inactivos');
 
     // Gestión de asociaciones cliente-vendedor
     Route::resource('cliente-vendedor', 'Admin\ClienteVendedorController')->only(['index', 'store', 'destroy']);

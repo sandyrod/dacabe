@@ -225,6 +225,7 @@
                         <label class="text-muted small font-weight-bold">ESTATUS</label>
                         <select name="estatus" class="form-control">
                             <option value="TODOS">Todos</option>
+                            <option value="PENDIENTE" {{ request('estatus') == 'PENDIENTE' ? 'selected' : '' }}>PENDIENTE</option>
                             <option value="CARGANDO" {{ request('estatus') == 'CARGANDO' ? 'selected' : '' }}>CARGANDO</option>
                             <option value="REVISION" {{ request('estatus') == 'REVISION' ? 'selected' : '' }}>REVISION</option>
                             <option value="APROBADO" {{ request('estatus') == 'APROBADO' ? 'selected' : '' }}>APROBADO</option>

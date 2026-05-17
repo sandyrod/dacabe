@@ -1165,7 +1165,7 @@
                         let recargo = response.recargo ? response.recargo : 0;
                         if (inven.BASE2 && inven.BASE2 > 0) {
                             precio2 = inven.BASE2 + ((inven.BASE2 * recargo) / 100);
-                            precio1 = precio2;// + ((precio2 * recargo) / 100);
+                            precio1 = inven.BASE1; //precio2;// + ((precio2 * recargo) / 100);
                         }
                         /*
                         //precio2 = inven.BASE1/(1-(dacabe_percent/100));
@@ -1229,8 +1229,8 @@
                             '</div><div class="col-10 w-100"><small class="btn btn-danger w-100" onclick="event.preventDefault(); addProduct(\'' +
                             inven.CODIGO + '\', \'' + precio2 + '\', \'' + (inven.EUNIDAD - inven
                                 .RESERVA) + '\', \'Bs\', ' + stock_minimo +
-                            ')" title="Agregar al carrito"><i class="fa fa-shopping-cart"></i> Precio: Ref ' +
-                            formatNumberInside(precio2) + '</small></div></div>';
+                            ')" title="Agregar al carrito"><i class="fa fa-shopping-cart"></i><b> Precio: Ref ' +
+                            formatNumberInside(precio2) + '</b></small></div></div>';
 
                         let porc_desc = 0;
                         let class_dcto = 'mt-5';
@@ -1239,14 +1239,16 @@
                         if (((!producto_nacional) || (inven.CGRUPO != producto_nacional))) {
                             dcto_cash = ((precio2 * (descuento * -1)) / 100);
                             porc_desc = descuento * (-1);
-                            class_dcto = '';
-                            html +=
-                                '<div class="row pt-1 w-100"><div class="col-12"><span class="text-danger w-100"><small class="text-danger"> Para pagos en Divisa recibes</small><br><b>' +
-                                descuento +
-                                '%</b> de Descuento <i class="fa fa-arrow-down"></i></span></div></div>';
+                            if (descuento != 0) {
+                                class_dcto = '';
+                                html +=
+                                    '<div class="row pt-1 w-100"><div class="col-12"><span class="text-danger w-100"><small class="text-danger"> Para pagos en Divisa recibes</small><br><b>' +
+                                    descuento +
+                                    '%</b> de Descuento <i class="fa fa-arrow-down"></i></span></div></div>'
+                            }
                         } else {
                             img_promo =
-                                '<img class="mt-5" src="{{ asset('imgs/logos/productos_nacionales.jpg') }}" alt="Producto Nacional" title="Producto Nacional" style="width:100%; float:right;">';
+                                '<img class="mt-2" src="{{ asset('imgs/logos/productos_nacionales.jpg') }}" alt="Producto Nacional" title="Producto Nacional" style="width:100%; float:right;">';
                             precio1 = inven.BASE2;
                             precio2 = inven.BASE1;
                         }
@@ -1254,17 +1256,17 @@
                         let iva_bs = inven.IMPUEST > 0 ? (precio1 * porcentaje_iva).toFixed(2) : 0;
 
                         html +=
-                            '<div class="row w-100" style="padding-top:-20px;"><div class="col-6 w-100"><span style="" class="mt-1 btn btn-danger w-100"><small> - Dcto: 0,00<br><hr style="border-top:1px solid #fff; margin:4px 0;"><b>TOTAL+IVA: ' +
+                            '<div class="row w-100" style="padding-top:-20px;"><div class="col-6 w-100"><span style="" class="mt-1 btn btn-success w-100">Base: '+formatNumberInside(parseFloat(precio1))+'<br><hr style="border-top:1px solid #fff; margin:4px 0;"><b>TOTAL+IVA: <br> Ref ' +
                             formatNumberInside(parseFloat(precio1) + parseFloat(iva_bs)) +
-                            '</b></small></span></div><div class="col-6">';
+                            '</b></span></div><div class="col-6">';
                         let base_cash = precio2 - dcto_cash;
                         let iva_cash = inven.IMPUEST > 0 ? base_cash * (porcentaje_iva) : 0;
                         let total_cash = base_cash + iva_cash;
                         html +=
-                            '<span class="btn btn-danger btn-block mt-1" style=""><small> - Dcto: ' +
-                            formatNumberInside(dcto_cash) +
-                            '<br><hr style="border-top:1px solid #fff; margin:4px 0;"><b>TOTAL+IVA: ' +
-                            formatNumberInside(total_cash) + '</b></small></span>';
+                            '<span class="btn btn-danger btn-block mt-1" style=""> Base: ' +
+                            formatNumberInside(precio2) +
+                            '<br><hr style="border-top:1px solid #fff; margin:4px 0;"><b>TOTAL+IVA: <br>Ref ' +
+                            formatNumberInside(total_cash) + '</b></span>';
                         html += '</div></div>';
                         
                         // Mostrar u ocultar promociones por porcentaje

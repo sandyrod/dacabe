@@ -684,6 +684,7 @@
                                                                         @if(abs($totalAjustesFooter) > 0.001)
                                                                         <div class="mt-1" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px;">
                                                                             <small class="d-block text-white-50">Ajuste adicional:</small>
+                                                                            <input type="hidden" value="{{$totalAjustesFooter}}" id="totalAjustes" >
                                                                             <small class="fw-bold" style="font-size: 0.82rem; color: {{ $totalAjustesFooter >= 0 ? '#7ee8a2' : '#f9a8d4' }};">
                                                                                 {{ $totalAjustesFooter >= 0 ? '+' : '' }}{{ number_format($totalAjustesFooter, 2, ',', '.') }} $
                                                                             </small>
@@ -781,7 +782,7 @@
                                     value="{{ old('forma_pago_id') }}">
                                 <input type="hidden" name="total_pagar"
                                     value="{{ $totalPagarDivisa - $totalDescuento }}">
-                                <input type="hidden" name="total_ajustes_netos" value="{{ $totalAjustesNetos }}">
+                                <input type="hidden" name="total_ajustes_netos" id="total_ajustes_netos" value="{{ $totalAjustesNetos }}">
                                 <input type="hidden" name="base_real" value="{{ $totalPagarDivisa - $totalDescuento }}">
                                 <input type="hidden" name="monto_total_bs" id="monto-total-bs" value="">
 
@@ -2833,7 +2834,8 @@
                 e.preventDefault();
 
                 const tipoPago = $('input[name="tipo_pago"]:checked').val();
-                const montoTotal = parseFloat($('#monto-total').val()) || 0;
+                let montoTotal = parseFloat($('#monto-total').val()) || 0;
+                const ajustesTotal = parseFloat($('#totalAjustes').val()) || 0;
                 const form = this;
 
                 if (SOLO_IVA_BS && tipoPago !== 'bs') {
@@ -2880,7 +2882,10 @@
                 } else {
                     $('#tasa_bcv').removeAttr('required');
                 }
-
+                
+                if (montoTotal <= 0 && ajustesTotal > 0) {
+                    montoTotal = ajustesTotal;
+                }
                 // Para pagos en bolívares, permitir si hay IVA pendiente aunque el total base sea 0
                 const ivaBsPendiente = parseFloat('{{ $iva_bs ?? 0 }}') || 0;
                 if (montoTotal <= 0 && !(tipoPago === 'bs' && ivaBsPendiente > 0)) {

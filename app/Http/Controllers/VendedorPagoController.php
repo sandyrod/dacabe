@@ -282,7 +282,8 @@ class VendedorPagoController extends Controller
                 ->where('pedidos.estatus', 'APROBADO')
                 ->where(function ($query) {
                     $query->where('pedidos.saldo_base', '>', 0)
-                        ->orWhere('pedidos.saldo_iva_bs', '>', 0);
+                        ->orWhere('pedidos.saldo_iva_bs', '>', 0)
+                        ->orWhere('pedidos.saldo_ajustes', '>', 0);
                 })
                 ->orderBy('pedidos.fecha', 'asc')
                 ->get()

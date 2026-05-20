@@ -664,6 +664,9 @@
           <a href="{{ route('comisiones.mi_estado_cuenta') }}" class="btn btn-outline-info btn-block btn-primary-seller">
             <i class="fas fa-balance-scale"></i> Estado de Cuenta
           </a>
+          <a href="{{ url('/vendedor/pedidos/historial') }}" class="btn btn-outline-danger btn-block btn-primary-seller">
+            <i class="fas fa-history"></i> Historial de Pedidos
+          </a>
           <a href="{{ url('users/' . auth()->user()->id) }}" class="btn btn-outline-primary btn-block btn-primary-seller"><i class="fas fa-user"></i> Ver mi perfil</a>
         </div>
       </div>

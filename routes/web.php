@@ -117,8 +117,13 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('sincronizar/clientes/get-pedidos-sin-cruce', 'App\Http\Controllers\SincronizarClientesController@getPedidosSinCruce')
         ->name('sincronizar.clientes.get.pedidos.sin.cruce');
 
+
     Route::get('sincronizar/clientes/buscar-cliente', 'App\Http\Controllers\SincronizarClientesController@buscarCliente')
         ->name('sincronizar.clientes.buscar.cliente');
+
+    // Historial de pedidos para vendedores
+    Route::get('vendedor/pedidos/historial', [App\Http\Controllers\Vendedor\PedidoHistorialController::class, 'index'])->name('vendedor.pedidos.historial');
+    Route::get('vendedor/pedidos/historial/exportar', [App\Http\Controllers\Vendedor\PedidoHistorialController::class, 'exportExcel'])->name('vendedor.pedidos.historial.exportar');
 
     Route::post('sincronizar/clientes/relacionar-cliente', 'App\Http\Controllers\SincronizarClientesController@relacionarCliente')
         ->name('sincronizar.clientes.relacionar.cliente');

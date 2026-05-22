@@ -705,16 +705,21 @@ class PedidosController extends Controller
 
         $company = (new Company)->getMyCompany();
         $seller = null;
+        $sellerZone = null;
         if ($order->user_id) {
             $user = (new User)->find($order->user_id);
             if ($user) {
                 $seller = trim($user->name . ' ' . $user->last_name);
+                $vendedor = (new Vendedor)->where('email', $user->email)->first();
+                if ($vendedor) {
+                    $sellerZone = optional((new \App\Models\Zona)->find($vendedor->zona_id))->nombre;
+                }
             }
         }
 
         $print = 1;
 
-        return view('orders.partials.print_order_ticket', compact(['order', 'print', 'client', 'company', 'seller']));
+        return view('orders.partials.print_order_ticket', compact(['order', 'print', 'client', 'company', 'seller', 'sellerZone']));
     }
 
     public function generatePdf($id)

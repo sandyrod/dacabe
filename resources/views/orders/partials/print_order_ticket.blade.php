@@ -89,28 +89,39 @@
 
         <div class="row"><strong>Nro:</strong> {{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }}</div>
         <div class="row"><strong>Fecha:</strong> {{ formatoFechaDMASimple($order->fecha ?? $order->created_at) }}</div>
-        <div class="row"><strong>Vendedor:</strong> {{ $seller ?: ($order->seller_code ?: 'N/D') }}</div>
-        <div class="row"><strong>Cliente:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}</div>
-        <div class="row"><strong>RIF:</strong> {{ optional($client)->RIF ?: ($order->rif ?: 'N/D') }}</div>
 
         <div class="divider"></div>
+        <div class="row"><strong>DATOS DEL CLIENTE</strong></div>
+        <div class="row"><strong>Nombre:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}</div>
+        <div class="row"><strong>Rif:</strong> {{ optional($client)->RIF ?: ($order->rif ?: 'N/D') }}</div>
+        <div class="row"><strong>Dirección:</strong> {{ optional($client)->DIRECCION ?: 'N/D' }}</div>
+        <div class="row"><strong>Zona:</strong> {{ optional($client)->DESZONA ?: 'N/D' }}</div>
+
+        <div class="divider"></div>
+        <div class="row"><strong>DATOS DEL VENDEDOR</strong></div>
+        <div class="row"><strong>Nombre y zona:</strong> {{ $seller ?: ($order->seller_code ?: 'N/D') }}{{ $sellerZone ? ' - ' . $sellerZone : '' }}</div>
+
+        <div class="divider"></div>
+        <div class="row"><strong>ARTICULO</strong></div>
 
         <table class="products">
             <thead>
                 <tr>
-                    <th>Producto</th>
+                    <th>Cod.</th>
+                    <th>Descripción</th>
                     <th>Cant.</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($order->pedido_detalle as $item)
                     <tr>
+                        <td>{{ $item->codigo_inven }}</td>
                         <td>{{ $item->inven_descr }}</td>
                         <td>{{ number_format((float) $item->cantidad, 0, ',', '.') }}</td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="2" class="center">Sin productos</td>
+                        <td colspan="3" class="center">Sin productos</td>
                     </tr>
                 @endforelse
             </tbody>

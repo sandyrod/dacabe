@@ -370,6 +370,9 @@
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-info m-1 print" data-iddata="{{ $pedido->id }}" title="Imprimir">
                                     <i class="fas fa-print"></i>
                                 </a>
+                                <a href="javascript:void(0)" class="btn btn-sm btn-outline-secondary m-1 print-ticket" data-iddata="{{ $pedido->id }}" title="Recibo Tickera">
+                                    <i class="fas fa-receipt"></i>
+                                </a>
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-dark m-1" onclick="update_retention({{ $pedido->id }})" title="Actualizar Retención">
                                     <i class="fas fa-percent"></i>
                                 </a>
@@ -402,6 +405,7 @@
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-secondary m-1 email" data-iddata="{{ $pedido->id }}" title="Enviar Correo">
                                     <i class="fas fa-envelope"></i>
                                 </a>
+                                
                             </td>
                         </tr>
                         @empty
@@ -527,6 +531,12 @@
         $(document).on('click', '.print', function() {
             let id = $(this).data('iddata');
             window.open(BASE_URL + '/print-order/' + id);
+        });
+
+        // Print Ticket Receipt
+        $(document).on('click', '.print-ticket', function() {
+            let id = $(this).data('iddata');
+            window.open(BASE_URL + '/print-order-ticket/' + id);
         });
 
         // Approve Order

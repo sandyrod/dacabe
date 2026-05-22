@@ -180,6 +180,15 @@ trait PedidosTrait
 
         }
 
+        //if (hasOrderPermission() || hasOrderClientPermission()) {
+            $buttons[] = [
+                'style' => 'secondary btn-sm mt-1',
+                'name' => 'print-ticket',
+                'hint' => 'Recibo Tickera',
+                'icon' => 'receipt',
+            ];
+        //}
+
         return getActionHtmlColumn ($data, $buttons);
     }
     

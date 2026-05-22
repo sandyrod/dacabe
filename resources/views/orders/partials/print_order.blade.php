@@ -9,6 +9,7 @@
 
   @php($user = (new \App\User)->find(@$order->user_id))
   @php($vendedor = @$user ? (new \App\Models\Vendedor)->where('email', @$user->email)->first() : null)
+  @php($zona = @$vendedor ? (new \App\Models\Zona)->find(@$vendedor->zona_id) : null)
   @php($client = (new \App\Models\OrderClient)->where('RIF', @$order->rif)->first())
 
   <div class="container-fluid">
@@ -87,6 +88,9 @@
                           <strong>{{ @$user->name }} {{ @$user->last_name }}</strong><br>
                           <b>Teléfono: </b>{{ @$vendedor->telefono }}<br>
                           <b>Email: </b>{{ @$vendedor->email }}
+                          @if (@$zona)
+                            <br><b>Zona: </b>{{ @$zona->nombre }}
+                          @endif
                         @else
                           <strong>{{ @$order->seller_code }}</strong><br>                          
                         @endif

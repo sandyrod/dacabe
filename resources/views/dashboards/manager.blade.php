@@ -222,6 +222,31 @@
         color: #b45309;
     }
 
+    .client-name-highlight {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+        color: #f8fbff;
+        font-weight: 700;
+        box-shadow: 0 6px 16px rgba(30, 60, 114, 0.22);
+    }
+
+    .client-name-highlight .client-rif {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #eaf2ff;
+        background: rgba(255, 255, 255, 0.14);
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+    }
+
+    .client-name-highlight i {
+        color: #f2c94c;
+    }
+
     /* STATS CARDS */
     .stat-card {
         border-radius: 12px;
@@ -521,8 +546,16 @@
                     @endphp
                     <div class="card card-info collapsed-card">
                         <div class="card-header">
-                            <h3 class="card-title">
+                            <h3 class="card-title d-flex align-items-center">
                                 {{ @$firstClient[0]->seller_code }}
+                                <span class="badge badge-light ml-2">
+                                    {{ $clientsCollection->count() }} pedido{{ $clientsCollection->count() != 1 ? 's' : '' }}
+                                </span>
+                                @if (@$firstClient[0]->zona_nombre)
+                                <span class="badge badge-info ml-2">
+                                    <i class="fa fa-map-marked-alt mr-1"></i> {{ @$firstClient[0]->zona_nombre }}
+                                </span>
+                                @endif
                             </h3>
                             <div class="card-tools">
                                 <button type="button" class="btn btn-tool" data-card-widget="collapse">
@@ -551,8 +584,17 @@
                                 </a>
                                 @endif
                                 <a href="#" onclick="event.preventDefault(); changeClient('{{ $firstOrder }}')">
-                                    <strong class="text-primary hint--top" aria-label="Click para cambiar el cliente">Cliente: {{ $firstOrder->descripcion ?? 'No disponible' }} (RIF: {{ $firstOrder->rif }})</strong>
+                                    <span class="client-name-highlight hint--top" aria-label="Click para cambiar el cliente">
+                                        <i class="fas fa-user-tag"></i>
+                                        <span>Cliente: {{ $firstOrder->descripcion ?? 'No disponible' }}</span>
+                                        <span class="client-rif">RIF: {{ $firstOrder->rif }}</span>
+                                    </span>
                                 </a>
+                                <br>
+                                @if (@$firstOrder->direccion)
+                                <i class="fa fa-map-marker-alt"></i> {{ $firstOrder->direccion }}
+                                @endif
+                                
                                 <br>
                                 @if (@$firstOrder->telefono)
                                 <i class="fa fa-phone"></i> {{ $firstOrder->telefono }}
@@ -686,7 +728,10 @@
                                         <a id="btn_RECHAZADO_{{@$firstOrder->id}}" href="javascript:void(0)" onclick="event.preventDefault(); approveOrCancelOrder('{{@$firstOrder->id}}', 'RECHAZADO')" class="btn btn-outline-danger btn-block pt-2 hint--top" aria-label="Rechazar Pedido"><i class="fa fa-trash"></i> Rechazar</a>
                                     </div>
                                     <div class="col-xs-12 col-sm-12 col-md-3 pt-2">
-                                        <a target="_blank" href="{{url('print-order/' . @$firstOrder->id)}}" class="btn btn-outline-info btn-block pt-2 hint--top" aria-label="Imprimir Pedido"><i class="fa fa-print"></i> Imprimir</a>
+                                        <div class="d-flex align-items-stretch">
+                                            <a target="_blank" href="{{url('print-order/' . @$firstOrder->id)}}" class="btn btn-outline-info flex-fill pt-2 hint--top" aria-label="Imprimir Pedido"><i class="fa fa-print"></i> Imprimir</a>
+                                            <a target="_blank" href="{{url('print-order-ticket/' . @$firstOrder->id)}}" class="btn btn-outline-secondary ml-2 px-3 pt-2 hint--top" aria-label="Imprimir Recibo"><i class="fas fa-receipt"></i></a>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

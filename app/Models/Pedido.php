@@ -269,9 +269,17 @@ class Pedido extends Model
     public function getPendingOrders()
     {
         return $this
-            ->select('pedidos.id', 'pedidos.created_at', 'pedidos.estatus', 'pedidos.descripcion', 'pedidos.seller_code', 'pedidos.rif', 'pedido_detalle.cantidad', 'pedido_detalle.codigo_inven', 'pedido_detalle.inven_descr', 'pedido_detalle.precio_dolar', 'pedidos.telefono', 'pedidos.email', 'pedidos.rif_foto', 'pedido_detalle.pago', 'pedidos.cdepos', 'pedidos.descuento', 'pedidos.factura', 'pedidos.porc_retencion', 'pedidos.retencion', 'pedidos.cliageret', 'pedidos.fecha_despacho', 'pedido_detalle.iva', 'pedidos.iva_bs', 'pedidos.base')
+            ->select('pedidos.id', 'pedidos.created_at', 'pedidos.estatus', 'pedidos.descripcion', 'pedidos.seller_code', 'pedidos.rif', 'pedido_detalle.cantidad', 'pedido_detalle.codigo_inven', 'pedido_detalle.inven_descr', 'pedido_detalle.precio_dolar', 'pedidos.telefono', 'pedidos.email', 'pedidos.rif_foto', 'pedido_detalle.pago', 'pedidos.cdepos', 'pedidos.descuento', 'pedidos.factura', 'pedidos.porc_retencion', 'pedidos.retencion', 'pedidos.cliageret', 'pedidos.fecha_despacho', 'pedido_detalle.iva', 'pedidos.iva_bs', 'pedidos.base', 'CLIENTE.DIRECCION as direccion', 'vendedores.codigo as vendedor_codigo', 'vendedores.email as vendedor_email', 'zonas.nombre as zona_nombre')
             ->join('pedido_detalle', 'pedidos.id', 'pedido_id')
-            ->where('estatus', 'PENDIENTE')
+            ->leftJoin('CLIENTE', function ($join) {
+                $join->on(DB::raw('TRIM(COALESCE(CONVERT(pedidos.rif USING utf8mb4), "")) COLLATE utf8mb4_unicode_ci'), '=', DB::raw('TRIM(COALESCE(CONVERT(CLIENTE.RIF USING utf8mb4), "")) COLLATE utf8mb4_unicode_ci'));
+            })
+            ->leftJoin('sdcloud.users as sd_users', 'pedidos.user_id', '=', 'sd_users.id')
+            ->leftJoin('vendedores', function ($join) {
+                $join->on(DB::raw('TRIM(COALESCE(CONVERT(sd_users.email USING utf8mb4), "")) COLLATE utf8mb4_unicode_ci'), '=', DB::raw('TRIM(COALESCE(CONVERT(vendedores.email USING utf8mb4), "")) COLLATE utf8mb4_unicode_ci'));
+            })
+            ->leftJoin('zonas', 'vendedores.zona_id', 'zonas.id')
+            ->where('pedidos.estatus', 'PENDIENTE')
             ->orderBy('pedidos.created_at', 'DESC')
             ->orderBy('pedidos.seller_code')
             ->get();

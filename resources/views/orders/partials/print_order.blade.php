@@ -68,7 +68,8 @@
                           Email: {{ $client->EMAIL }}<br>
                           @endif
                           <small>
-                            {{ $client->DIRECCION }}<br>                            
+                            {{ $client->DIRECCION }}<br>
+                            Zona: {{ @$client->DESZONA ?: 'N/D' }}<br>
                           </small>                          
                         @else
                           <strong>{{ $order->descripcion }}</strong><br>

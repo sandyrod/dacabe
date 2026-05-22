@@ -551,11 +551,6 @@
                                 <span class="badge badge-light ml-2">
                                     {{ $clientsCollection->count() }} pedido{{ $clientsCollection->count() != 1 ? 's' : '' }}
                                 </span>
-                                @if (@$firstClient[0]->zona_nombre)
-                                <span class="badge badge-info ml-2">
-                                    <i class="fa fa-map-marked-alt mr-1"></i> {{ @$firstClient[0]->zona_nombre }}
-                                </span>
-                                @endif
                             </h3>
                             <div class="card-tools">
                                 <button type="button" class="btn btn-tool" data-card-widget="collapse">
@@ -611,6 +606,14 @@
                                 <i class="fa fa-warehouse pl-3"></i> {{ $depos->DDEPOS }}
                                 @endif
                                 @endif
+
+                                @if (@$firstOrder->zona_nombre)
+                                <br>
+                                <span class="badge badge-info mt-2">
+                                    <i class="fa fa-map-marked-alt mr-1"></i> Zona Vendedor: {{ $firstOrder->zona_nombre }}
+                                </span>
+                                @endif
+
                                 <span class="float-right">
                                     <span class="badge badge-info">
                                         <i class="fa fa-calendar"> {{formatoFechaDMA(@$firstOrder->created_at)}}</i>

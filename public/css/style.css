@@ -346,12 +346,14 @@ a.btn-sdmodule:hover {
 
 
 .card-productos {
-    min-height:645px;
+    /* min-height:645px; */
+    min-height:550px !important;
 }
 
 @media screen and (max-width: 1060px) {
     .card-productos {
-        min-height:740px;
+        /* min-height:740px; */
+        min-height:550px !important;
     }
 }
 

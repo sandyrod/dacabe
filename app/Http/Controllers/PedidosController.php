@@ -676,6 +676,9 @@ class PedidosController extends Controller
     {
         $modelo = new Pedido();
         $order = $modelo->getData($order_id);
+        if (!$order) {
+            abort(404);
+        }
         $client = null;
         if ($order->rif) {
             $client = (new OrderClient)->where('RIF', $order->rif)->first();
@@ -685,6 +688,33 @@ class PedidosController extends Controller
         $report_data = $modelo->getReportConfig();
 
         return view('orders.partials.print_order', compact(['order', 'print', 'report_data', 'client']));
+    }
+
+    public function printOrderTicket(Request $request, $order_id)
+    {
+        $modelo = new Pedido();
+        $order = $modelo->getData($order_id);
+        if (!$order) {
+            abort(404);
+        }
+
+        $client = null;
+        if ($order->rif) {
+            $client = (new OrderClient)->where('RIF', $order->rif)->first();
+        }
+
+        $company = (new Company)->getMyCompany();
+        $seller = null;
+        if ($order->user_id) {
+            $user = (new User)->find($order->user_id);
+            if ($user) {
+                $seller = trim($user->name . ' ' . $user->last_name);
+            }
+        }
+
+        $print = 1;
+
+        return view('orders.partials.print_order_ticket', compact(['order', 'print', 'client', 'company', 'seller']));
     }
 
     public function generatePdf($id)

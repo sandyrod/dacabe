@@ -60,6 +60,10 @@
             print_record($(this).data('iddata'));
         });
 
+        $("table#"+table_id).on('click', '.print-ticket', function(){
+            print_ticket_record($(this).data('iddata'));
+        });
+
         $("table#"+table_id).on('click', '.delete', function(){
             update_record($(this).data('iddata'), 'RECHAZADO');
         });
@@ -100,6 +104,10 @@
         
         let print_record = (id) => {
             window.open('print-order/' + id)
+        };
+
+        let print_ticket_record = (id) => {
+            window.open('print-order-ticket/' + id)
         };
         
         let edit_verified = (id) => {

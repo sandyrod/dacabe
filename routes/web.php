@@ -333,6 +333,7 @@ Route::get('get-seller-balance/{seller_id?}', ['as' => 'get-seller-balance', 'us
 Route::post('order-save-payment', ['as' => 'order-save-payment', 'uses' => 'PedidosController@orderSavePayment']);
 Route::post('order-delete-payment', ['as' => 'order-delete-payment', 'uses' => 'PedidosController@orderDeletePayment']);
 Route::get('print-order/{order_id?}', ['as' => 'print-order', 'uses' => 'PedidosController@printOrder']);
+Route::get('print-order-ticket/{order_id?}', ['as' => 'print-order-ticket', 'uses' => 'PedidosController@printOrderTicket']);
 Route::get('orders-pending-by-seller/{seller_id}', ['as' => 'orders-pending-by-seller', 'uses' => 'PedidosController@getOrderPendingBySeller']);
 Route::post('update-estatus-order', ['as' => 'update-estatus-order', 'uses' => 'PedidosController@updateEstatusOrder']);
 

@@ -131,7 +131,7 @@
                                 <div class="fw-semibold">{{ $cli['NOMBRE'] ?? 'Sin cliente' }}</div>
                                 <small class="text-muted">{{ $pedido->rif ?? '' }}</small>
                             </td>
-                            <td class="fw-semibold">${{ number_format((float) $pedido->base + (float) $pedido->iva_bs, 2, ',', '.') }}</td>
+                            <td class="fw-semibold">${{ number_format((float) $pedido->base, 2, ',', '.') }}</td>
                             <td>
                                 @if($pedido->fecha_despacho)
                                     <i class="fas fa-truck text-success me-1"></i>{{ \Carbon\Carbon::parse($pedido->fecha_despacho)->format('d/m/Y') }}

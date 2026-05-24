@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -17,6 +18,21 @@
             font-size: 12px;
             color: #000;
             background: #fff;
+        }
+
+        @media print {
+
+            html,
+            body {
+                height: auto;
+                margin: 0;
+                padding: 0;
+            }
+
+            .ticket {
+                height: auto;
+                page-break-inside: avoid;
+            }
         }
 
         .ticket {
@@ -61,6 +77,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="ticket">
         <div class="center">
@@ -81,25 +98,27 @@
 
         <div class="divider"></div>
 
-        <div class="center">
+        <!--<div class="center">
             <strong>RECIBO DE PEDIDO</strong>
-        </div>
+        </div>-->
 
-        <div class="divider"></div>
+        <!--<div class="divider"></div>-->
 
         <div class="row"><strong>Nro:</strong> {{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }}</div>
         <div class="row"><strong>Fecha:</strong> {{ formatoFechaDMASimple($order->fecha ?? $order->created_at) }}</div>
 
         <div class="divider"></div>
         <div class="row"><strong>DATOS DEL CLIENTE</strong></div>
-        <div class="row"><strong>Nombre:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}</div>
+        <div class="row"><strong>Nombre:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}
+        </div>
         <div class="row"><strong>Rif:</strong> {{ optional($client)->RIF ?: ($order->rif ?: 'N/D') }}</div>
         <div class="row"><strong>Dirección:</strong> {{ optional($client)->DIRECCION ?: 'N/D' }}</div>
         <div class="row"><strong>Zona:</strong> {{ optional($client)->DESZONA ?: 'N/D' }}</div>
 
         <div class="divider"></div>
         <div class="row"><strong>DATOS DEL VENDEDOR</strong></div>
-        <div class="row"><strong>Nombre y zona:</strong> {{ $seller ?: ($order->seller_code ?: 'N/D') }}{{ $sellerZone ? ' - ' . $sellerZone : '' }}</div>
+        <div class="row"><strong>Nombre y zona:</strong>
+            {{ $seller ?: ($order->seller_code ?: 'N/D') }}{{ $sellerZone ? ' - ' . $sellerZone : '' }}</div>
 
         <div class="divider"></div>
         <div class="row"><strong>ARTICULO</strong></div>
@@ -142,4 +161,5 @@
         </script>
     @endif
 </body>
+
 </html>

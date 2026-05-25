@@ -580,6 +580,8 @@
                                 @endif
                                 <a href="#" onclick="event.preventDefault(); changeClient('{{ $firstOrder }}')">
                                     <span class="client-name-highlight hint--top" aria-label="Click para cambiar el cliente">
+                                        <span class="client-rif"><i class="fa fa-file-invoice mr-1"></i> #{{ $firstOrder->id }}</span>
+
                                         <i class="fas fa-user-tag"></i>
                                         <span>Cliente: {{ $firstOrder->descripcion ?? 'No disponible' }}</span>
                                         <span class="client-rif">RIF: {{ $firstOrder->rif }}</span>

@@ -80,45 +80,18 @@
 
 <body>
     <div class="ticket">
-        <div class="center">
-            <strong>{{ strtoupper(optional($company)->name ?? 'DACABE') }}</strong><br>
-            @if(optional($company)->code)
-                <span>RIF: {{ $company->code }}</span><br>
-            @endif
-            @if(optional($company)->phone)
-                <span>Tel: {{ $company->phone }}</span><br>
-            @endif
-            @if(optional($company)->email)
-                <span>{{ $company->email }}</span><br>
-            @endif
-            @if(optional($company)->location)
-                <div class="muted">{!! nl2br(e(trim(strip_tags($company->location)))) !!}</div>
-            @endif
-        </div>
-
-        <div class="divider"></div>
-
-        <!--<div class="center">
-            <strong>RECIBO DE PEDIDO</strong>
-        </div>-->
-
-        <!--<div class="divider"></div>-->
-
+        
         <div class="row"><strong>Nro:</strong> {{ str_pad($order->id, 5, '0', STR_PAD_LEFT) }}</div>
-        <div class="row"><strong>Fecha:</strong> {{ formatoFechaDMASimple($order->fecha ?? $order->created_at) }}</div>
-
+        
         <div class="divider"></div>
-        <div class="row"><strong>DATOS DEL CLIENTE</strong></div>
-        <div class="row"><strong>Nombre:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}
+        <div class="row"><strong>CLIENTE:</strong> {{ optional($client)->NOMBRE ?: ($order->descripcion ?: 'N/D') }}
         </div>
-        <div class="row"><strong>Rif:</strong> {{ optional($client)->RIF ?: ($order->rif ?: 'N/D') }}</div>
-        <div class="row"><strong>Dirección:</strong> {{ optional($client)->DIRECCION ?: 'N/D' }}</div>
-        <div class="row"><strong>Zona:</strong> {{ optional($client)->DESZONA ?: 'N/D' }}</div>
-
+        <div class="row"><strong>RIF:</strong> {{ optional($client)->RIF ?: ($order->rif ?: 'N/D') }}</div>
+        <div class="row"><strong>DIRECCIÓN:</strong> {{ optional($client)->DIRECCION ?: 'N/D' }}</div>
+        
         <div class="divider"></div>
-        <div class="row"><strong>DATOS DEL VENDEDOR</strong></div>
-        <div class="row"><strong>Nombre y zona:</strong>
-            {{ $seller ?: ($order->seller_code ?: 'N/D') }}{{ $sellerZone ? ' - ' . $sellerZone : '' }}</div>
+        <div class="row"><strong>VENDEDOR</strong>
+            {{ $seller ?: ($order->seller_code ?: 'N/D') }}</div>
 
         <div class="divider"></div>
         <div class="row"><strong>ARTICULO</strong></div>

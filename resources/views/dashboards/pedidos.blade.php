@@ -597,7 +597,7 @@
                                   <strong>#{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}</strong> - 
                                   {{ $pedido->descripcion }} 
                                   <span class="badge bg-danger text-white ms-2">
-                                      Vencido hace {{ \Carbon\Carbon::parse($pedido->fecha)->diffInDays(\Carbon\Carbon::now()) }} días
+                                      Vencido hace {{ (int) $pedido->dias_vencidos }} días
                                   </span>
                               </li>
                           @endforeach

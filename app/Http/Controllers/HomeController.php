@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\DB;
 use GuzzleHttp\Client;
-use Carbon\Carbon;
 
 class HomeController extends Controller
 {
@@ -46,17 +45,16 @@ class HomeController extends Controller
         if (Auth::user()->hasRole('vendedor')) {
             $pedidosVencidos = DB::connection('company')
                 ->table('pedidos')
-                ->select('pedidos.id', 'pedidos.descripcion', 'pedidos.dias_credito', 'pedidos.fecha')
+                ->select('pedidos.id', 'pedidos.descripcion', 'pedidos.dias_credito', 'pedidos.fecha_despacho')
+                ->selectRaw('DATEDIFF(CURDATE(), DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY)) as dias_vencidos')
                 ->where('pedidos.user_id', Auth::user()->id)
                 ->where('pedidos.estatus', 'APROBADO')
                 ->whereNotNull('pedidos.dias_credito')
                 ->where('pedidos.dias_credito', '>', 0)
-                ->get()
-                ->filter(function ($pedido) {
-                    $fechaPedido = Carbon::parse($pedido->fecha);
-                    $fechaLimite = $fechaPedido->copy()->addDays($pedido->dias_credito);
-                    return Carbon::now()->greaterThan($fechaLimite);
-                });
+                ->whereNotNull('pedidos.fecha_despacho')
+                ->whereRaw('TRIM(COALESCE(pedidos.fecha_despacho, "")) != ""')
+                ->whereRaw('DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY) < CURDATE()')
+                ->get();
         }
         
         return view('dashboard', compact(['permissions', 'company', 'pedidosVencidos']));

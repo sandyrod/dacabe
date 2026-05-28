@@ -114,10 +114,10 @@ class VendedorPagoController extends Controller
                         ->where('p4.estatus', 'APROBADO')
                         ->whereNotNull('p4.dias_credito')
                         ->where('p4.dias_credito', '>', 0)
+                        ->whereNotNull('p4.fecha_despacho')
+                        ->whereRaw('TRIM(COALESCE(p4.fecha_despacho, "")) != ""')
                         ->where(function ($q) {
-                            $fechaPedido = DB::raw('p4.fecha');
-                            $fechaLimite = DB::raw("DATE_ADD(p4.fecha, INTERVAL p4.dias_credito DAY)");
-                            $q->whereRaw("DATE_ADD(p4.fecha, INTERVAL p4.dias_credito DAY) < CURDATE()");
+                            $q->whereRaw("DATE_ADD(p4.fecha_despacho, INTERVAL p4.dias_credito DAY) < CURDATE()");
                         });
                 }
             ])
@@ -273,7 +273,9 @@ class VendedorPagoController extends Controller
                 DB::raw('CASE 
                     WHEN pedidos.dias_credito IS NOT NULL 
                          AND pedidos.dias_credito > 0 
-                         AND DATE_ADD(pedidos.fecha, INTERVAL pedidos.dias_credito DAY) < CURDATE() 
+                        AND pedidos.fecha_despacho IS NOT NULL
+                        AND TRIM(COALESCE(pedidos.fecha_despacho, "")) != ""
+                        AND DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY) < CURDATE() 
                     THEN 1 ELSE 0 END as esta_vencido')
             ])
                 ->leftJoin('pedidos_facturas', 'pedidos.id', '=', 'pedidos_facturas.pedido_id')

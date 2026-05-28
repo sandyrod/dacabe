@@ -14,7 +14,7 @@
 
         body {
             margin: 0;
-            font-family: "Courier New", Courier, monospace;
+            font-family: Consolas, "Lucida Console", "Courier New", monospace;
             font-size: 12px;
             color: #000;
             background: #fff;
@@ -58,6 +58,7 @@
         .products {
             width: 100%;
             border-collapse: collapse;
+            table-layout: fixed;
         }
 
         .products th,
@@ -66,10 +67,23 @@
             vertical-align: top;
         }
 
+        .products th:first-child,
+        .products td:first-child {
+            width: 20%;
+        }
+
+        .products th:nth-child(2),
+        .products td:nth-child(2) {
+            width: 58%;
+        }
+
         .products th:last-child,
         .products td:last-child {
             text-align: right;
-            width: 18%;
+            width: 22%;
+            white-space: nowrap;
+            font-weight: 700;
+            letter-spacing: .2px;
         }
 
         .muted {

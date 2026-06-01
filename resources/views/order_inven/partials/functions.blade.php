@@ -1165,8 +1165,8 @@
                         let recargo = response.recargo ? response.recargo : 0;
                         if (inven.BASE2 && inven.BASE2 > 0) {
                             // OJO Cedano Preguntar por la zona para el campo Local/Foraneo
-                            precio2 = inven.BASE4 > 0 ? inven.BASE4 : inven.BASE2 + ((inven.BASE2 * recargo) / 100);
-                            precio1 = inven.BASE3 > 0 ? inven.BASE3 : inven.BASE1 + ((inven.BASE1 * recargo) / 100); //precio2;// + ((precio2 * recargo) / 100);
+                            precio2 = inven.BASE4 > 0 && recargo>0 ? inven.BASE4 : inven.BASE2 + ((inven.BASE2 * recargo) / 100);
+                            precio1 = inven.BASE3 > 0  && recargo>0 ? inven.BASE3 : inven.BASE1 + ((inven.BASE1 * recargo) / 100); //precio2;// + ((precio2 * recargo) / 100);
                         }
                         /*
                         //precio2 = inven.BASE1/(1-(dacabe_percent/100));

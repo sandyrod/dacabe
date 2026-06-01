@@ -35,7 +35,7 @@ class OrderInvenPriceController extends Controller
         $direction = $request->get('direction', 'asc');
         
         // Validate sortable columns to prevent injection or errors
-        $allowedSorts = ['CODIGO', 'DESCR', 'BASE1', 'BASE2'];
+        $allowedSorts = ['CODIGO', 'DESCR', 'BASE1', 'BASE2', 'BASE3', 'BASE4'];
         if (in_array($sort, $allowedSorts)) {
             $query->orderBy($sort, $direction);
         } else {
@@ -73,7 +73,7 @@ class OrderInvenPriceController extends Controller
                 $field = $update['field'];
                 $value = $update['value'];
 
-                if (in_array($field, ['BASE1', 'BASE2'])) {
+                if (in_array($field, ['BASE1', 'BASE2', 'BASE3', 'BASE4'])) {
                     OrderInven::where('CODIGO', $code)->update([$field => $value]);
                 }
             }
@@ -95,7 +95,7 @@ class OrderInvenPriceController extends Controller
             $field = $request->field; 
             $value = $request->value;
 
-            if (!in_array($field, ['BASE1', 'BASE2'])) {
+            if (!in_array($field, ['BASE1', 'BASE2', 'BASE3', 'BASE4'])) {
                 return response()->json(['success' => false, 'message' => 'Invalid field'], 400);
             }
 

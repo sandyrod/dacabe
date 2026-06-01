@@ -79,7 +79,7 @@
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             padding: 8px 12px;
-            width: 130px;
+            width: 100px;
             text-align: right;
             font-weight: 600;
             color: var(--primary-navy);
@@ -183,6 +183,81 @@
 
         .price-input.dirty+.badge-dirty-tag {
             display: inline-block;
+        }
+
+        .zone-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .zone-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: #fff;
+            border: 1px solid rgba(26, 35, 126, 0.08);
+            box-shadow: 0 6px 20px rgba(31, 38, 135, 0.06);
+        }
+
+        .zone-legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .zone-local-swatch {
+            background: linear-gradient(135deg, #dfe9ff 0%, #bfd4ff 100%);
+            box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.12);
+        }
+
+        .zone-foreign-swatch {
+            background: linear-gradient(135deg, #fff0d9 0%, #ffd89a 100%);
+            box-shadow: 0 0 0 4px rgba(243, 156, 18, 0.16);
+        }
+
+        .zone-column-local {
+            background: linear-gradient(180deg, rgba(26, 115, 232, 0.08) 0%, rgba(26, 115, 232, 0.02) 100%);
+        }
+
+        .zone-column-foreign {
+            background: linear-gradient(180deg, rgba(243, 156, 18, 0.12) 0%, rgba(243, 156, 18, 0.03) 100%);
+        }
+
+        .zone-header-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .zone-header-chip.local {
+            background: rgba(26, 115, 232, 0.1);
+            color: #185abc;
+        }
+
+        .zone-header-chip.foreign {
+            background: rgba(243, 156, 18, 0.16);
+            color: #b06d00;
+        }
+
+        .zone-header-title {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 6px;
+        }
+
+        .zone-header-title a {
+            color: inherit;
         }
 
         /* Specific Fix for Laravel/Tailwind Pagination Arrows */
@@ -356,6 +431,33 @@
                 </div>
             </div>
 
+            <div class="px-4 pt-4 pb-2 bg-white border-bottom">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center" style="gap: 16px;">
+                    <div>
+                        <h6 class="mb-1 font-weight-bold" style="color: var(--primary-navy);">
+                            <i class="fas fa-palette mr-2"></i> Referencia visual por zona
+                        </h6>
+                        <small class="text-muted">Las columnas sombreadas indican qué bases pertenecen a Zona Local y cuáles a Zona Foránea.</small>
+                    </div>
+                    <div class="zone-legend">
+                        <div class="zone-legend-item">
+                            <span class="zone-legend-swatch zone-local-swatch"></span>
+                            <div>
+                                <div class="font-weight-bold" style="color: var(--primary-navy);">Zona Local</div>
+                                <small class="text-muted">BASE1 y BASE2</small>
+                            </div>
+                        </div>
+                        <div class="zone-legend-item">
+                            <span class="zone-legend-swatch zone-foreign-swatch"></span>
+                            <div>
+                                <div class="font-weight-bold" style="color: var(--primary-navy);">Zona Foránea</div>
+                                <small class="text-muted">BASE3 y BASE4</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             @php
                 function getSortUrl($column)
                 {
@@ -398,17 +500,41 @@
                                     </a>
                                 </th>
                                 <th width="120" class="text-center">Existencias</th>
-                                <th class="text-right" width="160">
-                                    <a href="{{ getSortUrl('BASE1') }}" class="text-decoration-none"
-                                        style="color: inherit;">
-                                        BASE 1 {!! getSortIcon('BASE1') !!}
-                                    </a>
+                                <th class="text-right zone-column-local" width="120">
+                                    <div class="zone-header-title">
+                                        <span class="zone-header-chip local">Local</span>
+                                        <a href="{{ getSortUrl('BASE1') }}" class="text-decoration-none"
+                                            style="color: inherit;">
+                                            BASE 1 {!! getSortIcon('BASE1') !!}
+                                        </a>
+                                    </div>
                                 </th>
-                                <th class="text-right" width="180">
-                                    <a href="{{ getSortUrl('BASE2') }}" class="text-decoration-none"
-                                        style="color: inherit;">
-                                        BASE 2 {!! getSortIcon('BASE2') !!}
-                                    </a>
+                                <th class="text-right zone-column-local" width="120">
+                                    <div class="zone-header-title">
+                                        <span class="zone-header-chip local">Local</span>
+                                        <a href="{{ getSortUrl('BASE2') }}" class="text-decoration-none"
+                                            style="color: inherit;">
+                                            BASE 2 {!! getSortIcon('BASE2') !!}
+                                        </a>
+                                    </div>
+                                </th>
+                                <th class="text-right zone-column-foreign" width="120">
+                                    <div class="zone-header-title">
+                                        <span class="zone-header-chip foreign">Foránea</span>
+                                        <a href="{{ getSortUrl('BASE3') }}" class="text-decoration-none"
+                                            style="color: inherit;">
+                                            BASE 3 {!! getSortIcon('BASE3') !!}
+                                        </a>
+                                    </div>
+                                </th>
+                                <th class="text-right zone-column-foreign" width="120">
+                                    <div class="zone-header-title">
+                                        <span class="zone-header-chip foreign">Foránea</span>
+                                        <a href="{{ getSortUrl('BASE4') }}" class="text-decoration-none"
+                                            style="color: inherit;">
+                                            BASE 4 {!! getSortIcon('BASE4') !!}
+                                        </a>
+                                    </div>
                                 </th>
                             </tr>
                         </thead>
@@ -449,24 +575,38 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="text-right align-middle">
+                                    <td class="text-right align-middle zone-column-local">
                                         <input type="number" step="0.01" class="price-input update-price"
                                             data-codigo="{{ $product->CODIGO }}" data-field="BASE1"
                                             data-original="{{ number_format($product->BASE1, 2, '.', '') }}"
                                             value="{{ number_format($product->BASE1, 2, '.', '') }}">
                                         <span class="badge-dirty-tag">Pte</span>
                                     </td>
-                                    <td class="text-right align-middle">
+                                    <td class="text-right align-middle zone-column-local">
                                         <input type="number" step="0.01" class="price-input update-price"
                                             data-codigo="{{ $product->CODIGO }}" data-field="BASE2"
                                             data-original="{{ number_format($product->BASE2, 2, '.', '') }}"
                                             value="{{ number_format($product->BASE2, 2, '.', '') }}">
                                         <span class="badge-dirty-tag">Pte</span>
                                     </td>
+                                    <td class="text-right align-middle zone-column-foreign">
+                                        <input type="number" step="0.01" class="price-input update-price"
+                                            data-codigo="{{ $product->CODIGO }}" data-field="BASE3"
+                                            data-original="{{ number_format($product->BASE3, 2, '.', '') }}"
+                                            value="{{ number_format($product->BASE3, 2, '.', '') }}">
+                                        <span class="badge-dirty-tag">Pte</span>
+                                    </td>
+                                    <td class="text-right align-middle zone-column-foreign">
+                                        <input type="number" step="0.01" class="price-input update-price"
+                                            data-codigo="{{ $product->CODIGO }}" data-field="BASE4"
+                                            data-original="{{ number_format($product->BASE4, 2, '.', '') }}"
+                                            value="{{ number_format($product->BASE4, 2, '.', '') }}">
+                                        <span class="badge-dirty-tag">Pte</span>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center py-5">
+                                    <td colspan="7" class="text-center py-5">
                                         <i class="fas fa-search fa-3x text-muted mb-3"></i>
                                         <p class="text-muted font-weight-bold">No se encontraron productos.</p>
                                     </td>

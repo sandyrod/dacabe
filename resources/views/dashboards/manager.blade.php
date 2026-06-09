@@ -1017,6 +1017,18 @@
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-bell text-warning"></i> Clientes Inactivos <span class="badge badge-warning ml-2">Nuevo</span>
                                         </a>
+                                        <a href="{{ route('admin.reportes.vendedor.360') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-user-tie"></i> Vision 360 Vendedor <span class="badge badge-info ml-2">Nuevo</span>
+                                        </a>
+                                        <a href="{{ route('admin.reportes.cliente.360') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-users"></i> Vision 360 Cliente <span class="badge badge-primary ml-2">Nuevo</span>
+                                        </a>
+                                        <a href="{{ route('admin.reportes.producto.360') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-box-open"></i> Vision 360 Producto <span class="badge badge-success ml-2">Nuevo</span>
+                                        </a>
                                     </div>
                                 </div>
                             </div>

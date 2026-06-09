@@ -423,6 +423,15 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::get('reportes/inventario-deposito', 'Admin\ReporteInventarioController@porDeposito')->name('admin.reportes.inventario.deposito');
     Route::get('reportes/inventario-dashboard', 'Admin\ReporteInventarioController@dashboard')->name('admin.reportes.inventario.dashboard');
     Route::get('reportes/clientes-inactivos', 'Admin\ReporteClientesInactivosController@index')->name('admin.reportes.clientes.inactivos');
+    Route::get('reportes/vendedor-360', 'Admin\ReporteVendedor360Controller@index')->name('admin.reportes.vendedor.360');
+    Route::get('reportes/vendedor-360/export/excel', 'Admin\ReporteVendedor360Controller@exportExcel')->name('admin.reportes.vendedor.360.export.excel');
+    Route::get('reportes/vendedor-360/export/pdf', 'Admin\ReporteVendedor360Controller@exportPdf')->name('admin.reportes.vendedor.360.export.pdf');
+    Route::get('reportes/cliente-360', 'Admin\ReporteCliente360Controller@index')->name('admin.reportes.cliente.360');
+    Route::get('reportes/cliente-360/export/excel', 'Admin\ReporteCliente360Controller@exportExcel')->name('admin.reportes.cliente.360.export.excel');
+    Route::get('reportes/cliente-360/export/pdf', 'Admin\ReporteCliente360Controller@exportPdf')->name('admin.reportes.cliente.360.export.pdf');
+    Route::get('reportes/producto-360', 'Admin\ReporteProducto360Controller@index')->name('admin.reportes.producto.360');
+    Route::get('reportes/producto-360/export/excel', 'Admin\ReporteProducto360Controller@exportExcel')->name('admin.reportes.producto.360.export.excel');
+    Route::get('reportes/producto-360/export/pdf', 'Admin\ReporteProducto360Controller@exportPdf')->name('admin.reportes.producto.360.export.pdf');
 
     // Gestión de asociaciones cliente-vendedor
     Route::resource('cliente-vendedor', 'Admin\ClienteVendedorController')->only(['index', 'store', 'destroy']);

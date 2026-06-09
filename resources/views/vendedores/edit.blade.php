@@ -12,7 +12,7 @@
 
 	{!! Form::open(['route' =>  ['vendedores.update', $vendedor->id], 'method' => 'PUT', 'id' => 'form']) !!}
 		<input type="hidden" name="vendedor_id" id="vendedor_id" value="{{$vendedor->id}}">
-		<input type="hidden" name="user_id" id="user_id" value="{{$vendedor->user->id}}">
+		<input type="hidden" name="user_id" id="user_id" value="{{ optional($vendedor->user)->id }}">
 		<div class="card card-primary card-outline">
 			
 			<div class="card-body">

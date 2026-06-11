@@ -221,8 +221,8 @@
                                                     @foreach ($pago->pago_pedidos as $pp)
                                                     <div class="d-flex flex-column mb-2">
                                                         <div class="font-weight-bold text-dark mb-1">{{ $pp->pedido->descripcion ?? 'Cliente Desconocido' }}</div>
-                                                        <div class="d-flex align-items-center">
-                                                            <span class="badge badge-primary mr-2" style="font-size:0.85rem; letter-spacing:0.3px;">
+                                                        <div class="d-flex align-items-center flex-wrap" style="gap:4px;">
+                                                            <span class="badge badge-primary" style="font-size:0.85rem; letter-spacing:0.3px;">
                                                                 <i class="fas fa-receipt mr-1"></i>#{{ $pp->pedido_id }}
                                                             </span>
                                                             @php
@@ -236,6 +236,12 @@
                                                                     <i class="fas fa-file-invoice mr-1"></i>#{{ $factura->factura }}
                                                                 </span>
                                                             @endif
+                                                            <button class="btn-factura-pedido"
+                                                                data-pedido-id="{{ $pp->pedido_id }}"
+                                                                title="Ver factura completa del pedido #{{ $pp->pedido_id }}"
+                                                                style="padding:2px 8px;font-size:0.7rem;border-radius:6px;background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;color:#0369a1;font-weight:700;cursor:pointer;white-space:nowrap;">
+                                                                <i class="fas fa-file-invoice-dollar mr-1"></i>Ver Factura
+                                                            </button>
                                                         </div>
                                                     </div>
                                                     @if (!$loop->last)
@@ -490,6 +496,158 @@
         </div>
     </div>
 </div>
+<!-- Modal Factura Completa de Pedido -->
+<div class="modal fade" id="modalFacturaPedido" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+
+            <!-- Header -->
+            <div class="modal-header border-0 p-0" style="background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);">
+                <!-- Banda superior con logo y controles -->
+                <div class="w-100 d-flex align-items-center px-4 py-2" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                    <div class="d-flex align-items-center flex-grow-1">
+                        <div style="background:#fff;border-radius:10px;padding:5px 10px;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.25);">
+                            <img src="{{ asset('imgs/logos/dacabe.png') }}" alt="DACABE"
+                                 style="max-height:38px;max-width:130px;object-fit:contain;display:block;">
+                        </div>
+                        <div class="ml-3">
+                            <div class="text-white font-weight-bold" style="font-size:0.95rem;letter-spacing:0.3px;">Factura del Pedido</div>
+                            <div class="text-white-50" style="font-size:0.72rem;">Consulta de factura con precios en USD y Bs.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <button type="button" id="btnImprimirFactura" class="btn btn-sm mr-2"
+                            style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;font-size:0.8rem;">
+                            <i class="fas fa-print mr-1"></i>Imprimir
+                        </button>
+                        <button type="button" class="close text-white mb-0" data-dismiss="modal" style="opacity:0.7;font-size:1.3rem;">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+                <!-- Sub-banda: número de pedido en grande -->
+                <div class="w-100 px-4 py-3 d-flex align-items-center justify-content-between">
+                    <div>
+                        <div id="factNumero" class="text-white font-weight-bold" style="font-size:1.6rem;letter-spacing:1px;line-height:1;">PEDIDO #—</div>
+                        <div class="mt-1 d-flex align-items-center" style="gap:10px;">
+                            <span id="factFactura" class="text-white-50" style="font-size:0.78rem;"></span>
+                            <span id="factFecha" class="text-white-50" style="font-size:0.78rem;"></span>
+                        </div>
+                    </div>
+                    <div id="factEstatus"></div>
+                </div>
+            </div>
+
+            <div class="modal-body p-0 bg-light" style="max-height:85vh;overflow-y:auto;">
+
+                <!-- Loading -->
+                <div id="loadingFactura" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted small">Cargando factura...</p>
+                </div>
+
+                <!-- Contenido Factura -->
+                <div id="contenidoFactura" style="display:none;" class="p-4">
+
+                    <!-- Datos Cliente + Pedido -->
+                    <div class="row mb-4">
+                        <div class="col-md-7">
+                            <div class="p-3 h-100 rounded" style="background:#fff;border:1px solid #e2e8f0;">
+                                <div class="text-uppercase font-weight-bold mb-2" style="font-size:0.7rem;letter-spacing:1.5px;color:#64748b;">
+                                    <i class="fas fa-user mr-1"></i>Cliente
+                                </div>
+                                <div id="factCliente" class="font-weight-bold" style="color:#0f172a;font-size:1rem;"></div>
+                                <div class="mt-2 small text-muted">
+                                    <div id="factRif"></div>
+                                    <div id="factTelefono"></div>
+                                    <div id="factEmail"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="p-3 h-100 rounded" style="background:#fff;border:1px solid #e2e8f0;">
+                                <div class="text-uppercase font-weight-bold mb-2" style="font-size:0.7rem;letter-spacing:1.5px;color:#64748b;">
+                                    <i class="fas fa-info-circle mr-1"></i>Información
+                                </div>
+                                <table class="table table-sm table-borderless mb-0 small">
+                                    <tbody>
+                                        <tr>
+                                            <td class="pl-0 text-muted py-1">Vendedor</td>
+                                            <td class="font-weight-bold py-1" id="factVendedor">—</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-0 text-muted py-1">Referencia</td>
+                                            <td class="font-weight-bold py-1" id="factReferencia">—</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-0 text-muted py-1">Tasa BCV</td>
+                                            <td class="font-weight-bold py-1 text-success" id="factTasa">—</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Condiciones/Observaciones -->
+                    <div id="factObsSection" class="mb-4" style="display:none;">
+                        <div class="p-3 rounded" style="background:#fffbeb;border:1px solid #fde68a;">
+                            <div class="small font-weight-bold text-warning-dark mb-1">
+                                <i class="fas fa-sticky-note mr-1"></i>Observaciones / Condiciones
+                            </div>
+                            <div class="small text-muted" id="factObsTexto"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Items -->
+                    <div class="rounded shadow-sm overflow-hidden mb-4">
+                        <div class="px-3 py-2" style="background:linear-gradient(90deg,#0f172a,#1e3a5f);">
+                            <span class="text-white font-weight-bold small text-uppercase" style="letter-spacing:1px;">
+                                <i class="fas fa-list mr-2"></i>Detalle de Productos / Servicios
+                            </span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0" style="font-size:0.82rem;">
+                                <thead style="background:#f1f5f9;color:#475569;">
+                                    <tr>
+                                        <th class="pl-3 py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">Código</th>
+                                        <th class="py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;">Descripción</th>
+                                        <th class="text-center py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">UM</th>
+                                        <th class="text-right py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">Cant.</th>
+                                        <th class="text-right py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">P. USD</th>
+                                        <th class="text-right py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">P. Bs</th>
+                                        <th class="text-right py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">IVA%</th>
+                                        <th class="text-right py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">Sub. USD</th>
+                                        <th class="text-right pr-3 py-2" style="font-size:0.7rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;">Total Bs</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="factItemsBody" style="background:#fff;"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Totales -->
+                    <div class="row justify-content-end">
+                        <div class="col-md-7 col-lg-6">
+                            <div class="rounded overflow-hidden shadow-sm">
+                                <div class="px-3 py-2" style="background:linear-gradient(90deg,#0f172a,#1e3a5f);">
+                                    <span class="text-white font-weight-bold small text-uppercase" style="letter-spacing:1px;">
+                                        <i class="fas fa-calculator mr-2"></i>Resumen
+                                    </span>
+                                </div>
+                                <table class="table table-sm table-borderless mb-0" style="background:#fff;font-size:0.85rem;">
+                                    <tbody id="factTotalesBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @section('styles')
@@ -1036,5 +1194,173 @@
             });
         }
     });
+
+    /* ─────────────── MODAL FACTURA PEDIDO ─────────────── */
+    $(document).on('click', '.btn-factura-pedido', function (e) {
+        e.stopPropagation();
+        const pedidoId = $(this).data('pedido-id');
+
+        $('#loadingFactura').show();
+        $('#contenidoFactura').hide();
+        $('#modalFacturaPedido').modal('show');
+
+        $.get('{{ url("pedidos") }}/' + pedidoId + '/ver-factura')
+            .done(function (r) {
+                renderFactura(r);
+                $('#loadingFactura').hide();
+                $('#contenidoFactura').fadeIn(200);
+            })
+            .fail(function () {
+                $('#modalFacturaPedido').modal('hide');
+                toastr.error('No se pudo cargar la factura del pedido.');
+            });
+    });
+
+    $('#btnImprimirFactura').on('click', function () {
+        const contenido = document.getElementById('contenidoFactura').innerHTML;
+        const ventana = window.open('', '_blank', 'width=900,height=700');
+        ventana.document.write(`
+            <html><head><title>Factura</title>
+            <link rel="stylesheet" href="{{ asset('theme/plugins/bootstrap/css/bootstrap.min.css') }}">
+            <style>
+                body{font-family:sans-serif;padding:24px;font-size:12px;}
+                table{width:100%;border-collapse:collapse;}
+                th,td{padding:5px 8px;border:1px solid #ddd;}
+                thead{background:#0f172a;color:#fff;}
+                .no-print{display:none!important;}
+                @media print{.no-print{display:none!important;}}
+            </style>
+            </head><body>${contenido}</body></html>`);
+        ventana.document.close();
+        ventana.focus();
+        setTimeout(() => { ventana.print(); ventana.close(); }, 400);
+    });
+
+    function renderFactura(r) {
+        const p  = r.pedido   || {};
+        const t  = r.totales  || {};
+        const items = r.items || [];
+
+        const fmt = (v, dec = 2) => new Intl.NumberFormat('es-VE', {
+            minimumFractionDigits: dec, maximumFractionDigits: dec
+        }).format(parseFloat(v) || 0);
+
+        const fmtUSD = v => '$ ' + fmt(v);
+        const fmtBs  = v => fmt(v) + ' Bs.';
+
+        /* — cabecera del header — */
+        $('#factNumero').text('PEDIDO #' + (p.id || '—'));
+
+        $('#factFactura').html(p.factura
+            ? '<i class="fas fa-file-invoice mr-1"></i>Factura&nbsp;#' + p.factura + ' &nbsp;·&nbsp; '
+            : '');
+        $('#factFecha').html(p.fecha
+            ? '<i class="far fa-calendar-alt mr-1"></i>' + p.fecha
+            : '');
+
+        const statusColors = {
+            'PAGADO':   { bg:'rgba(209,250,229,0.25)', color:'#6ee7b7', border:'rgba(110,231,183,0.4)' },
+            'APROBADO': { bg:'rgba(219,234,254,0.25)', color:'#93c5fd', border:'rgba(147,197,253,0.4)' },
+            'PENDIENTE':{ bg:'rgba(254,243,199,0.25)', color:'#fde68a', border:'rgba(253,230,138,0.4)' },
+        };
+        const sc = statusColors[p.estatus] || { bg:'rgba(241,245,249,0.2)', color:'#cbd5e1', border:'rgba(203,213,225,0.3)' };
+        $('#factEstatus').html(
+            `<span style="background:${sc.bg};color:${sc.color};border:1px solid ${sc.border};padding:4px 14px;border-radius:20px;font-size:0.72rem;font-weight:700;letter-spacing:0.5px;">${p.estatus || ''}</span>`
+        );
+
+        /* — cliente — */
+        $('#factCliente').text(p.cliente || '—');
+        $('#factRif').html(p.rif        ? '<i class="fas fa-id-card mr-1"></i>' + p.rif      : '');
+        $('#factTelefono').html(p.telefono ? '<i class="fas fa-phone mr-1"></i>' + p.telefono : '');
+        $('#factEmail').html(p.email    ? '<i class="fas fa-envelope mr-1"></i>' + p.email   : '');
+
+        /* — info — */
+        $('#factVendedor').text(p.vendedor   || '—');
+        $('#factReferencia').text(p.referencia || '—');
+        $('#factTasa').text(p.tasa > 0 ? 'Bs. ' + fmt(p.tasa) : '—');
+
+        /* — observaciones — */
+        const obs = [p.observations, p.conditions].filter(Boolean).join(' | ');
+        if (obs) {
+            $('#factObsTexto').text(obs);
+            $('#factObsSection').show();
+        } else {
+            $('#factObsSection').hide();
+        }
+
+        /* — items — */
+        const tbody = $('#factItemsBody').empty();
+        if (!items.length) {
+            tbody.append('<tr><td colspan="9" class="text-center text-muted py-3">Sin ítems</td></tr>');
+        } else {
+            items.forEach(function (item, i) {
+                const bg = i % 2 === 0 ? '#fff' : '#f8fafc';
+                tbody.append(`
+                    <tr style="background:${bg};">
+                        <td class="pl-3 py-2 text-muted small" style="white-space:nowrap;">${item.codigo || ''}</td>
+                        <td class="py-2 font-weight-bold" style="color:#0f172a;">${item.descripcion || ''}</td>
+                        <td class="text-center py-2 text-muted small">${item.unidad || ''}</td>
+                        <td class="text-right py-2">${fmt(item.cantidad, 0)}</td>
+                        <td class="text-right py-2 text-primary font-weight-bold" style="white-space:nowrap;">${fmtUSD(item.precio_usd)}</td>
+                        <td class="text-right py-2 text-success" style="white-space:nowrap;">${fmtBs(item.precio_bs)}</td>
+                        <td class="text-right py-2 text-muted">${fmt(item.iva_porc, 0)}%</td>
+                        <td class="text-right py-2 font-weight-bold" style="white-space:nowrap;color:#1e40af;">${fmtUSD(item.subtotal_usd)}</td>
+                        <td class="text-right pr-3 py-2 font-weight-bold" style="white-space:nowrap;color:#065f46;">${fmtBs(item.total_bs)}</td>
+                    </tr>`);
+            });
+        }
+
+        /* — totales — */
+        const tb = $('#factTotalesBody').empty();
+
+        const rowTot = (label, usd, bs, opts = {}) => {
+            const style = opts.bold ? 'font-weight:700;' : '';
+            const cls   = opts.cls  || 'text-dark';
+            return `
+                <tr style="${opts.rowStyle || ''}">
+                    <td class="pl-3 py-2 text-muted" style="font-size:0.82rem;">${label}</td>
+                    <td class="text-right py-2 ${cls}" style="${style}font-size:0.82rem;white-space:nowrap;">${usd !== null ? fmtUSD(usd) : ''}</td>
+                    <td class="text-right pr-3 py-2 ${cls}" style="${style}font-size:0.82rem;white-space:nowrap;">${fmtBs(bs)}</td>
+                </tr>`;
+        };
+
+        tb.append(`
+            <tr style="background:#f8fafc;">
+                <th class="pl-3 py-1" style="font-size:0.7rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border:none;">Concepto</th>
+                <th class="text-right py-1" style="font-size:0.7rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border:none;white-space:nowrap;">USD</th>
+                <th class="text-right pr-3 py-1" style="font-size:0.7rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border:none;white-space:nowrap;">Bs.</th>
+            </tr>`);
+
+        tb.append(rowTot('Subtotal (Base)', t.subtotal_usd, t.subtotal_bs));
+
+        const ivaLabel = (t.retencion_porc > 0)
+            ? 'IVA (' + fmt(t.retencion_porc > 0 && t.subtotal_bs > 0 ? (t.iva_bs / t.subtotal_bs * 100) : 16, 0) + '%)'
+            : 'IVA';
+        tb.append(rowTot(ivaLabel, t.iva_usd, t.iva_bs));
+
+        if ((t.retencion_bs || 0) > 0.009) {
+            const retLabel = 'Retención IVA' + (t.retencion_porc > 0 ? ' (' + fmt(t.retencion_porc, 0) + '%)' : '');
+            tb.append(rowTot(retLabel, -(t.retencion_usd || 0), -t.retencion_bs,
+                { cls: 'text-warning' }));
+        }
+        if ((t.descuento_usd || 0) > 0.009) {
+            tb.append(rowTot('Descuento', -t.descuento_usd, -t.descuento_bs,
+                { cls: 'text-success' }));
+        }
+
+        /* fila TOTAL */
+        tb.append(`
+            <tr style="background:linear-gradient(90deg,#0f172a,#1e3a5f);">
+                <td class="pl-3 py-3 text-white font-weight-bold" style="font-size:0.9rem;letter-spacing:0.5px;text-transform:uppercase;border:none;">
+                    TOTAL
+                </td>
+                <td class="text-right py-3 font-weight-bold" style="font-size:1rem;color:#93c5fd;white-space:nowrap;border:none;">
+                    ${fmtUSD(t.neto_usd)}
+                </td>
+                <td class="text-right pr-3 py-3 font-weight-bold" style="font-size:1.1rem;color:#6ee7b7;white-space:nowrap;border:none;">
+                    ${fmtBs(t.neto_bs)}
+                </td>
+            </tr>`);
+    }
 </script>
 @endsection

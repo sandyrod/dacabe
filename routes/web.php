@@ -186,6 +186,7 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('pagos/{id}/cambiar-estatus', 'PagosController@cambiarEstatus')->name('pagos.cambiarEstatus');
     Route::get('pagos/{id}/detalle', 'PagosController@detalle')->name('pagos.detalle');
     Route::post('pagos/{id}/aprobar-retencion', 'PagosController@aprobarRetencion')->name('pagos.aprobarRetencion');
+    Route::get('pedidos/{id}/ver-factura', 'PagosController@verFacturaPedido')->name('pedidos.ver.factura');
 });
 
 Route::get('users/card', ['as' => 'users.card', 'uses' => 'UsersController@showCardList']);

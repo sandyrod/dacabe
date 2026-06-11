@@ -91,6 +91,10 @@ class ComisionVendedorController extends Controller
             $query->having('estatus_comision', $estadoFiltro);
         }
 
+        if ($request->has('metodo_pago') && $request->metodo_pago) {
+            $query->having('moneda_pago', $request->metodo_pago);
+        }
+
         if ($request->has('fecha_inicio') && $request->fecha_inicio) {
             $query->whereDate('comision_agrupada.fecha_pedido', '>=', $request->fecha_inicio);
         }
@@ -241,7 +245,7 @@ class ComisionVendedorController extends Controller
         $tasaDia = $tasaRecord ? $tasaRecord->valor : 0;
 
         // Check if any filters are applied (excluding sort and direction)
-        $hasFilters = $request->hasAny(['vendedor', 'cliente', 'estado', 'fecha_inicio', 'fecha_fin']);
+        $hasFilters = $request->hasAny(['vendedor', 'cliente', 'estado', 'metodo_pago', 'fecha_inicio', 'fecha_fin']);
 
         // Paginar los resultados agrupados
         if ($hasFilters) {

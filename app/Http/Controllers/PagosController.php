@@ -297,6 +297,107 @@ class PagosController extends Controller
         }
     }
 
+    // Ver factura completa de un pedido
+    public function verFacturaPedido($id)
+    {
+        $pedido = Pedido::on('company')
+            ->with(['pedido_detalle', 'pedido_factura'])
+            ->findOrFail($id);
+
+        $tasa = (float) ($pedido->tasa ?? 0);
+
+        $items = $pedido->pedido_detalle->map(function ($det) use ($tasa) {
+            $precioUsd   = (float) ($det->precio_dolar ?? 0);
+            $tasaDet     = (float) ($det->tasa ?: $tasa) ?: 1;
+            $precioBs    = $precioUsd * $tasaDet;
+            $cantidad    = (float) ($det->cantidad ?? 0);
+            $ivaPorc     = (float) ($det->iva ?? 0);
+            $subtotalUsd = $cantidad * $precioUsd;
+            $subtotalBs  = $cantidad * $precioBs;
+            $ivaUsd      = $subtotalUsd * ($ivaPorc / 100);
+            $ivaBs       = $subtotalBs  * ($ivaPorc / 100);
+
+            return [
+                'codigo'       => $det->codigo_inven ?? '',
+                'descripcion'  => $det->inven_descr  ?? '',
+                'unidad'       => $det->inven_unidad  ?? '',
+                'cantidad'     => $cantidad,
+                'precio_usd'   => round($precioUsd,   4),
+                'precio_bs'    => round($precioBs,    2),
+                'iva_porc'     => $ivaPorc,
+                'subtotal_usd' => round($subtotalUsd, 2),
+                'subtotal_bs'  => round($subtotalBs,  2),
+                'iva_usd'      => round($ivaUsd,      2),
+                'iva_bs'       => round($ivaBs,       2),
+                'total_usd'    => round($subtotalUsd + $ivaUsd, 2),
+                'total_bs'     => round($subtotalBs  + $ivaBs,  2),
+            ];
+        });
+
+        // Subtotal desde pedido->base (USD) y conversión a Bs
+        $subtotalUsd = round((float) ($pedido->base ?? $items->sum('subtotal_usd')), 2);
+        $subtotalBs  = round($subtotalUsd * $tasa, 2);
+
+        // IVA directo de pedido->iva_bs; USD derivado dividiendo por tasa
+        $ivaBs  = round((float) ($pedido->iva_bs ?? 0), 2);
+        $ivaUsd = ($tasa > 0) ? round($ivaBs / $tasa, 2) : 0;
+
+        $totalUsd = round($subtotalUsd + $ivaUsd, 2);
+        $totalBs  = round($subtotalBs  + $ivaBs,  2);
+
+        $retencionPorc = (float) ($pedido->porc_retencion ?? 0);
+        $retencionBs   = round((float) ($pedido->retencion ?: ($retencionPorc > 0 ? $ivaBs * ($retencionPorc / 100) : 0)), 2);
+        $retencionUsd  = ($tasa > 0) ? round($retencionBs / $tasa, 2) : 0;
+
+        $descuentoUsd = (float) ($pedido->monto_descuento ?? $pedido->descuento ?? 0);
+        $descuentoBs  = round($descuentoUsd * $tasa, 2);
+
+        $netoUsd = round($totalUsd - $retencionUsd - $descuentoUsd, 2);
+        $netoBs  = round($totalBs  - $retencionBs  - $descuentoBs,  2);
+
+        $user = null;
+        if ($pedido->user_id) {
+            $user = \App\User::find($pedido->user_id);
+        }
+
+        return response()->json([
+            'pedido' => [
+                'id'         => $pedido->id,
+                'referencia' => $pedido->referencia,
+                'fecha'      => $pedido->fecha
+                    ? \Carbon\Carbon::parse($pedido->fecha)->format('d/m/Y')
+                    : null,
+                'cliente'    => $pedido->descripcion,
+                'rif'        => $pedido->rif,
+                'telefono'   => $pedido->telefono,
+                'email'      => $pedido->email,
+                'tasa'       => $tasa,
+                'estatus'    => $pedido->estatus,
+                'factura'    => $pedido->pedido_factura ? $pedido->pedido_factura->factura : null,
+                'vendedor'   => $user ? trim($user->name . ' ' . $user->last_name) : null,
+                'observations' => $pedido->observations,
+                'conditions'   => $pedido->conditions,
+            ],
+            'items'   => $items->values()->toArray(),
+            'totales' => [
+                'subtotal_usd'   => $subtotalUsd,
+                'subtotal_bs'    => $subtotalBs,
+                'iva_usd'        => $ivaUsd,
+                'iva_bs'         => $ivaBs,
+                'total_usd'      => $totalUsd,
+                'total_bs'       => $totalBs,
+                'retencion_porc' => $retencionPorc,
+                'retencion_bs'   => $retencionBs,
+                'retencion_usd'  => $retencionUsd,
+                'descuento_usd'  => $descuentoUsd,
+                'descuento_bs'   => $descuentoBs,
+                'neto_usd'       => $netoUsd,
+                'neto_bs'        => $netoBs,
+                'tasa'           => $tasa,
+            ],
+        ]);
+    }
+
     // Obtener detalles de un pago
     public function detalle($id)
     {

@@ -160,6 +160,27 @@
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         color: white;
     }
+
+    .pdf-badge-cargado {
+        background: linear-gradient(135deg, #c0392b, #e74c3c);
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.72rem;
+        letter-spacing: 0.2px;
+        box-shadow: 0 2px 6px rgba(192, 57, 43, 0.4);
+        transition: opacity 0.2s;
+    }
+    .pdf-badge-cargado:hover {
+        opacity: 0.85;
+        color: #fff;
+        text-decoration: none;
+    }
+    .pdf-badge-vacio {
+        background: transparent;
+        color: #ced4da;
+        border: 1px dashed #ced4da;
+        font-size: 0.72rem;
+    }
 </style>
 @endsection
 
@@ -305,6 +326,18 @@
                                     <span class="badge badge-secondary badge-pill d-block">Sin Factura</span>
                                     @endif
                                 </a>
+                                @if($pedido->factura_pdf)
+                                <a href="{{ asset('imgs/' . $pedido->factura_pdf) }}" target="_blank"
+                                   class="badge badge-pill d-block mt-1 pdf-badge-cargado"
+                                   title="Ver Factura PDF adjunta">
+                                    <i class="fas fa-file-pdf mr-1"></i>PDF ✓
+                                </a>
+                                @else
+                                <span class="badge badge-pill d-block mt-1 pdf-badge-vacio"
+                                      title="Sin Factura PDF">
+                                    <i class="fas fa-file-pdf mr-1"></i>Sin PDF
+                                </span>
+                                @endif
                             </td>
                             <td class="align-middle">
                                 <div class="mb-2">{{ \Carbon\Carbon::parse($pedido->fecha)->format('d/m/Y') }}</div>
@@ -405,7 +438,25 @@
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-secondary m-1 email" data-iddata="{{ $pedido->id }}" title="Enviar Correo">
                                     <i class="fas fa-envelope"></i>
                                 </a>
-                                
+                                @if($pedido->factura_pdf)
+                                <a href="javascript:void(0)"
+                                   class="btn btn-sm btn-success m-1 btn-factura-pdf"
+                                   data-id="{{ $pedido->id }}"
+                                   data-url="{{ asset('imgs/' . $pedido->factura_pdf) }}"
+                                   title="Ver / Reemplazar Factura PDF"
+                                   style="font-size:0.78rem;">
+                                    <i class="fas fa-file-pdf mr-1"></i><i class="fas fa-check-circle"></i>
+                                </a>
+                                @else
+                                <a href="javascript:void(0)"
+                                   class="btn btn-sm btn-outline-secondary m-1 btn-factura-pdf"
+                                   data-id="{{ $pedido->id }}"
+                                   data-url=""
+                                   title="Adjuntar Factura PDF"
+                                   style="border-style:dashed;font-size:0.78rem;color:#adb5bd;">
+                                    <i class="fas fa-file-pdf mr-1"></i><i class="fas fa-plus" style="font-size:0.7em;"></i>
+                                </a>
+                                @endif
                             </td>
                         </tr>
                         @empty
@@ -510,6 +561,50 @@
 </div>
 
 @endsection
+
+{{-- Modal Factura PDF --}}
+<div class="modal fade" id="modalFacturaPdf" tabindex="-1" role="dialog" aria-labelledby="modalFacturaPdfLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered" role="document">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #c0392b, #e74c3c);">
+                <h5 class="modal-title font-weight-bold" id="modalFacturaPdfLabel">
+                    <i class="fas fa-file-pdf mr-2"></i>Factura PDF — Pedido #<span id="facturaPdfPedidoId"></span>
+                </h5>
+                <button type="button" class="close text-white" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="facturaPdfActual" class="mb-3 d-none">
+                    <p class="text-muted small mb-1"><i class="fas fa-info-circle mr-1"></i>PDF adjunto actualmente:</p>
+                    <a id="facturaPdfLink" href="#" target="_blank" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-file-pdf mr-1"></i> Ver PDF actual
+                    </a>
+                    <hr>
+                </div>
+                <form id="formFacturaPdf" enctype="multipart/form-data">
+                    @csrf
+                    <div class="form-group mb-0">
+                        <label class="font-weight-bold mb-1"><i class="fas fa-upload mr-1"></i>Seleccionar archivo PDF</label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="inputFacturaPdf" name="factura_pdf" accept=".pdf">
+                            <label class="custom-file-label" for="inputFacturaPdf">Elegir archivo...</label>
+                        </div>
+                        <small class="text-muted">Solo archivos PDF. Máximo 10 MB.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0">
+                <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">
+                    <i class="fas fa-times mr-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger px-4" id="btnGuardarFacturaPdf">
+                    <i class="fas fa-save mr-1"></i>Guardar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 @section('scripts')
 <script src="{{ asset('theme/plugins/sweetalert2/sweetalert2.min.js') }}"></script>
@@ -1162,6 +1257,75 @@
                 Swal.fire('¡Actualizado!', 'Días de crédito actualizados correctamente.', 'success').then(() => {
                     window.location.reload();
                 });
+            }
+        });
+    });
+
+    // --- Factura PDF ---
+    $(document).on('click', '.btn-factura-pdf', function () {
+        const id  = $(this).data('id');
+        const url = $(this).data('url');
+
+        $('#facturaPdfPedidoId').text(id);
+        $('#formFacturaPdf').data('pedido-id', id);
+        $('#inputFacturaPdf').val('');
+        $('.custom-file-label').text('Elegir archivo...');
+
+        if (url) {
+            $('#facturaPdfLink').attr('href', url);
+            $('#facturaPdfActual').removeClass('d-none');
+        } else {
+            $('#facturaPdfActual').addClass('d-none');
+        }
+
+        $('#modalFacturaPdf').modal('show');
+    });
+
+    $('#inputFacturaPdf').on('change', function () {
+        const fileName = $(this).val().split('\\').pop() || 'Elegir archivo...';
+        $(this).next('.custom-file-label').text(fileName);
+    });
+
+    $('#btnGuardarFacturaPdf').on('click', function () {
+        const pedidoId = $('#formFacturaPdf').data('pedido-id');
+        const file = $('#inputFacturaPdf')[0].files[0];
+
+        if (!file) {
+            toastr.warning('Seleccione un archivo PDF primero.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('factura_pdf', file);
+        formData.append('_token', TOKEN);
+
+        const $btn = $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i>Subiendo...');
+
+        $.ajax({
+            url: BASE_URL + '/admin/pedidos/' + pedidoId + '/factura-pdf',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (res) {
+                if (res.type === 'success') {
+                    $('#modalFacturaPdf').modal('hide');
+                    toastr.success(res.message);
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    toastr.error(res.message || 'Error al guardar.');
+                }
+            },
+            error: function (xhr) {
+                const msg = xhr.responseJSON && xhr.responseJSON.message
+                    ? xhr.responseJSON.message
+                    : (xhr.responseJSON && xhr.responseJSON.errors
+                        ? Object.values(xhr.responseJSON.errors).flat().join(' ')
+                        : 'Error al subir el archivo.');
+                toastr.error(msg);
+            },
+            complete: function () {
+                $btn.prop('disabled', false).html('<i class="fas fa-save mr-1"></i>Guardar PDF');
             }
         });
     });

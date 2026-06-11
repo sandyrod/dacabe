@@ -242,6 +242,13 @@
                                                                 style="padding:2px 8px;font-size:0.7rem;border-radius:6px;background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;color:#0369a1;font-weight:700;cursor:pointer;white-space:nowrap;">
                                                                 <i class="fas fa-file-invoice-dollar mr-1"></i>Ver Factura
                                                             </button>
+                                                            @if($pp->pedido && $pp->pedido->factura_pdf)
+                                                            <a href="{{ asset('imgs/' . $pp->pedido->factura_pdf) }}" target="_blank"
+                                                                style="padding:2px 8px;font-size:0.7rem;border-radius:6px;background:linear-gradient(135deg,#fee2e2,#fecaca);border:1px solid #ef4444;color:#b91c1c;font-weight:700;text-decoration:none;white-space:nowrap;display:inline-block;"
+                                                                title="Ver Factura PDF del pedido #{{ $pp->pedido_id }}">
+                                                                <i class="fas fa-file-pdf mr-1"></i>Factura PDF
+                                                            </a>
+                                                            @endif
                                                         </div>
                                                     </div>
                                                     @if (!$loop->last)

@@ -45,7 +45,8 @@ class Pedido extends Model
         'saldo_iva_bs',
         'total_ajustes',
         'saldo_ajustes',
-        'comprobante_retencion'
+        'comprobante_retencion',
+        'factura_pdf'
     ];
 
     protected $casts = [

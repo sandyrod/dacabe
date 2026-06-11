@@ -106,6 +106,18 @@
                                 </div>
                                 <div class="col-md-2">
                                     <div class="form-group mb-0">
+                                        <label for="metodo_pago" class="font-weight-bold text-primary mb-1">
+                                            <i class="fas fa-money-bill-wave mr-1"></i>Método de Pago
+                                        </label>
+                                        <select name="metodo_pago" id="metodo_pago" class="form-control">
+                                            <option value="">Todas</option>
+                                            <option value="DIVISA EFECTIVO" {{ request('metodo_pago') == 'DIVISA EFECTIVO' ? 'selected' : '' }}>Divisa Efectivo</option>
+                                            <option value="BOLIVARES" {{ request('metodo_pago') == 'BOLIVARES' ? 'selected' : '' }}>Bolívares</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="form-group mb-0">
                                         <label class="font-weight-bold text-primary mb-1"><i
                                                 class="far fa-calendar-alt mr-1"></i> Fecha Inicio</label>
                                         <input type="date" name="fecha_inicio" class="form-control"
@@ -124,7 +136,7 @@
                                     <button type="submit" class="btn btn-primary btn-block mt-2">
                                         <i class="fas fa-filter mr-1"></i> Filtrar
                                     </button>
-                                    @if (request()->hasAny(['vendedor', 'cliente', 'estado', 'fecha_inicio', 'fecha_fin']))
+                                    @if (request()->hasAny(['vendedor', 'cliente', 'estado', 'metodo_pago', 'fecha_inicio', 'fecha_fin']))
                                         <a href="{{ route('comisiones.index') }}"
                                             class="btn btn-outline-secondary btn-sm mt-2" title="Limpiar filtros">
                                             <i class="fas fa-undo-alt"></i>
@@ -480,6 +492,14 @@
                                                                         <i class="fas fa-file-invoice mr-1"></i> Fact: {{ explode(',', $comision->facturas)[0] }}
 
                                                                     </span>
+                                                                @endif
+                                                                @if ($comision->factura_pdf)
+                                                                    <a href="{{ asset('imgs/' . $comision->factura_pdf) }}" target="_blank"
+                                                                       class="badge badge-pill"
+                                                                       style="background:linear-gradient(135deg,#fee2e2,#fecaca);border:1px solid #ef4444;color:#b91c1c;font-weight:700;text-decoration:none;"
+                                                                       title="Ver Factura PDF del pedido">
+                                                                        <i class="fas fa-file-pdf mr-1"></i>PDF
+                                                                    </a>
                                                                 @endif
                                                                 <br>
                                                                 <small class="text-primary"><i
@@ -1299,15 +1319,45 @@
 
                 .pagination {
                     margin-bottom: 0;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 3px;
+                    align-items: center;
+                }
+
+                .page-item .page-link {
+                    color: #3c8dbc;
+                    border-radius: 6px !important;
+                    border: 1px solid #dee2e6;
+                    padding: 0.35rem 0.65rem;
+                    font-size: 0.875rem;
+                    line-height: 1.5;
+                    transition: all 0.2s ease;
+                    min-width: 34px;
+                    text-align: center;
+                }
+
+                .page-item .page-link:hover {
+                    background-color: #e8f4fb;
+                    border-color: #3c8dbc;
+                    color: #2a6496;
+                    text-decoration: none;
                 }
 
                 .page-item.active .page-link {
                     background-color: #3c8dbc;
                     border-color: #3c8dbc;
+                    color: #fff;
+                    font-weight: 600;
+                    box-shadow: 0 2px 6px rgba(60, 141, 188, 0.4);
                 }
 
-                .page-link {
-                    color: #3c8dbc;
+                .page-item.disabled .page-link {
+                    color: #adb5bd;
+                    background-color: #f8f9fa;
+                    border-color: #dee2e6;
+                    cursor: not-allowed;
+                    opacity: 0.7;
                 }
 
                 .form-control:focus,

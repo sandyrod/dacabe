@@ -57,6 +57,7 @@ class ComisionVendedorController extends Controller
                 'pgd.pedido_id',
                 'p.descripcion as descripcion_pedido',
                 'p.descuento as descuento_pedido',
+                'p.factura_pdf',
                 'comision_agrupada.fecha_pedido',
                 'comision_agrupada.nombre_vendedor',
                 'comision_agrupada.correo_vendedor',
@@ -74,7 +75,7 @@ class ComisionVendedorController extends Controller
                     ELSE "SIN PAGO REGISTRADO"
                 END as moneda_pago')
             )
-            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.porcentaje_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
+            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'p.factura_pdf', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.porcentaje_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
 
         // Filtros
         if ($request->has('vendedor') && $request->vendedor) {
@@ -89,6 +90,10 @@ class ComisionVendedorController extends Controller
         $estadoFiltro = $request->get('estado', 'pendiente');
         if ($estadoFiltro && in_array($estadoFiltro, ['pendiente', 'pagada', 'rechazada'])) {
             $query->having('estatus_comision', $estadoFiltro);
+        }
+
+        if ($request->has('metodo_pago') && $request->metodo_pago) {
+            $query->having('moneda_pago', $request->metodo_pago);
         }
 
         if ($request->has('fecha_inicio') && $request->fecha_inicio) {
@@ -241,7 +246,7 @@ class ComisionVendedorController extends Controller
         $tasaDia = $tasaRecord ? $tasaRecord->valor : 0;
 
         // Check if any filters are applied (excluding sort and direction)
-        $hasFilters = $request->hasAny(['vendedor', 'cliente', 'estado', 'fecha_inicio', 'fecha_fin']);
+        $hasFilters = $request->hasAny(['vendedor', 'cliente', 'estado', 'metodo_pago', 'fecha_inicio', 'fecha_fin']);
 
         // Paginar los resultados agrupados
         if ($hasFilters) {

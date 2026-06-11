@@ -493,6 +493,14 @@
 
                                                                     </span>
                                                                 @endif
+                                                                @if ($comision->factura_pdf)
+                                                                    <a href="{{ asset('imgs/' . $comision->factura_pdf) }}" target="_blank"
+                                                                       class="badge badge-pill"
+                                                                       style="background:linear-gradient(135deg,#fee2e2,#fecaca);border:1px solid #ef4444;color:#b91c1c;font-weight:700;text-decoration:none;"
+                                                                       title="Ver Factura PDF del pedido">
+                                                                        <i class="fas fa-file-pdf mr-1"></i>PDF
+                                                                    </a>
+                                                                @endif
                                                                 <br>
                                                                 <small class="text-primary"><i
                                                                         class="fas fa-user-circle mr-1"></i>{{ $comision->descripcion_pedido }}</small>

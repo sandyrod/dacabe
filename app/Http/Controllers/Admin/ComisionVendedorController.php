@@ -57,6 +57,7 @@ class ComisionVendedorController extends Controller
                 'pgd.pedido_id',
                 'p.descripcion as descripcion_pedido',
                 'p.descuento as descuento_pedido',
+                'p.factura_pdf',
                 'comision_agrupada.fecha_pedido',
                 'comision_agrupada.nombre_vendedor',
                 'comision_agrupada.correo_vendedor',
@@ -74,7 +75,7 @@ class ComisionVendedorController extends Controller
                     ELSE "SIN PAGO REGISTRADO"
                 END as moneda_pago')
             )
-            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.porcentaje_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
+            ->groupBy('pgd.pedido_id', 'p.descripcion', 'p.descuento', 'p.factura_pdf', 'comision_agrupada.fecha_pedido', 'comision_agrupada.nombre_vendedor', 'comision_agrupada.correo_vendedor', 'comision_agrupada.total_comision', 'comision_agrupada.porcentaje_comision', 'comision_agrupada.estatus_comision', 'comision_agrupada.recibido', 'pd_count.total_productos');
 
         // Filtros
         if ($request->has('vendedor') && $request->vendedor) {

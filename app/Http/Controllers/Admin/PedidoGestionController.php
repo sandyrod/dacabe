@@ -9,6 +9,8 @@ use App\Models\PedidoAjuste;
 use App\Models\Vendedor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -437,6 +439,51 @@ class PedidoGestionController extends Controller
             'data' => [
                 'dias_credito' => $pedido->dias_credito
             ]
+        ]);
+    }
+
+    public function subirFacturaPdf(Request $request, $pedidoId)
+    {
+        $request->validate([
+            'factura_pdf' => 'required|file|mimes:pdf|max:10240',
+        ], [
+            'factura_pdf.required' => 'Debe seleccionar un archivo PDF.',
+            'factura_pdf.mimes'    => 'El archivo debe ser un PDF.',
+            'factura_pdf.max'      => 'El archivo no puede superar los 10 MB.',
+        ]);
+
+        $file      = $request->file('factura_pdf');
+        $carpeta   = 'facturas_pdf';
+        $extension = $file->getClientOriginalExtension() ?: 'pdf';
+        $nombre    = now()->format('Ymd_His') . '_' . Str::uuid() . '.' . $extension;
+        $ruta      = $carpeta . '/' . $nombre;
+
+        try {
+            $disk = Storage::disk('public');
+            if (!$disk->exists($carpeta)) {
+                $disk->makeDirectory($carpeta);
+            }
+            $contenido = file_get_contents($file->getRealPath());
+            if ($contenido !== false) {
+                $disk->put($ruta, $contenido);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Fallo disco public para factura_pdf, usando fallback.', ['error' => $e->getMessage()]);
+            $directorio = public_path('imgs/' . $carpeta);
+            if (!is_dir($directorio) && !mkdir($directorio, 0775, true) && !is_dir($directorio)) {
+                return response()->json(['type' => 'error', 'message' => 'No se pudo crear el directorio de destino.'], 500);
+            }
+            $file->move($directorio, $nombre);
+        }
+
+        $pedido = Pedido::findOrFail($pedidoId);
+        $pedido->factura_pdf = $ruta;
+        $pedido->save();
+
+        return response()->json([
+            'type'    => 'success',
+            'message' => 'Factura PDF adjuntada correctamente.',
+            'url'     => asset('imgs/' . $ruta),
         ]);
     }
 }

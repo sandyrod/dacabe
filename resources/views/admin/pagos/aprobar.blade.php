@@ -527,6 +527,10 @@
                             style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;border-radius:8px;font-size:0.8rem;">
                             <i class="fas fa-print mr-1"></i>Imprimir
                         </button>
+                        <button type="button" id="btnTasasHistorico" class="btn btn-sm mr-2"
+                            style="background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.45);color:#6ee7b7;border-radius:8px;font-size:0.8rem;transition:all .2s;">
+                            <i class="fas fa-chart-line mr-1"></i>Tasas
+                        </button>
                         <button type="button" class="close text-white mb-0" data-dismiss="modal" style="opacity:0.7;font-size:1.3rem;">
                             <span aria-hidden="true">&times;</span>
                         </button>
@@ -546,6 +550,75 @@
             </div>
 
             <div class="modal-body p-0 bg-light" style="max-height:85vh;overflow-y:auto;">
+
+                <!-- Panel Historial de Tasas BCV -->
+                <div id="panelHistoricoTasas" style="display:none;background:#f0fdf4;border-bottom:1px solid #a7f3d0;">
+                    <div class="px-4 pt-3 pb-3">
+                        <!-- Encabezado del panel -->
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <div class="d-flex align-items-center">
+                                <div style="width:4px;height:26px;background:linear-gradient(180deg,#10b981,#059669);border-radius:2px;margin-right:10px;flex-shrink:0;"></div>
+                                <div>
+                                    <div class="font-weight-bold" style="font-size:0.88rem;color:#065f46;">
+                                        <i class="fas fa-chart-line mr-1"></i>Historial de Tasas BCV
+                                    </div>
+                                    <div class="text-muted" style="font-size:0.72rem;">Tasas cercanas a la fecha del pedido. <span id="tasasRefLabel"></span></div>
+                                </div>
+                            </div>
+                            <button type="button" id="btnCerrarTasas" class="btn btn-sm"
+                                    style="background:#fff;border:1px solid #a7f3d0;color:#065f46;border-radius:8px;font-size:0.75rem;">
+                                <i class="fas fa-times mr-1"></i>Cerrar
+                            </button>
+                        </div>
+                        <!-- Filtros -->
+                        <div class="d-flex align-items-end flex-wrap mb-3" style="gap:8px;">
+                            <div>
+                                <label class="d-block mb-1" style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Desde</label>
+                                <input type="date" id="tasaDesde" class="form-control form-control-sm"
+                                       style="font-size:0.8rem;border:1px solid #a7f3d0;background:#fff;width:145px;border-radius:7px;">
+                            </div>
+                            <div>
+                                <label class="d-block mb-1" style="font-size:0.68rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Hasta</label>
+                                <input type="date" id="tasaHasta" class="form-control form-control-sm"
+                                       style="font-size:0.8rem;border:1px solid #a7f3d0;background:#fff;width:145px;border-radius:7px;">
+                            </div>
+                            <button id="btnFiltrarTasas" class="btn btn-sm"
+                                    style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.8rem;padding:6px 14px;">
+                                <i class="fas fa-search mr-1"></i>Filtrar
+                            </button>
+                            <button id="btnTasas7dias" class="btn btn-sm"
+                                    style="background:#fff;border:1px solid #a7f3d0;color:#059669;border-radius:8px;font-size:0.75rem;padding:6px 11px;"
+                                    title="Mostrar ±7 días desde la fecha del pedido">
+                                <i class="fas fa-calendar-week mr-1"></i>±7 días
+                            </button>
+                            <button id="btnTasas30dias" class="btn btn-sm"
+                                    style="background:#fff;border:1px solid #a7f3d0;color:#059669;border-radius:8px;font-size:0.75rem;padding:6px 11px;"
+                                    title="Mostrar ±30 días desde la fecha del pedido">
+                                <i class="fas fa-calendar-alt mr-1"></i>±30 días
+                            </button>
+                            <div id="loadingTasas" style="display:none;align-items:center;" class="ml-1">
+                                <div class="spinner-border spinner-border-sm text-success mr-1" role="status" style="width:14px;height:14px;"></div>
+                                <span class="small text-muted">Cargando...</span>
+                            </div>
+                        </div>
+                        <!-- Tabla de tasas -->
+                        <div style="max-height:240px;overflow-y:auto;border-radius:9px;border:1px solid #d1fae5;box-shadow:0 1px 6px rgba(16,185,129,0.08);">
+                            <table class="table table-sm mb-0" style="font-size:0.82rem;">
+                                <thead style="background:linear-gradient(90deg,#065f46,#047857);position:sticky;top:0;z-index:2;">
+                                    <tr>
+                                        <th class="pl-3 py-2 text-white border-0" style="font-size:0.68rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;font-weight:600;">Fecha</th>
+                                        <th class="text-right py-2 text-white border-0" style="font-size:0.68rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;font-weight:600;">Tasa BCV</th>
+                                        <th class="text-right py-2 text-white border-0" style="font-size:0.68rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;font-weight:600;">Variación</th>
+                                        <th class="text-right pr-3 py-2 text-white border-0" style="font-size:0.68rem;letter-spacing:0.5px;text-transform:uppercase;white-space:nowrap;font-weight:600;">Registrado por</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tasasBody" style="background:#fff;">
+                                    <tr><td colspan="4" class="text-center text-muted py-3 small">Sin datos</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Loading -->
                 <div id="loadingFactura" class="text-center py-5">
@@ -1202,6 +1275,131 @@
         }
     });
 
+    /* ─────────────── HISTORIAL DE TASAS BCV ─────────────── */
+    let factFechaRef = null;
+
+    function ajustarFiltroTasas(dias) {
+        // factFechaRef siempre es yyyy-mm-dd o null; new Date('yyyy-mm-dd') interpreta UTC
+        // Usamos parsing manual para evitar desfase de zona horaria
+        let ref = new Date();
+        if (factFechaRef) {
+            const parts = factFechaRef.split('-');
+            if (parts.length === 3) {
+                const candidate = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+                if (!isNaN(candidate.getTime())) ref = candidate;
+            }
+        }
+        const desde = new Date(ref); desde.setDate(desde.getDate() - dias);
+        const hasta = new Date(ref); hasta.setDate(hasta.getDate() + dias);
+        const fmtDate = d => [
+            d.getFullYear(),
+            String(d.getMonth() + 1).padStart(2, '0'),
+            String(d.getDate()).padStart(2, '0')
+        ].join('-');
+        $('#tasaDesde').val(fmtDate(desde));
+        $('#tasaHasta').val(fmtDate(hasta));
+    }
+
+    function cargarTasas() {
+        const desde = $('#tasaDesde').val();
+        const hasta = $('#tasaHasta').val();
+        $('#loadingTasas').css('display', 'flex');
+        $('#tasasBody').css('opacity', 0.4);
+        $.get('{{ url("admin/tasas/historico") }}', { desde: desde, hasta: hasta })
+            .done(function (r) { renderTasas(r.tasas || []); })
+            .fail(function () { toastr.error('No se pudo cargar el historial de tasas.'); })
+            .always(function () {
+                $('#loadingTasas').css('display', 'none');
+                $('#tasasBody').css('opacity', 1);
+            });
+    }
+
+    function renderTasas(tasas) {
+        const tbody = $('#tasasBody').empty();
+        if (!tasas.length) {
+            tbody.append('<tr><td colspan="4" class="text-center text-muted py-3 small">Sin registros en el período seleccionado</td></tr>');
+            return;
+        }
+        const fmt = v => new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(v) || 0);
+        const refDate = factFechaRef ? factFechaRef.substr(0, 10) : null;
+
+        tasas.forEach(function (t, i) {
+            const prev = tasas[i + 1];
+            let varHtml = '<span class="text-muted" style="font-size:0.75rem;">—</span>';
+            if (prev) {
+                const diff = parseFloat(t.valor) - parseFloat(prev.valor);
+                const pct = parseFloat(prev.valor) > 0 ? ((diff / parseFloat(prev.valor)) * 100).toFixed(2) : 0;
+                if (Math.abs(diff) > 0.001) {
+                    const up = diff > 0;
+                    varHtml = `<span style="color:${up ? '#dc2626' : '#16a34a'};font-weight:600;font-size:0.78rem;">
+                        <i class="fas fa-arrow-${up ? 'up' : 'down'}" style="font-size:0.6rem;"></i> ${Math.abs(pct)}%
+                    </span>`;
+                } else {
+                    varHtml = '<span class="text-muted" style="font-size:0.75rem;">=</span>';
+                }
+            }
+            const rowDate   = t.fecha ? t.fecha.substr(0, 10) : null;
+            const isRef     = refDate && rowDate === refDate;
+            const rowStyle  = isRef
+                ? 'background:linear-gradient(90deg,#ecfdf5,#d1fae5);border-left:3px solid #10b981;'
+                : (i % 2 === 0 ? 'background:#fff;' : 'background:#f8fafc;');
+
+            tbody.append(`
+                <tr style="${rowStyle}">
+                    <td class="pl-3 py-2" style="white-space:nowrap;${isRef ? 'color:#065f46;font-weight:700;' : ''}">
+                        ${isRef ? '<i class="fas fa-star text-success mr-1" style="font-size:0.6rem;vertical-align:middle;"></i>' : ''}
+                        ${rowDate || '—'}
+                    </td>
+                    <td class="text-right py-2 font-weight-bold" style="white-space:nowrap;${isRef ? 'color:#065f46;' : 'color:#0f172a;'}">
+                        Bs.&nbsp;${fmt(t.valor)}
+                    </td>
+                    <td class="text-right py-2">${varHtml}</td>
+                    <td class="text-right pr-3 py-2 text-muted small">${t.usuario || '—'}</td>
+                </tr>`);
+        });
+    }
+
+    $('#btnTasasHistorico').on('click', function () {
+        const panel  = $('#panelHistoricoTasas');
+        const abierto = panel.is(':visible');
+        if (abierto) {
+            panel.slideUp(200);
+            $(this).html('<i class="fas fa-chart-line mr-1"></i>Tasas')
+                   .css({ background: 'rgba(16,185,129,0.18)', color: '#6ee7b7', 'border-color': 'rgba(16,185,129,0.45)' });
+        } else {
+            ajustarFiltroTasas(7);
+            panel.slideDown(250);
+            $(this).html('<i class="fas fa-chart-line mr-1"></i>Ocultar Tasas')
+                   .css({ background: 'rgba(16,185,129,0.35)', color: '#fff', 'border-color': 'rgba(16,185,129,0.7)' });
+            cargarTasas();
+        }
+    });
+
+    $('#btnCerrarTasas').on('click', function () {
+        $('#panelHistoricoTasas').slideUp(200);
+        $('#btnTasasHistorico').html('<i class="fas fa-chart-line mr-1"></i>Tasas')
+                               .css({ background: 'rgba(16,185,129,0.18)', color: '#6ee7b7', 'border-color': 'rgba(16,185,129,0.45)' });
+    });
+
+    $('#btnFiltrarTasas').on('click', cargarTasas);
+
+    $('#btnTasas7dias').on('click', function () {
+        ajustarFiltroTasas(7);
+        cargarTasas();
+    });
+
+    $('#btnTasas30dias').on('click', function () {
+        ajustarFiltroTasas(30);
+        cargarTasas();
+    });
+
+    $('#modalFacturaPedido').on('hidden.bs.modal', function () {
+        $('#panelHistoricoTasas').hide();
+        $('#btnTasasHistorico').html('<i class="fas fa-chart-line mr-1"></i>Tasas')
+                               .css({ background: 'rgba(16,185,129,0.18)', color: '#6ee7b7', 'border-color': 'rgba(16,185,129,0.45)' });
+        factFechaRef = null;
+    });
+
     /* ─────────────── MODAL FACTURA PEDIDO ─────────────── */
     $(document).on('click', '.btn-factura-pedido', function (e) {
         e.stopPropagation();
@@ -1247,6 +1445,19 @@
         const p  = r.pedido   || {};
         const t  = r.totales  || {};
         const items = r.items || [];
+
+        // Guardar fecha de referencia normalizada a yyyy-mm-dd
+        factFechaRef = null;
+        if (p.fecha) {
+            const iso = p.fecha.match(/(\d{4})-(\d{2})-(\d{2})/);
+            const dmy = p.fecha.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (iso) {
+                factFechaRef = iso[0];
+            } else if (dmy) {
+                factFechaRef = dmy[3] + '-' + String(dmy[2]).padStart(2,'0') + '-' + String(dmy[1]).padStart(2,'0');
+            }
+        }
+        $('#tasasRefLabel').text(factFechaRef ? 'Referencia: ' + factFechaRef : '');
 
         const fmt = (v, dec = 2) => new Intl.NumberFormat('es-VE', {
             minimumFractionDigits: dec, maximumFractionDigits: dec

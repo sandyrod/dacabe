@@ -437,4 +437,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
 
     // Gestión de asociaciones cliente-vendedor
     Route::resource('cliente-vendedor', 'Admin\ClienteVendedorController')->only(['index', 'store', 'destroy']);
+
+    // Historial de tasas BCV
+    Route::get('tasas/historico', 'Admin\PagoController@tasasHistorico')->name('admin.tasas.historico');
 });

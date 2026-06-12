@@ -169,6 +169,23 @@ class PagoController extends Controller
         return view('admin.pagos.aprobar', compact('pagos', 'vendedores', 'tipos_pago', 'totalPendiente', 'totalEnRevision', 'totalHoy'));
     }
 
+    public function tasasHistorico(Request $request)
+    {
+        $query = DB::connection('company')->table('tasas')
+            ->select('id', 'fecha', 'valor', 'usuario');
+
+        if ($request->filled('desde')) {
+            $query->whereDate('fecha', '>=', $request->desde);
+        }
+        if ($request->filled('hasta')) {
+            $query->whereDate('fecha', '<=', $request->hasta);
+        }
+
+        $tasas = $query->orderBy('fecha', 'desc')->limit(90)->get();
+
+        return response()->json(['tasas' => $tasas]);
+    }
+
     public function trazabilidad($pedido_id)
     {
         try {

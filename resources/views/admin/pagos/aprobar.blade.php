@@ -503,6 +503,50 @@
         </div>
     </div>
 </div>
+<!-- Modal Observación de Rechazo -->
+<div class="modal fade" id="modalObservacionRechazo" tabindex="-1" role="dialog" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 480px;">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div class="modal-header border-0 text-white" style="background: linear-gradient(135deg, #c0392b 0%, #922b21 100%); padding: 1.25rem 1.5rem;">
+                <div class="d-flex align-items-center">
+                    <div style="background: rgba(255,255,255,0.15); border-radius: 50%; width: 40px; height: 40px; display:flex; align-items:center; justify-content:center; margin-right: 12px;">
+                        <i class="fas fa-times-circle" style="font-size: 1.1rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title font-weight-bold mb-0">Rechazar Pago</h5>
+                        <small style="opacity: 0.8;">Esta acción revertirá el estatus de los pedidos</small>
+                    </div>
+                </div>
+                <button type="button" class="close text-white ml-auto" data-dismiss="modal" style="opacity: 0.7; font-size: 1.3rem;">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body p-4">
+                <p class="text-muted mb-3" style="font-size: 0.92rem;">
+                    <i class="fas fa-info-circle text-warning mr-1"></i>
+                    Opcionalmente puede incluir una observación que será enviada al vendedor para explicar el motivo del rechazo.
+                </p>
+                <div class="form-group mb-0">
+                    <label class="font-weight-bold text-dark mb-1" style="font-size: 0.85rem;">
+                        <i class="far fa-sticky-note mr-1 text-danger"></i>Observación (opcional)
+                    </label>
+                    <textarea id="txtObservacionRechazo" class="form-control" rows="3"
+                        placeholder="Ej: El comprobante no es legible, la referencia no coincide..."
+                        style="border-radius: 10px; font-size: 0.9rem; resize: none; border-color: #e9ecef;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 px-4 pb-4" style="gap: 8px;">
+                <button type="button" class="btn btn-light btn-sm px-4" data-dismiss="modal" style="border-radius: 8px; font-weight: 600;">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-danger btn-sm px-4" id="btnConfirmarRechazo" style="border-radius: 8px; font-weight: 600;">
+                    <i class="fas fa-times-circle mr-1"></i>Confirmar Rechazo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal Factura Completa de Pedido -->
 <div class="modal fade" id="modalFacturaPedido" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl" role="document">
@@ -1244,18 +1288,29 @@
 
         $('#btnAprobar').on('click', function() {
             if (!currentPagoId) return;
-            procesarPago(currentPagoId, 'APROBADO', '¿Está seguro de APROBAR este pago?');
+            procesarPago(currentPagoId, 'APROBADO');
+        });
+
+        $('#modalObservacionRechazo').on('hidden.bs.modal', function() {
+            $('#txtObservacionRechazo').val('');
         });
 
         $('#btnRechazar').on('click', function() {
             if (!currentPagoId) return;
-            procesarPago(currentPagoId, 'RECHAZADO',
-                '¿Está seguro de RECHAZAR este pago? Esta acción revertirá el estatus de los pedidos.'
-            );
+            $('#modalObservacionRechazo').modal('show');
         });
 
-        function procesarPago(id, estatus, confirmMsg) {
-            if (!confirm(confirmMsg)) return;
+        $('#btnConfirmarRechazo').on('click', function() {
+            if (!currentPagoId) return;
+            const obs = $('#txtObservacionRechazo').val().trim();
+            $('#modalObservacionRechazo').modal('hide');
+            procesarPago(currentPagoId, 'RECHAZADO', obs);
+        });
+
+        function procesarPago(id, estatus, observaciones) {
+            if (estatus === 'APROBADO') {
+                if (!confirm('¿Está seguro de APROBAR este pago?')) return;
+            }
 
             const btn = estatus === 'APROBADO' ? $('#btnAprobar') : $('#btnRechazar');
             const originalText = btn.html();
@@ -1263,7 +1318,8 @@
 
             $.post('{{ url("pagos") }}/' + id + '/cambiar-estatus', {
                     _token: '{{ csrf_token() }}',
-                    estatus: estatus
+                    estatus: estatus,
+                    observaciones: observaciones || ''
                 },
                 function(response) {
                     if (response.success) {

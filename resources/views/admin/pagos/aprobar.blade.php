@@ -376,8 +376,8 @@
                             </div>
                         </div>
                         <div class="col-12 mb-3">
-                            <div class="payment-detail-item">
-                                <div class="detail-label"><i class="far fa-sticky-note mr-1"></i>Detalle / Observaciones</div>
+                            <div class="payment-detail-item payment-detail-item-obs">
+                                <div class="detail-label" style="color: #5d0808;"><i class="far fa-sticky-note mr-1"></i>Detalle / Observaciones</div>
                                 <div class="detail-value" id="modalDetallePagoTexto">Sin observaciones</div>
                             </div>
                         </div>
@@ -850,6 +850,12 @@
         border-radius: 12px;
         background: #fff;
         border: 1px solid #eee;
+        height: 100%;
+    }
+    
+    .payment-detail-item-obs {
+        background: #fef881;
+        border: 1px solid #a7a555;
         height: 100%;
     }
 

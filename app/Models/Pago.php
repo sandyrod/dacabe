@@ -28,7 +28,8 @@ class Pago extends Model
         'monto_bs',
         'pago_destino_id',
         'moneda_pago',
-        'pago_grupo_id'
+        'pago_grupo_id',
+        'observaciones'
     ];
 
     public function getData($id = null)

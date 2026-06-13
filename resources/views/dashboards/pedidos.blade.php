@@ -1,6 +1,92 @@
 
 
 
+@php
+    $pagosRechazados = \App\Models\Pago::where('user_id', auth()->id())
+        ->where('estatus', 'RECHAZADO')
+        ->whereNotNull('observaciones')
+        ->where('observaciones', '!=', '')
+        ->orderByDesc('updated_at')
+        ->take(5)
+        ->get();
+@endphp
+
+@if ($pagosRechazados->isNotEmpty())
+<style>
+.apr-alerta { transition: opacity 0.35s ease, transform 0.35s ease; }
+</style>
+
+<div id="alerta-pagos-rechazados" class="mb-3">
+    @foreach ($pagosRechazados as $pagoRec)
+    <div class="apr-alerta d-flex align-items-start p-0 mb-3 shadow-sm"
+         data-pago-id="{{ $pagoRec->id }}"
+         style="border-radius: 14px; overflow: hidden; background: #fff;">
+        <div style="width: 6px; flex-shrink: 0; background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);"></div>
+        <div class="flex-grow-1 p-3">
+            <div class="d-flex align-items-center mb-2">
+                <div style="background: #fdecea; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 10px;">
+                    <i class="fas fa-times-circle" style="color: #c0392b; font-size: 1rem;"></i>
+                </div>
+                <div style="flex: 1;">
+                    <div class="font-weight-bold" style="color: #922b21; font-size: 0.92rem; line-height: 1.2;">
+                        Pago Rechazado
+                    </div>
+                    <div class="text-muted" style="font-size: 0.75rem;">
+                        {{ \Carbon\Carbon::parse($pagoRec->updated_at)->format('d/m/Y H:i') }}
+                        &nbsp;·&nbsp;
+                        Ref: <strong>{{ $pagoRec->referencia ?? 'N/A' }}</strong>
+                        &nbsp;·&nbsp;
+                        ${{ number_format($pagoRec->monto, 2) }}
+                    </div>
+                </div>
+                <button type="button"
+                    onclick="cerrarAlertaPago(this, {{ $pagoRec->id }})"
+                    style="background: none; border: none; color: #aaa; font-size: 1.1rem; cursor: pointer; padding: 4px 8px; line-height: 1; flex-shrink: 0;"
+                    title="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="background: #fdecea; border-radius: 8px; padding: 10px 14px;">
+                <div class="mb-1" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; color: #c0392b; font-weight: 700;">
+                    <i class="far fa-sticky-note mr-1"></i>Observación del administrador
+                </div>
+                <div style="color: #5d2020; font-size: 0.88rem; line-height: 1.5;">
+                    {{ $pagoRec->observaciones }}
+                </div>
+            </div>
+        </div>
+    </div>
+    @endforeach
+</div>
+
+<script>
+function cerrarAlertaPago(btn, id) {
+    var alerta = btn.closest('.apr-alerta');
+    alerta.style.opacity = '0';
+    alerta.style.transform = 'translateX(20px)';
+    setTimeout(function() {
+        alerta.remove();
+        var cont = document.getElementById('alerta-pagos-rechazados');
+        if (cont && cont.querySelectorAll('.apr-alerta').length === 0) cont.remove();
+    }, 350);
+    try {
+        var d = JSON.parse(localStorage.getItem('aprDismissed') || '[]');
+        if (d.indexOf(id) === -1) d.push(id);
+        localStorage.setItem('aprDismissed', JSON.stringify(d));
+    } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        var d = JSON.parse(localStorage.getItem('aprDismissed') || '[]');
+        d.forEach(function(id) {
+            var el = document.querySelector('.apr-alerta[data-pago-id="' + id + '"]');
+            if (el) el.style.display = 'none';
+        });
+    } catch(e) {}
+});
+</script>
+@endif
+
 @if (hasOrderPermission() )
 
       @include('dashboards.modulos')

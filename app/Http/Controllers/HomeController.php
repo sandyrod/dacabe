@@ -40,6 +40,7 @@ class HomeController extends Controller
             return redirect()->route('manager.dashboard');
         }
 
+        
         // Detectar pedidos vencidos para vendedores
         $pedidosVencidos = [];
         if (Auth::user()->hasRole('vendedor')) {

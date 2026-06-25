@@ -51,6 +51,8 @@
 
 
         let edit_record = (id) => {
+            $(location).attr('href', URL+'/'+id+'/edit');
+            return;
             swal({
                 title: "Aviso!", text: "¿Desea editar los datos del registro?", type: "info", showCancelButton: true, confirmButtonColor: '#1274D9', confirmButtonText: 'Si, editar!', cancelButtonText: "Cancelar", closeOnConfirm: false
             }, function(isConfirm){
@@ -61,6 +63,9 @@
         };
         
         let delete_record = (id) => {
+            let url = URL+'/'+id;
+            send_request_method(url, 'delete', id);
+            return;
             swal({
                 title: "Atención", text: "Confirme que desea eliminar este registro.", type: "warning", showCancelButton: true, confirmButtonColor: '#D62E21', confirmButtonText: 'Si, Eliminar!', cancelButtonText: "Cancelar", closeOnConfirm: false, showLoaderOnConfirm: true,
             }, function() {

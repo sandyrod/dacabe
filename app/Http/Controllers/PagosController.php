@@ -53,6 +53,7 @@ class PagosController extends Controller
             $pago = Pago::findOrFail($id);
             $estatusAnterior = $pago->estatus; // guardar antes de sobreescribir
             $pago->estatus = $request->estatus;
+            $pago->observaciones = $request->observaciones;
             $pago->save();
 
             $esDivisa = $pago->moneda_pago != 'Bolívares';

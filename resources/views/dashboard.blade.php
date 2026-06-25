@@ -107,6 +107,7 @@
         }
     });
 
+    
     $('#select2_products').on("select2:select", function(e) { 
       let descr = '';
       let detail = '<tr><td></td><td></td><td></td><td></td><td></td></tr>';

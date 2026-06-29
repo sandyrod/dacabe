@@ -209,6 +209,58 @@ class PagosController extends Controller
                 }
             }
 
+            // Calcular y registrar comisiones al aprobar (una sola vez por pedido)
+            if ($request->estatus === 'APROBADO' && $pago->pago_grupo_id) {
+                foreach ($pagosPedidos as $pagoPedido) {
+                    $pagoGrupoDetallesIds = \App\Models\PagoGrupoDetalles::where('pedido_id', $pagoPedido->pedido_id)->pluck('id');
+                    if (\App\Models\ComisionVendedor::whereIn('pago_id', $pagoGrupoDetallesIds)->exists()) {
+                        continue;
+                    }
+
+                    $pagoGrupoDetalle = \App\Models\PagoGrupoDetalles::where('pago_grupo_id', $pago->pago_grupo_id)
+                        ->where('pedido_id', $pagoPedido->pedido_id)
+                        ->first();
+                    if (!$pagoGrupoDetalle) continue;
+
+                    $vendedor = \App\Models\Vendedor::where('id', $pago->seller_id)->first();
+                    if (!$vendedor) continue;
+                    $correoVendedor = $vendedor->email;
+                    $nombreVendedor = \App\User::where('email', $correoVendedor)->value('name');
+
+                    $detallesPedido = \App\Models\PedidoDetalle::where('pedido_id', $pagoPedido->pedido_id)->get();
+                    $totalBasePedido = $detallesPedido->sum(fn($d) => $d->precio_dolar * $d->cantidad);
+
+                    foreach ($detallesPedido as $detallePed) {
+                        $inven = \App\Models\InvenInformacion::where('codigo', $detallePed->codigo_inven)->first();
+                        $porcentaje = $inven ? (float) $inven->comision : 0;
+                        if ($porcentaje <= 0) continue;
+
+                        $invenOrder = \App\Models\OrderInven::where('CODIGO', $detallePed->codigo_inven)->first();
+                        $descr = $invenOrder ? $invenOrder->DESCR : '';
+
+                        $baseItem = (float) $detallePed->precio_dolar * (float) $detallePed->cantidad;
+
+                        if ($pago->moneda_pago != 'Bolívares' && $totalBasePedido > 0) {
+                            $proporcionItem = $baseItem / $totalBasePedido;
+                            $descuentoItem  = (float) ($pagoGrupoDetalle->descuento ?? 0) * $proporcionItem;
+                            $baseItem       = max($baseItem - $descuentoItem, 0);
+                        }
+
+                        \App\Models\ComisionVendedor::create([
+                            'pago_id'             => $pagoGrupoDetalle->id,
+                            'codigo_producto'     => $detallePed->codigo_inven,
+                            'nombre_producto'     => $descr,
+                            'cantidad'            => $detallePed->cantidad,
+                            'monto_base_comision' => round($baseItem, 2),
+                            'monto_comision'      => round($baseItem * ($porcentaje / 100), 2),
+                            'porcentaje_comision' => $porcentaje,
+                            'correo_vendedor'     => $correoVendedor,
+                            'nombre_vendedor'     => $nombreVendedor,
+                        ]);
+                    }
+                }
+            }
+
             DB::commit();
             return response()->json([
                 'success' => true,

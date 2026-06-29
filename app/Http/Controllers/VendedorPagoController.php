@@ -654,7 +654,7 @@ class VendedorPagoController extends Controller
 
         // Obtener los totales del formulario
         $totalPagar = (float) $request->total_pagar;
-        $totalDescuentoSolicitado = (float) $request->total_descuento;
+        $totalDescuentoSolicitado = 0; //(float) $request->total_descuento;
         $tipoPago = $request->tipo_pago;
         $montoDivisa = $tipoPago === 'divisa_parcial' ? (float) $request->monto_divisa : null;
         $observaciones = $request->input('observaciones');
@@ -2196,64 +2196,11 @@ class VendedorPagoController extends Controller
                 $pagoGrupoDetalle->pedido_id = $pedido->id;
                 $pagoGrupoDetalle->save();
 
-                // Calcular comisiones solo si es la primera vez que se registra un pago para este pedido.
-                // La comisión se calcula UNA sola vez sobre el precio completo del producto,
-                // independientemente de si el pago es parcial o total.
-                $detallesPedido = \App\Models\PedidoDetalle::where('pedido_id', $pedido->id)->get();
-
-                // IDs de todos los PagoGrupoDetalles previos para este pedido (incluyendo el actual)
-                $pagoGrupoDetallesIds = \App\Models\PagoGrupoDetalles::where('pedido_id', $pedido->id)->pluck('id');
-
-                // Verificar si ya existe AL MENOS UNA comisión registrada para este pedido
-                $comisionYaRegistrada = \App\Models\ComisionVendedor::whereIn('pago_id', $pagoGrupoDetallesIds)->exists();
-
-                if (!$comisionYaRegistrada) {
-                    // Primer pago: calcular y registrar comisiones por producto
-                    $totalBasePedido = $detallesPedido->sum(fn($d) => $d->precio_dolar * $d->cantidad);
-
-                    $vendedor = Vendedor::where('id', $seller_id)->first();
-                    $correoVendedor = $vendedor->email;
-                    $nombreVendedor = \App\User::where('email', $correoVendedor)->value('name');
-
-                    foreach ($detallesPedido as $detallePed) {
-                        $inven = \App\Models\InvenInformacion::where('codigo', $detallePed->codigo_inven)->first();
-                        $porcentaje = $inven ? (float) $inven->comision : 0;
-                        if ($porcentaje <= 0) {
-                            continue;
-                        }
-
-                        $invenOrder = \App\Models\OrderInven::where('CODIGO', $detallePed->codigo_inven)->first();
-                        $descr = $invenOrder ? $invenOrder->DESCR : '';
-
-                        // Base: precio completo del ítem en USD
-                        $baseItem = (float) $detallePed->precio_dolar * (float) $detallePed->cantidad;
-
-                        // Para pagos en divisa: aplicar el descuento total distribuido proporcionalmente
-                        if ($moneda_pago != 'Bolívares' && $totalBasePedido > 0) {
-                            $proporcionItem = $baseItem / $totalBasePedido;
-                            $descuentoItem  = (float) ($detalle['descuento'] ?? 0) * $proporcionItem;
-                            $baseItem       = max($baseItem - $descuentoItem, 0);
-                        }
-
-                        \App\Models\ComisionVendedor::create([
-                            'pago_id'             => $pagoGrupoDetalle->id,
-                            'codigo_producto'     => $detallePed->codigo_inven,
-                            'nombre_producto'     => $descr,
-                            'cantidad'            => $detallePed->cantidad,
-                            'monto_base_comision' => round($baseItem, 2),
-                            'monto_comision'      => round($baseItem * ($porcentaje / 100), 2),
-                            'porcentaje_comision' => $porcentaje,
-                            'correo_vendedor'     => $correoVendedor,
-                            'nombre_vendedor'     => $nombreVendedor,
-                        ]);
-                    }
-                }
-
                 // Validar si se debe actualizar el estatus
                 $actualizarEstatus = true;
 
                 // LOGICA DE PAGO PARCIAL (MODIFICADA)
-                /*
+                
                 if ($pedidos->count() === 1) {
                     $montoTotalSimple = $pedido->pedido_detalle->sum(function ($detalle) {
                         return $detalle->precio * $detalle->cantidad;
@@ -2266,11 +2213,10 @@ class VendedorPagoController extends Controller
                         $actualizarEstatus = false;
                     }
                 }
-                */
-
-                //if ($actualizarEstatus) {
+                
+                if ($actualizarEstatus) {
                     Pedido::where('id', $pedido->id)->update(['estatus' => 'EN REVISION']);
-                //}
+                }
             }
 
             DB::commit();

@@ -1043,10 +1043,13 @@
                             }
 
                             const totalmentePagado = saldo <= 0.01 && saldoIvaBs <= 0.01;
-                            // Caso especial: base y ajustes pagados, pero saldo_iva_bs > 0 porque es el monto de retención
-                            // que quedó pendiente tras aplicar "Aplicar Retención" al IVA. Solo falta subir comprobante.
-                            const soloFaltaComprobanteRetencion = porcRetencion > 0 && saldoBase <= 0.01 && saldoAjustes <= 0.01 && saldoIvaBs > 0.01;
-                            const deshabilitarSeleccion = totalmentePagado || soloFaltaComprobanteRetencion;
+                            // Cuando saldo_base = 0 pero saldo_iva_bs > 0, el usuario puede registrar pago:
+                            // - por la porción no retenida del IVA (ej. 25% si retención es 75%)
+                            // - o por la totalidad del saldo_iva_bs si lo prefiere
+                            // Se mantiene soloFaltaComprobanteRetencion = false para permitir la selección
+                            // siempre que haya saldo_iva_bs pendiente; tieneRetencionPendiente sigue siendo informativo.
+                            const soloFaltaComprobanteRetencion = false;
+                            const deshabilitarSeleccion = totalmentePagado;
 
                             // Ajustes pendientes del pedido
                             const ajustesDetalle = pedido.ajustes_detalle || [];

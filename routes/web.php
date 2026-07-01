@@ -287,6 +287,7 @@ Route::get('zonas/print', ['as' => 'zonas.print', 'uses' => 'ZonasController@sho
 Route::resource('zonas', 'ZonasController')->except(['show']);
 
 Route::get('vendedores/print', ['as' => 'vendedores.print', 'uses' => 'VendedoresController@showPrintList']);
+Route::patch('vendedores/{vendedor}/estatus', ['as' => 'vendedores.estatus', 'uses' => 'VendedoresController@updateStatus']);
 Route::resource('vendedores', 'VendedoresController')->except(['show']);
 
 Route::get('administradores/print', ['as' => 'administradores.print', 'uses' => 'AdministradoresController@showPrintList']);

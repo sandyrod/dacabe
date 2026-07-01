@@ -2,7 +2,17 @@
 
 
 @php
-    $pagosRechazados = \App\Models\Pago::where('user_id', auth()->id())
+  $pagosRechazados = \App\Models\Pago::select('pagos.*')
+    ->selectSub(function ($query) {
+      $query->from('pagos_pedidos as pp')
+        ->join('pedidos as ped', 'ped.id', '=', 'pp.pedido_id')
+        ->join('CLIENTE as c', function ($join) {
+          $join->whereRaw('c.RIF COLLATE utf8mb4_unicode_ci = ped.rif COLLATE utf8mb4_unicode_ci');
+        })
+        ->whereColumn('pp.pago_id', 'pagos.id')
+        ->selectRaw("GROUP_CONCAT(DISTINCT c.NOMBRE ORDER BY c.NOMBRE SEPARATOR ', ')");
+    }, 'cliente_nombre')
+    ->where('user_id', auth()->id())
         ->where('estatus', 'RECHAZADO')
         ->whereNotNull('observaciones')
         ->where('observaciones', '!=', '')
@@ -34,6 +44,8 @@
                     <div class="text-muted" style="font-size: 0.75rem;">
                         {{ \Carbon\Carbon::parse($pagoRec->updated_at)->format('d/m/Y H:i') }}
                         &nbsp;·&nbsp;
+                      Cliente: <strong>{{ $pagoRec->cliente_nombre ?: 'No identificado' }}</strong>
+                      &nbsp;·&nbsp;
                         Ref: <strong>{{ $pagoRec->referencia ?? 'N/A' }}</strong>
                         &nbsp;·&nbsp;
                         ${{ number_format($pagoRec->monto, 2) }}

@@ -103,6 +103,38 @@ class VendedoresController extends Controller
         ], 200);
     }
 
+    public function updateStatus(Request $request, $code)
+    {
+        if ( ! hasPermission($this->permission) ) {
+            abort(403);
+        }
+
+        $request->validate([
+            'estatus' => 'required|in:ACTIVO,SUSPENDIDO'
+        ]);
+
+        $vendedor = (new Vendedor)->find($code);
+        if (! $vendedor) {
+            return Response::json([
+                'type' => 'error',
+                'title' => 'Registro no encontrado',
+                'text' => 'No fue posible localizar el vendedor indicado.'
+            ], 404);
+        }
+
+        $estatus = strtoupper(trim((string) $request->estatus));
+        $vendedor->estatus = $estatus === 'SUSPENDIDO' ? 'SUSPENDIDO' : null;
+        $vendedor->save();
+
+        return Response::json([
+            'type' => 'success',
+            'title' => $estatus === 'SUSPENDIDO' ? 'Vendedor suspendido' : 'Vendedor habilitado',
+            'text' => $estatus === 'SUSPENDIDO'
+                ? 'El vendedor ha sido suspendido correctamente.'
+                : 'El vendedor ha sido habilitado correctamente.'
+        ], 200);
+    }
+
 
     public function showPdfList()
     {

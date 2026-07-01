@@ -39,6 +39,7 @@ class Kernel extends HttpKernel
 
             \App\Http\Middleware\SetDatabaseConnection::class,
             \App\Http\Middleware\EnsureActiveRoleSet::class,
+            \App\Http\Middleware\EnsureSellerIsActive::class,
 
         ],
 

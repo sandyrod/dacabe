@@ -22,6 +22,9 @@ trait VendedorTrait
             ->editColumn('name', function ( $data ) {
                 return  $this->getNameColumn($data);
             })
+            ->editColumn('estatus', function ( $data ) {
+                return  $this->getEstatusColumn($data);
+            })
             ->editColumn('zona', function ( $data ) {
                 return  $this->getZonaColumn($data);
             })
@@ -34,7 +37,7 @@ trait VendedorTrait
             ->addColumn('action', function ( $data ) {
                 return  $this->getActionColumn($data);
             })
-            ->rawColumns(['action', 'name', 'zona', 'deposito', 'document'])
+            ->rawColumns(['action', 'name', 'estatus', 'zona', 'deposito', 'document'])
             ->make(true);
     }
 
@@ -59,6 +62,16 @@ trait VendedorTrait
         }
     }
 
+    private function getEstatusColumn($data)
+    {
+        $estatus = strtoupper(trim((string) @$data->estatus));
+        if ($estatus === 'SUSPENDIDO') {
+            return '<span class="badge badge-danger">Suspendido</span>';
+        }
+
+        return '<span class="badge badge-success">Activo</span>';
+    }
+
     private function getDepositoColumn($data)
     {
         $html = '';
@@ -77,6 +90,15 @@ trait VendedorTrait
     public static function getActionColumn($data){
         $buttons = [];
         if (hasOrderPermission()) {
+            $suspendido = strtoupper(trim((string) @$data->estatus)) === 'SUSPENDIDO';
+
+            $buttons[] = [
+                'style' => $suspendido ? 'success btn-sm' : 'warning btn-sm',
+                'name' => 'toggle-status',
+                'hint' => $suspendido ? 'Habilitar' : 'Suspender',
+                'icon' => $suspendido ? 'play' : 'pause',
+            ];
+
             $buttons[] = [
                 'style' => 'primary btn-sm',
                 'name' => 'edit',

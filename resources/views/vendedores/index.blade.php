@@ -9,6 +9,13 @@
     <link rel="stylesheet" href="{{ asset('theme/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css') }}">
         <link rel="stylesheet" href="{{ asset('theme/plugins/datatables-responsive/css/responsive.bootstrap4.min.css') }}">
     <style>
+        .fila-vendedor-suspendido td {
+            background-color: #fff1f0 !important;
+        }
+
+        .fila-vendedor-suspendido {
+            border-left: 4px solid #dc3545;
+        }
     </style>
 @endsection
 
@@ -55,6 +62,7 @@
                                     <th>Nombre</th>
                                     <th>Rif/Cédula</th>
                                     <th>Email</th>
+                                    <th>Estatus</th>
                                     <th>Zona</th>
                                     <th>Depósito</th>
                                     <th>% Recargo</th>

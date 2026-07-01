@@ -22,11 +22,19 @@
                     {data: 'name', name: 'name'},
                     {data: 'document', name: 'document'},
                     {data: 'email', name: 'email'},
+                    {data: 'estatus', name: 'estatus'},
                     {data: 'zona', name: 'zona'},
                     {data: 'deposito', name: 'deposito'},
                     {data: 'recargo', name: 'recargo'},
                     {data: 'action', name: 'action'}                    
                 ],
+                createdRow: function (row, data) {
+                    const estatusRaw = (data.estatus || '').toString().toUpperCase();
+                    const isSuspendido = estatusRaw.includes('SUSPENDIDO');
+                    if (isSuspendido) {
+                        $(row).addClass('fila-vendedor-suspendido');
+                    }
+                },
                 bAutoWidth: false,
             };
     };
@@ -51,6 +59,10 @@
 
         $("table#"+table_id).on('click', '.delete', function(){
             delete_record($(this).data('iddata'));
+        });
+
+        $("table#"+table_id).on('click', '.toggle-status', function(){
+            toggle_status($(this).data('iddata'), $(this));
         });
 
 
@@ -82,14 +94,38 @@
             }).then((result) => {
                 if (result.isConfirmed) {
                     let url = URL+'/'+id;
-                    send_request_method(url, 'delete', id);
+                    send_request_method(url, 'delete', {id: id});
                 }
             });
         };
 
-        let send_request_method = (url, type, id) => {
+        let toggle_status = (id, trigger) => {
+            const isSuspendido = $(trigger).attr('aria-label') === 'Habilitar';
+            const nextStatus = isSuspendido ? 'ACTIVO' : 'SUSPENDIDO';
+            const actionText = isSuspendido ? 'habilitar' : 'suspender';
+
+            Swal.fire({
+                title: "Confirmación",
+                text: `¿Desea ${actionText} este vendedor?`,
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: isSuspendido ? '#28a745' : '#e67e22',
+                confirmButtonText: isSuspendido ? 'Si, habilitar' : 'Si, suspender',
+                cancelButtonText: "Cancelar"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const url = URL + '/' + id + '/estatus';
+                    send_request_method(url, 'patch', { estatus: nextStatus });
+                }
+            });
+        };
+
+        let send_request_method = (url, type, payload = {}) => {
             $.ajax({
-                url : url, type : type, data: { _token : TOKEN, id: id  }, dataType : 'json',
+                url : url,
+                type : type,
+                data: Object.assign({ _token : TOKEN }, payload),
+                dataType : 'json',
                 success : function(check){
                     Swal.fire({
                         title: check.title, 

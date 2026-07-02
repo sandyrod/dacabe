@@ -258,6 +258,9 @@ Route::get('fabioss', 'PagesController@getFabios');
 Route::get('menu/{landing?}', 'PagesController@getLandingMenu');
 
 Route::get('andrea-valentina', 'PagesController@getAndrea');
+
+// Vista pública de contenido de caja (QR)
+Route::get('logistica/caja/{token}', 'Admin\LogisticaController@publicShow')->name('logistica.public.show');
 Route::get('15-de-andrea', 'PagesController@getAndrea2');
 
 Route::get('crew-anchor', 'PagesController@getCrewAnchor');
@@ -372,6 +375,12 @@ Route::get('consulta-cliente/{rif?}', ['as' => 'consulta-cliente', 'uses' => 'Pe
 Route::post('consulta-cliente-seniat', ['as' => 'consulta-cliente-seniat', 'uses' => 'PedidosController@verifyClientSeniatNew']);
 
 Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pedidos|gerente|vendedor|facturacion_dacabe']], function () {
+    Route::get('logistica/dashboard', 'Admin\LogisticaController@dashboard')->name('admin.logistica.dashboard');
+    Route::get('logistica/clientes/{rif}/pedidos', 'Admin\LogisticaController@getPedidosCliente')->name('admin.logistica.pedidos_cliente');
+    Route::get('logistica/{id}/label', 'Admin\LogisticaController@label')->name('admin.logistica.label');
+    Route::post('logistica/{id}/status', 'Admin\LogisticaController@updateStatus')->name('admin.logistica.update_status');
+    Route::resource('logistica', 'Admin\LogisticaController')->names('admin.logistica');
+
     Route::resource('pagos', 'Admin\PagoController')->only(['index']);
     Route::get('pagos/aprobar', ['as' => 'pagos.aprobar', 'uses' => 'Admin\PagoController@aprobar']);
     Route::get('cuentas-por-cobrar', ['as' => 'admin.cuentas_por_cobrar.index', 'uses' => 'Admin\CuentasPorCobrarController@index']);

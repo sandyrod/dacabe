@@ -132,6 +132,36 @@
 
                         {{-- Reportes gerenciales --}}
                         <li class="nav-item has-treeview">
+                            <a href="#" class="nav-link {{ request()->routeIs('admin.logistica.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-truck-loading"></i>
+                                <p>
+                                    Logística
+                                    <i class="right fas fa-angle-left"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item">
+                                    <a href="{{ route('admin.logistica.dashboard') }}" class="nav-link {{ request()->routeIs('admin.logistica.dashboard') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Dashboard</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('admin.logistica.index') }}" class="nav-link {{ request()->routeIs('admin.logistica.index') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Gestión de Cajas</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a href="{{ route('admin.logistica.create') }}" class="nav-link {{ request()->routeIs('admin.logistica.create') ? 'active' : '' }}">
+                                        <i class="far fa-circle nav-icon"></i>
+                                        <p>Armar Caja</p>
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+
+                        <li class="nav-item has-treeview">
                             <a href="#" class="nav-link {{ request()->routeIs('admin.reportes.*') ? 'active' : '' }}">
                                 <i class="nav-icon fas fa-chart-bar"></i>
                                 <p>

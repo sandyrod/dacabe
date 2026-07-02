@@ -121,6 +121,11 @@
         /* Red */
     }
 
+    .manager-accordion .btn-header[aria-controls="collapseLogistica"]:not(.collapsed) {
+        background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+        /* Teal */
+    }
+
     .manager-accordion .btn-header[aria-controls="collapseMaestros"]:not(.collapsed) {
         background: linear-gradient(135deg, #373B44 0%, #4286f4 100%);
         /* Dark Blue/Grey */
@@ -860,6 +865,36 @@
                                         <a href="{{ url('admin/pedidos-iva-modificar') }}"
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-calculator"></i> Ajustar Montos
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LOGISTICA -->
+                        <div class="card">
+                            <div class="card-header" id="headingLogistica">
+                                <button class="btn btn-header collapsed" type="button" data-toggle="collapse"
+                                    data-target="#collapseLogistica" aria-expanded="false"
+                                    aria-controls="collapseLogistica">
+                                    <span>
+                                        <i class="fas fa-truck-loading icon-main"></i> Logistica
+                                        <span class="label-report-new"><i class="fas fa-bell"></i></span>
+                                    </span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div id="collapseLogistica" class="collapse" aria-labelledby="headingLogistica"
+                                data-parent="#accordionManager">
+                                <div class="card-body">
+                                    <div class="list-group list-group-flush">
+                                        <a href="{{ route('admin.logistica.index') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-boxes"></i> Gestion
+                                        </a>
+                                        <a href="{{ route('admin.logistica.dashboard') }}"
+                                            class="list-group-item list-group-item-action report-highlight">
+                                            <i class="fas fa-chart-line"></i> Reportes
                                         </a>
                                     </div>
                                 </div>

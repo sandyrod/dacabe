@@ -112,6 +112,9 @@ class LogisticaController extends Controller
             $caja = LogisticaCaja::create([
                 'codigo' => 'PENDIENTE',
                 'public_token' => Str::uuid()->toString(),
+                'bulto_codigo' => $data['bulto_codigo'] ?? null,
+                'bulto_posicion' => $data['bulto_posicion'] ?? null,
+                'bulto_total' => $data['bulto_total'] ?? null,
                 'cliente_rif' => $data['cliente_rif'],
                 'cliente_codcli' => $data['cliente_codcli'] ?? null,
                 'cliente_nombre' => $data['cliente_nombre'],
@@ -181,6 +184,9 @@ class LogisticaController extends Controller
             $nuevoEstatus = $data['estatus'] ?? $estatusAnterior;
 
             $caja->fill([
+                'bulto_codigo' => $data['bulto_codigo'] ?? null,
+                'bulto_posicion' => $data['bulto_posicion'] ?? null,
+                'bulto_total' => $data['bulto_total'] ?? null,
                 'cliente_rif' => $data['cliente_rif'],
                 'cliente_codcli' => $data['cliente_codcli'] ?? null,
                 'cliente_nombre' => $data['cliente_nombre'],
@@ -251,8 +257,26 @@ class LogisticaController extends Controller
     {
         $caja = LogisticaCaja::with('items')->findOrFail($id);
         $publicUrl = route('logistica.public.show', ['token' => $caja->public_token]);
+        $pedidoIds = [];
+        $facturas = [];
 
-        return view('admin.logistica.label', compact('caja', 'publicUrl'));
+        foreach ($caja->items as $item) {
+            if (!empty($item->pedido_id)) {
+                $pedidoIds[(string) $item->pedido_id] = (string) $item->pedido_id;
+            }
+
+            if (!empty($item->factura_numero)) {
+                $facturas[(string) $item->factura_numero] = (string) $item->factura_numero;
+            }
+        }
+
+        $pedidoIds = array_values($pedidoIds);
+        $facturas = array_values($facturas);
+        $bultoEtiqueta = $caja->bulto_total && $caja->bulto_posicion
+            ? $caja->bulto_posicion . '/' . $caja->bulto_total
+            : null;
+
+        return view('admin.logistica.label', compact('caja', 'publicUrl', 'pedidoIds', 'facturas', 'bultoEtiqueta'));
     }
 
     public function publicShow(string $token)
@@ -261,10 +285,26 @@ class LogisticaController extends Controller
 
         $caja = LogisticaCaja::with('items')->where('public_token', $token)->firstOrFail();
 
-        $pedidoIds = $caja->items->pluck('pedido_id')->filter()->unique()->values();
-        $facturas = $caja->items->pluck('factura_numero')->filter()->unique()->values();
+        $pedidoIds = [];
+        $facturas = [];
 
-        return view('logistica.public_show', compact('caja', 'pedidoIds', 'facturas'));
+        foreach ($caja->items as $item) {
+            if (!empty($item->pedido_id)) {
+                $pedidoIds[(string) $item->pedido_id] = (string) $item->pedido_id;
+            }
+
+            if (!empty($item->factura_numero)) {
+                $facturas[(string) $item->factura_numero] = (string) $item->factura_numero;
+            }
+        }
+
+        $pedidoIds = array_values($pedidoIds);
+        $facturas = array_values($facturas);
+        $bultoEtiqueta = $caja->bulto_total && $caja->bulto_posicion
+            ? $caja->bulto_posicion . '/' . $caja->bulto_total
+            : null;
+
+        return view('logistica.public_show', compact('caja', 'pedidoIds', 'facturas', 'bultoEtiqueta'));
     }
 
     private function ensureCompanyConnectionDatabase(): void
@@ -283,6 +323,9 @@ class LogisticaController extends Controller
     private function validateCaja(Request $request, ?int $cajaId = null): array
     {
         $validated = $request->validate([
+            'bulto_codigo' => 'nullable|string|max:40|required_with:bulto_posicion,bulto_total',
+            'bulto_posicion' => 'nullable|integer|min:1|required_with:bulto_codigo,bulto_total',
+            'bulto_total' => 'nullable|integer|min:1|required_with:bulto_codigo,bulto_posicion',
             'cliente_rif' => 'required|string|max:40',
             'cliente_codcli' => 'nullable|string|max:40',
             'cliente_nombre' => 'required|string|max:255',
@@ -308,6 +351,12 @@ class LogisticaController extends Controller
             'items.*.vendedor_codigo' => 'nullable|string|max:80',
             'items.*.vendedor_nombre' => 'nullable|string|max:150',
         ]);
+
+        if (!empty($validated['bulto_posicion']) && !empty($validated['bulto_total']) && (int) $validated['bulto_posicion'] > (int) $validated['bulto_total']) {
+            throw ValidationException::withMessages([
+                'bulto_posicion' => 'El número de la caja dentro del bulto no puede ser mayor que el total de cajas del bulto.',
+            ]);
+        }
 
         $this->validateDisponibilidadItems($validated['items'], $cajaId);
 

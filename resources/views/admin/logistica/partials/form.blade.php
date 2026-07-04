@@ -24,7 +24,20 @@
 
         <div class="card-body">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <label>Bulto</label>
+                    <input type="text" class="form-control" name="bulto_codigo" value="{{ old('bulto_codigo', $caja->bulto_codigo) }}" placeholder="Opcional">
+                    <small class="text-muted">Código o referencia del grupo de cajas.</small>
+                </div>
+                <div class="col-md-2">
+                    <label>Nro. caja</label>
+                    <input type="number" class="form-control" name="bulto_posicion" value="{{ old('bulto_posicion', $caja->bulto_posicion) }}" min="1" placeholder="1">
+                </div>
+                <div class="col-md-2">
+                    <label>Total bulto</label>
+                    <input type="number" class="form-control" name="bulto_total" value="{{ old('bulto_total', $caja->bulto_total) }}" min="1" placeholder="3">
+                </div>
+                <div class="col-md-5">
                     <label>Cliente</label>
                     <select id="cliente_rif_select" class="form-control select2bs4" required>
                         <option value="">Seleccione cliente...</option>

@@ -40,6 +40,8 @@
                         <thead>
                         <tr>
                             <th>Código</th>
+                            <th>Caja</th>
+                            <th>Bulto</th>
                             <th>Cliente</th>
                             <th>Teléfono</th>
                             <th>Destino</th>
@@ -54,6 +56,8 @@
                         @forelse($cajas as $caja)
                             <tr>
                                 <td>{{ $caja->codigo }}</td>
+                                <td>{{ $caja->bulto_posicion && $caja->bulto_total ? $caja->bulto_posicion . '/' . $caja->bulto_total : '-' }}</td>
+                                <td>{{ $caja->bulto_codigo ?: '-' }}</td>
                                 <td>{{ $caja->cliente_nombre }}</td>
                                 <td>{{ $caja->telefono ?: '-' }}</td>
                                 <td>{{ $caja->direccion_entrega }}</td>
@@ -77,7 +81,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="9" class="text-center py-4">No hay cajas registradas.</td></tr>
+                            <tr><td colspan="11" class="text-center py-4">No hay cajas registradas.</td></tr>
                         @endforelse
                         </tbody>
                     </table>

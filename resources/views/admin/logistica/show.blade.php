@@ -27,6 +27,11 @@
                     <div class="col-md-4"><strong>Estatus:</strong> {{ str_replace('_', ' ', $caja->estatus) }}</div>
                 </div>
                 <div class="row mt-2">
+                    <div class="col-md-4"><strong>Bulto:</strong> {{ $caja->bulto_codigo ?: '-' }}</div>
+                    <div class="col-md-4"><strong>Orden dentro del bulto:</strong> {{ $caja->bulto_posicion && $caja->bulto_total ? $caja->bulto_posicion . '/' . $caja->bulto_total : '-' }}</div>
+                    <div class="col-md-4"><strong>Fecha armado:</strong> {{ optional($caja->fecha_armado)->format('d/m/Y H:i') }}</div>
+                </div>
+                <div class="row mt-2">
                     <div class="col-md-6"><strong>Dirección entrega:</strong> {{ $caja->direccion_entrega }}</div>
                     <div class="col-md-3"><strong>Ciudad:</strong> {{ $caja->ciudad ?: '-' }}</div>
                     <div class="col-md-3"><strong>Estado:</strong> {{ $caja->estado ?: '-' }}</div>
@@ -34,7 +39,7 @@
                 <div class="row mt-2">
                     <div class="col-md-4"><strong>Vendedor:</strong> {{ $caja->vendedor_nombre ?: '-' }}</div>
                     <div class="col-md-4"><strong>Chofer:</strong> {{ $caja->chofer_nombre ?: '-' }}</div>
-                    <div class="col-md-4"><strong>Fecha armado:</strong> {{ optional($caja->fecha_armado)->format('d/m/Y H:i') }}</div>
+                    <div class="col-md-4"><strong>Fecha entrega:</strong> {{ optional($caja->fecha_entrega)->format('d/m/Y H:i') ?: '-' }}</div>
                 </div>
                 @if($caja->observaciones)
                     <div class="row mt-2">

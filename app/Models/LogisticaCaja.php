@@ -12,6 +12,9 @@ class LogisticaCaja extends Model
     protected $fillable = [
         'codigo',
         'public_token',
+        'bulto_codigo',
+        'bulto_posicion',
+        'bulto_total',
         'cliente_rif',
         'cliente_codcli',
         'cliente_nombre',

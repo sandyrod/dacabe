@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -435,6 +436,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::get('reportes/inventario-deposito', 'Admin\ReporteInventarioController@porDeposito')->name('admin.reportes.inventario.deposito');
     Route::get('reportes/inventario-dashboard', 'Admin\ReporteInventarioController@dashboard')->name('admin.reportes.inventario.dashboard');
     Route::get('reportes/clientes-inactivos', 'Admin\ReporteClientesInactivosController@index')->name('admin.reportes.clientes.inactivos');
+    Route::get('reportes/analisis-vendedores', 'Admin\ReporteAnalisisVendedoresController@index')->name('admin.reportes.vendedores.analisis');
     Route::get('reportes/vendedor-360', 'Admin\ReporteVendedor360Controller@index')->name('admin.reportes.vendedor.360');
     Route::get('reportes/vendedor-360/export/excel', 'Admin\ReporteVendedor360Controller@exportExcel')->name('admin.reportes.vendedor.360.export.excel');
     Route::get('reportes/vendedor-360/export/pdf', 'Admin\ReporteVendedor360Controller@exportPdf')->name('admin.reportes.vendedor.360.export.pdf');

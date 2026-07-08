@@ -195,6 +195,12 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a href="{{ route('admin.reportes.vendedores.analisis') }}" class="nav-link {{ request()->routeIs('admin.reportes.vendedores.analisis') ? 'active' : '' }}">
+                                        <i class="nav-icon fas fa-bullseye text-info"></i>
+                                        <p>Análisis de Vendedores</p>
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a href="{{ route('admin.producto_bultos.index') }}" class="nav-link">
                                         <i class="far fa-circle nav-icon"></i>
                                         <p>Conf. Bultos</p>

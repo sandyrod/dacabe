@@ -1052,6 +1052,10 @@
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-bell text-warning"></i> Clientes Inactivos <span class="badge badge-warning ml-2">Nuevo</span>
                                         </a>
+                                        <a href="{{ route('admin.reportes.vendedores.analisis') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-bullseye text-info"></i> Analisis de Vendedores <span class="badge badge-info ml-2">Nuevo</span>
+                                        </a>
                                         <a href="{{ route('admin.reportes.vendedor.360') }}"
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-user-tie"></i> Vision 360 Vendedor <span class="badge badge-info ml-2">Nuevo</span>

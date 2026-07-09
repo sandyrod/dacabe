@@ -765,6 +765,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <a href="{{ url('/vendedor/pedidos/historial') }}" class="btn btn-outline-danger btn-block btn-primary-seller">
             <i class="fas fa-history"></i> Historial de Pedidos
           </a>
+          <a href="{{ url('/vendedor/dashboard/logros') }}" class="btn btn-outline-success btn-block btn-primary-seller">
+            <i class="fas fa-trophy"></i> Mis Logros
+          </a>
           <a href="{{ url('users/' . auth()->user()->id) }}" class="btn btn-outline-primary btn-block btn-primary-seller"><i class="fas fa-user"></i> Ver mi perfil</a>
         </div>
       </div>

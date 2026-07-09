@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OrderInven;
+use App\Models\InvenInformacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -103,6 +104,106 @@ class OrderInvenPriceController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Precio actualizado correctamente']);
         } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function indexComision(Request $request)
+    {
+        $query = OrderInven::query()
+            ->select('INVEN.*')
+            ->addSelect('inven_informacion.comision as COMISION')
+            ->leftJoin('inven_informacion', function ($join) {
+                $join->on(DB::raw('BINARY inven_informacion.codigo'), '=', DB::raw('BINARY INVEN.CODIGO'));
+            });
+
+        // Filtering
+        if ($request->filled('codigo')) {
+            $query->where('INVEN.CODIGO', 'like', '%' . $request->codigo . '%');
+        }
+
+        if ($request->filled('descr')) {
+            $query->where('INVEN.DESCR', 'like', '%' . $request->descr . '%');
+        }
+
+        if ($request->filled('cgrupo') && $request->cgrupo != 'TODOS') {
+            $query->where('INVEN.CGRUPO', $request->cgrupo);
+        }
+
+        if ($request->filled('comision_filter') && $request->comision_filter != 'TODOS') {
+            if ($request->comision_filter == 'CON') {
+                $query->where('inven_informacion.comision', '>', 0);
+            } elseif ($request->comision_filter == 'SIN') {
+                $query->where(function ($q) {
+                    $q->whereNull('inven_informacion.comision')
+                        ->orWhere('inven_informacion.comision', '<=', 0);
+                });
+            }
+        }
+
+        // Sorting
+        $sort = $request->get('sort', 'DESCR');
+        $direction = $request->get('direction', 'asc');
+
+        // Validate sortable columns to prevent injection or errors
+        $allowedSorts = [
+            'CODIGO' => 'INVEN.CODIGO',
+            'DESCR' => 'INVEN.DESCR',
+            'COMISION' => 'inven_informacion.comision',
+        ];
+        if (array_key_exists($sort, $allowedSorts)) {
+            $query->orderBy($allowedSorts[$sort], $direction);
+        } else {
+            $query->orderBy('INVEN.DESCR', 'asc');
+        }
+
+        // Statistics for the dashboard
+        $totalProducts = OrderInven::count();
+        $conComision = InvenInformacion::where('comision', '>', 0)->count();
+        $stats = [
+            'total_products' => $totalProducts,
+            'con_comision' => $conComision,
+            'sin_comision' => $totalProducts - $conComision,
+            'avg_comision' => InvenInformacion::where('comision', '>', 0)->avg('comision'),
+        ];
+
+        $groups = \App\Models\OrderGrupo::orderBy('DGRUPO')->get();
+
+        $products = $query->paginate(50);
+
+        return view('order_inven.modify_comisiones', compact('products', 'stats', 'groups'));
+    }
+
+    public function batchUpdateComision(Request $request)
+    {
+        try {
+            $updates = $request->updates; // Array of {codigo, value}
+
+            if (!is_array($updates) || empty($updates)) {
+                return response()->json(['success' => false, 'message' => 'No hay cambios para procesar'], 400);
+            }
+
+            DB::beginTransaction();
+
+            foreach ($updates as $update) {
+                $code = $update['codigo'];
+                $value = $update['value'];
+
+                $informacion = InvenInformacion::where('codigo', $code)->first();
+                if (!$informacion) {
+                    $informacion = new InvenInformacion();
+                    $informacion->codigo = $code;
+                    $informacion->detalle = ' ';
+                }
+                $informacion->comision = $value;
+                $informacion->save();
+            }
+
+            DB::commit();
+
+            return response()->json(['success' => true, 'message' => count($updates) . ' comisiones actualizadas correctamente']);
+        } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }

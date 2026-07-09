@@ -805,6 +805,10 @@
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-tags"></i> Modificar Precios
                                         </a>
+                                        <a href="{{ url('modificar-comisiones') }}"
+                                            class="list-group-item list-group-item-action">
+                                            <i class="fas fa-percentage"></i> Modificar Comisiones
+                                        </a>
                                         <a href="{{ url('productos-futuros') }}"
                                             class="list-group-item list-group-item-action">
                                             <i class="fas fa-clock"></i> Productos por Llegar

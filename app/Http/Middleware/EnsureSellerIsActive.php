@@ -18,17 +18,17 @@ class EnsureSellerIsActive
         }
 
         $user = Auth::user();
-        if (!$user->hasRole('vendedor')) {
-            return $next($request);
-        }
-
         if ($request->routeIs('logout')) {
             return $next($request);
         }
 
         $vendedor = Vendedor::select('id', 'estatus')
-            ->whereRaw('LOWER(email) = ?', [strtolower((string) $user->email)])
+            ->whereRaw('LOWER(TRIM(COALESCE(email, ""))) = ?', [strtolower(trim((string) $user->email))])
             ->first();
+
+        if (!$vendedor) {
+            return $next($request);
+        }
 
         $estatus = strtoupper(trim((string) optional($vendedor)->estatus));
         if ($estatus !== 'SUSPENDIDO') {

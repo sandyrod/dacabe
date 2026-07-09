@@ -213,6 +213,30 @@
 
 @section('content')
 <div class="container-fluid">
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+            </button>
+        </div>
+    @endif
+
+    @if(!$metaTableDisponible)
+        <div class="alert alert-warning" role="alert">
+            Las metas manuales por vendedor aun no estan activas porque falta crear la tabla <strong>metas_vendedores_periodo</strong> en la base de datos de company.
+        </div>
+    @endif
+
     <div class="av-hero p-4 mb-4">
         <div class="row align-items-center">
             <div class="col-lg-8 mb-3 mb-lg-0">
@@ -287,6 +311,11 @@
                         <div class="form-group col-4">
                             <label class="mb-1 font-weight-bold text-dark" style="font-size:.82rem;">Meta %</label>
                             <input type="number" step="0.5" min="0" class="form-control form-control-sm" name="meta_crecimiento" value="{{ $filtros['meta_crecimiento'] }}">
+                        </div>
+
+                        <div class="form-group col-12">
+                            <label class="mb-1 font-weight-bold text-dark" style="font-size:.82rem;">Periodo objetivo de metas manuales</label>
+                            <input type="text" class="form-control form-control-sm" name="meta_periodo_objetivo" value="{{ $filtros['meta_periodo_objetivo'] }}" placeholder="{{ $filtros['periodo'] === 'mes' ? 'YYYY-MM' : ($filtros['periodo'] === 'trimestre' ? 'YYYY-T1..T4' : ($filtros['periodo'] === 'semestre' ? 'YYYY-S1 o S2' : 'YYYY')) }}">
                         </div>
 
                         <div class="form-group col-12">
@@ -442,7 +471,7 @@
             <div class="card av-card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="fas fa-user-tie mr-2"></i>Ranking de Vendedores</span>
-                    <span class="av-muted">Cumplimiento y meta sugerida</span>
+                    <span class="av-muted">Metas para {{ $filtros['meta_periodo_objetivo'] }} ({{ $metaTableDisponible ? 'edicion manual activa' : 'solo sugeridas' }})</span>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 460px; overflow:auto;">
@@ -455,15 +484,12 @@
                                     <th class="text-right">Pagados</th>
                                     <th class="text-right">Ventas USD</th>
                                     <th class="text-right">Cobertura</th>
-                                    <th class="text-right">Meta</th>
+                                    <th class="text-right">Meta Ventas</th>
+                                    <th>Accion</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($rankingVendedores as $vendedor)
-                                    @php
-                                        $metaVendedor = round(max($vendedor->ventas_usd, $resumen['promedio_periodo_ventas']) * (1 + ($filtros['meta_crecimiento'] / 100)), 2);
-                                        $brechaMeta = $metaVendedor - $vendedor->ventas_usd;
-                                    @endphp
                                     <tr>
                                         <td>
                                             <div class="font-weight-bold">{{ $vendedor->vendedor_nombre }}</div>
@@ -479,13 +505,34 @@
                                             </span>
                                         </td>
                                         <td class="text-right">
-                                            <div>${{ number_format($metaVendedor, 2, ',', '.') }}</div>
-                                            <div class="av-muted">Brecha: ${{ number_format($brechaMeta, 2, ',', '.') }}</div>
+                                            <div>${{ number_format($vendedor->meta_ventas_usd, 2, ',', '.') }}</div>
+                                            <div class="av-muted">Brecha: ${{ number_format($vendedor->brecha_meta_usd, 2, ',', '.') }}</div>
+                                            <div class="av-muted">{{ $vendedor->meta_manual ? 'Manual' : 'Sugerida' }}</div>
+                                        </td>
+                                        <td>
+                                            @if($vendedor->vendedor_id > 0)
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-primary btn-editar-meta"
+                                                    data-toggle="modal"
+                                                    data-target="#modalEditarMeta"
+                                                    data-vendedor-id="{{ $vendedor->vendedor_id }}"
+                                                    data-vendedor-nombre="{{ $vendedor->vendedor_nombre }}"
+                                                    data-meta-ventas-usd="{{ number_format((float) $vendedor->meta_ventas_usd, 2, '.', '') }}"
+                                                    data-meta-pedidos-aprobados="{{ (int) $vendedor->meta_pedidos_aprobados }}"
+                                                    data-meta-pedidos-pagados="{{ (int) $vendedor->meta_pedidos_pagados }}"
+                                                    data-meta-logro-pedidos-pct="{{ number_format((float) $vendedor->meta_logro_pedidos_pct, 2, '.', '') }}"
+                                                    {{ !$metaTableDisponible ? 'disabled' : '' }}>
+                                                    <i class="fas fa-pen mr-1"></i>Editar
+                                                </button>
+                                            @else
+                                                <span class="av-muted">No editable</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">Sin vendedores con datos para mostrar.</td>
+                                        <td colspan="8" class="text-center text-muted py-4">Sin vendedores con datos para mostrar.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -544,7 +591,7 @@
             <div class="card av-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="fas fa-bullseye mr-2"></i>Metas Sugeridas para el Siguiente Periodo</span>
-                    <span class="av-muted">Basado en el rendimiento actual y el crecimiento indicado</span>
+                    <span class="av-muted">Las metas manuales por vendedor se gestionan en la tabla de ranking</span>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -565,6 +612,63 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditarMeta" tabindex="-1" role="dialog" aria-labelledby="modalEditarMetaLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <form method="POST" action="{{ route('admin.reportes.vendedores.analisis.meta.guardar') }}">
+                    @csrf
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="modalEditarMetaLabel">Editar Metas por Vendedor</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="vendedor_id" id="meta_modal_vendedor_id">
+                        <input type="hidden" name="periodo_tipo" value="{{ $filtros['periodo'] }}">
+                        <input type="hidden" name="periodo_key" value="{{ $filtros['meta_periodo_objetivo'] }}">
+
+                        <div class="alert alert-info mb-3" role="alert">
+                            <div><strong>Vendedor:</strong> <span id="meta_modal_vendedor_nombre">-</span></div>
+                            <div><strong>Periodo objetivo:</strong> {{ $filtros['meta_periodo_objetivo'] }} ({{ ucfirst($filtros['periodo']) }})</div>
+                        </div>
+
+                        <div class="border rounded p-3 mb-3" style="background:#f7fbff;">
+                            <div class="font-weight-bold mb-2">Leyenda de campos</div>
+                            <div class="av-muted">Meta Ventas USD: monto de ventas objetivo del periodo.</div>
+                            <div class="av-muted">Meta Pedidos Aprobados: cantidad objetivo de pedidos aprobados.</div>
+                            <div class="av-muted">Meta Pedidos Pagados: cantidad objetivo de pedidos con pago aprobado.</div>
+                            <div class="av-muted">Meta Cobertura (%): porcentaje objetivo de cobertura de pedidos pagados.</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="meta_modal_ventas_usd">Meta Ventas USD</label>
+                                <input type="number" step="0.01" min="0" class="form-control" id="meta_modal_ventas_usd" name="meta_ventas_usd" required>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="meta_modal_pedidos_aprobados">Meta Pedidos Aprobados</label>
+                                <input type="number" min="0" class="form-control" id="meta_modal_pedidos_aprobados" name="meta_pedidos_aprobados" required>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="meta_modal_pedidos_pagados">Meta Pedidos Pagados</label>
+                                <input type="number" min="0" class="form-control" id="meta_modal_pedidos_pagados" name="meta_pedidos_pagados" required>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="meta_modal_logro_pedidos_pct">Meta Cobertura (%)</label>
+                                <input type="number" step="0.01" min="0" max="100" class="form-control" id="meta_modal_logro_pedidos_pct" name="meta_logro_pedidos_pct" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary" {{ !$metaTableDisponible ? 'disabled' : '' }}>Guardar Meta</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -681,6 +785,30 @@
     (function applyProgressWidths() {
         document.querySelectorAll('.av-progress > span[data-width]').forEach(function (bar) {
             bar.style.width = bar.dataset.width + '%';
+        });
+    })();
+
+    (function setupMetaModal() {
+        var modal = document.getElementById('modalEditarMeta');
+        if (!modal || typeof window.jQuery === 'undefined') return;
+
+        window.jQuery(modal).on('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            if (!button) return;
+
+            var vendedorId = button.getAttribute('data-vendedor-id') || '';
+            var vendedorNombre = button.getAttribute('data-vendedor-nombre') || '-';
+            var metaVentas = button.getAttribute('data-meta-ventas-usd') || '';
+            var metaAprobados = button.getAttribute('data-meta-pedidos-aprobados') || '';
+            var metaPagados = button.getAttribute('data-meta-pedidos-pagados') || '';
+            var metaCobertura = button.getAttribute('data-meta-logro-pedidos-pct') || '';
+
+            document.getElementById('meta_modal_vendedor_id').value = vendedorId;
+            document.getElementById('meta_modal_vendedor_nombre').textContent = vendedorNombre;
+            document.getElementById('meta_modal_ventas_usd').value = metaVentas;
+            document.getElementById('meta_modal_pedidos_aprobados').value = metaAprobados;
+            document.getElementById('meta_modal_pedidos_pagados').value = metaPagados;
+            document.getElementById('meta_modal_logro_pedidos_pct').value = metaCobertura;
         });
     })();
 </script>

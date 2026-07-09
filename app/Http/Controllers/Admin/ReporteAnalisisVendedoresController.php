@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class ReporteAnalisisVendedoresController extends Controller
 {
@@ -28,7 +31,76 @@ class ReporteAnalisisVendedoresController extends Controller
             'topProductos' => $data['topProductos'],
             'pedidoDetalle' => $data['pedidoDetalle'],
             'metas' => $data['metas'],
+            'metaTableDisponible' => $data['metaTableDisponible'],
         ]);
+    }
+
+    public function guardarMetaPeriodo(Request $request)
+    {
+        $usuario = Auth::user();
+        $puedeEditar = $usuario
+            && method_exists($usuario, 'hasRole')
+            && $usuario->hasRole(['admin', 'admin_pedidos', 'gerente']);
+
+        if (!$puedeEditar) {
+            abort(403, 'Solo los administradores pueden modificar metas.');
+        }
+
+        if (!Schema::connection('company')->hasTable('metas_vendedores_periodo')) {
+            return back()->with('error', 'No existe la tabla de metas manuales. Ejecuta el SQL de creacion y vuelve a intentar.');
+        }
+
+        $rules = [
+            'vendedor_id' => ['required', 'integer', 'min:1', 'exists:company.vendedores,id'],
+            'periodo_tipo' => ['required', Rule::in(['mes', 'trimestre', 'semestre', 'anual'])],
+            'periodo_key' => ['required', 'string', 'max:10'],
+            'meta_ventas_usd' => ['nullable', 'numeric', 'min:0'],
+            'meta_pedidos_aprobados' => ['nullable', 'integer', 'min:0'],
+            'meta_pedidos_pagados' => ['nullable', 'integer', 'min:0'],
+            'meta_logro_pedidos_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ];
+
+        $validated = $request->validate($rules);
+
+        if (!$this->isPeriodoKeyValido($validated['periodo_key'], $validated['periodo_tipo'])) {
+            return back()->with('error', 'El formato del periodo no es valido para el tipo seleccionado.');
+        }
+
+        $todosNulos = is_null($validated['meta_ventas_usd'])
+            && is_null($validated['meta_pedidos_aprobados'])
+            && is_null($validated['meta_pedidos_pagados'])
+            && is_null($validated['meta_logro_pedidos_pct']);
+
+        if ($todosNulos) {
+            return back()->with('error', 'Debes indicar al menos una meta para guardar.');
+        }
+
+        $periodoKey = strtoupper(trim($validated['periodo_key']));
+        $filtro = [
+            'vendedor_id' => (int) $validated['vendedor_id'],
+            'periodo_tipo' => $validated['periodo_tipo'],
+            'periodo_key' => $periodoKey,
+        ];
+
+        $payload = [
+            'meta_ventas_usd' => is_null($validated['meta_ventas_usd']) ? null : round((float) $validated['meta_ventas_usd'], 2),
+            'meta_pedidos_aprobados' => is_null($validated['meta_pedidos_aprobados']) ? null : (int) $validated['meta_pedidos_aprobados'],
+            'meta_pedidos_pagados' => is_null($validated['meta_pedidos_pagados']) ? null : (int) $validated['meta_pedidos_pagados'],
+            'meta_logro_pedidos_pct' => is_null($validated['meta_logro_pedidos_pct']) ? null : round((float) $validated['meta_logro_pedidos_pct'], 2),
+            'actualizado_por' => (int) $usuario->id,
+            'updated_at' => now(),
+        ];
+
+        $query = DB::connection('company')->table('metas_vendedores_periodo')->where($filtro);
+        if ($query->exists()) {
+            $query->update($payload);
+        } else {
+            DB::connection('company')->table('metas_vendedores_periodo')->insert(array_merge($filtro, $payload, [
+                'created_at' => now(),
+            ]));
+        }
+
+        return back()->with('success', 'Meta manual guardada correctamente.');
     }
 
     private function resolverContexto(Request $request): array
@@ -50,6 +122,7 @@ class ReporteAnalisisVendedoresController extends Controller
             'producto' => trim((string) $request->get('producto', '')),
             'meta_crecimiento' => max(0, (float) $request->get('meta_crecimiento', 10)),
             'top_limit' => min(25, max(5, (int) $request->get('top_limit', 10))),
+            'meta_periodo_objetivo' => trim((string) $request->get('meta_periodo_objetivo', '')),
         ];
 
         if ($filtros['fecha_desde'] > $filtros['fecha_hasta']) {
@@ -57,6 +130,12 @@ class ReporteAnalisisVendedoresController extends Controller
             $filtros['fecha_desde'] = $filtros['fecha_hasta'];
             $filtros['fecha_hasta'] = $tmp;
         }
+
+        $filtros['meta_periodo_objetivo'] = $this->normalizePeriodoObjetivo(
+            $filtros['meta_periodo_objetivo'],
+            $filtros['periodo'],
+            $filtros['fecha_hasta']
+        );
 
         return [$vendedores, $filtros];
     }
@@ -285,6 +364,45 @@ class ReporteAnalisisVendedoresController extends Controller
             'logro_pedidos_pct' => min(100, round(max((float) optional($periodoActual)->logro_pedidos_pct, $promedioCobertura) + max(2, $filtros['meta_crecimiento'] / 2), 2)),
         ];
 
+        $metaTableDisponible = Schema::connection('company')->hasTable('metas_vendedores_periodo');
+        $metasManualMap = collect();
+        if ($metaTableDisponible) {
+            $metasManualMap = DB::connection('company')
+                ->table('metas_vendedores_periodo')
+                ->where('periodo_tipo', $filtros['periodo'])
+                ->where('periodo_key', strtoupper($filtros['meta_periodo_objetivo']))
+                ->get()
+                ->keyBy('vendedor_id');
+        }
+
+        $rankingVendedores = $rankingVendedores
+            ->map(function ($vendedor) use ($metasManualMap, $promedioVentas, $metaFactor, $promedioCobertura) {
+                $metaSugeridaVentas = round(max((float) $vendedor->ventas_usd, (float) $promedioVentas) * $metaFactor, 2);
+                $metaSugeridaPedidosAprobados = (int) ceil(max((float) $vendedor->pedidos_aprobados, 1) * $metaFactor);
+                $metaSugeridaPedidosPagados = (int) ceil(max((float) $vendedor->pedidos_pagados, 1) * $metaFactor);
+                $metaSugeridaLogro = min(100, round(max((float) $vendedor->logro_pedidos_pct, $promedioCobertura) + 2, 2));
+
+                $manual = $metasManualMap->get((int) $vendedor->vendedor_id);
+
+                $vendedor->meta_ventas_usd = !is_null(optional($manual)->meta_ventas_usd)
+                    ? (float) $manual->meta_ventas_usd
+                    : $metaSugeridaVentas;
+                $vendedor->meta_pedidos_aprobados = !is_null(optional($manual)->meta_pedidos_aprobados)
+                    ? (int) $manual->meta_pedidos_aprobados
+                    : $metaSugeridaPedidosAprobados;
+                $vendedor->meta_pedidos_pagados = !is_null(optional($manual)->meta_pedidos_pagados)
+                    ? (int) $manual->meta_pedidos_pagados
+                    : $metaSugeridaPedidosPagados;
+                $vendedor->meta_logro_pedidos_pct = !is_null(optional($manual)->meta_logro_pedidos_pct)
+                    ? (float) $manual->meta_logro_pedidos_pct
+                    : $metaSugeridaLogro;
+                $vendedor->meta_manual = !is_null($manual);
+                $vendedor->brecha_meta_usd = round($vendedor->meta_ventas_usd - (float) $vendedor->ventas_usd, 2);
+
+                return $vendedor;
+            })
+            ->values();
+
         return [
             'resumen' => [
                 'pedidos_total' => $resumenGlobal['pedidos_total'],
@@ -313,7 +431,70 @@ class ReporteAnalisisVendedoresController extends Controller
             'topProductos' => $topProductos,
             'pedidoDetalle' => $pedidoDetalle,
             'metas' => $metas,
+            'metaTableDisponible' => $metaTableDisponible,
         ];
+    }
+
+    private function normalizePeriodoObjetivo(string $periodoObjetivo, string $periodoTipo, string $fechaHasta): string
+    {
+        $periodoObjetivo = strtoupper(trim($periodoObjetivo));
+        if ($periodoObjetivo !== '' && $this->isPeriodoKeyValido($periodoObjetivo, $periodoTipo)) {
+            return $periodoObjetivo;
+        }
+
+        return $this->nextPeriodKeyFromDate($periodoTipo, $fechaHasta);
+    }
+
+    private function nextPeriodKeyFromDate(string $periodoTipo, string $fechaHasta): string
+    {
+        $fecha = Carbon::parse($fechaHasta)->startOfDay();
+
+        if ($periodoTipo === 'trimestre') {
+            $year = (int) $fecha->format('Y');
+            $quarter = (int) ceil(((int) $fecha->format('n')) / 3);
+            $quarter++;
+            if ($quarter > 4) {
+                $quarter = 1;
+                $year++;
+            }
+
+            return $year . '-T' . $quarter;
+        }
+
+        if ($periodoTipo === 'semestre') {
+            $year = (int) $fecha->format('Y');
+            $semestre = ((int) $fecha->format('n')) <= 6 ? 1 : 2;
+            $semestre++;
+            if ($semestre > 2) {
+                $semestre = 1;
+                $year++;
+            }
+
+            return $year . '-S' . $semestre;
+        }
+
+        if ($periodoTipo === 'anual') {
+            return (string) (((int) $fecha->format('Y')) + 1);
+        }
+
+        return $fecha->copy()->startOfMonth()->addMonth()->format('Y-m');
+    }
+
+    private function isPeriodoKeyValido(string $periodoKey, string $periodoTipo): bool
+    {
+        if ($periodoTipo === 'trimestre') {
+            return preg_match('/^\d{4}-T[1-4]$/', $periodoKey) === 1;
+        }
+
+        if ($periodoTipo === 'semestre') {
+            return preg_match('/^\d{4}-S[1-2]$/', $periodoKey) === 1;
+        }
+
+        if ($periodoTipo === 'anual') {
+            return preg_match('/^\d{4}$/', $periodoKey) === 1;
+        }
+
+        return preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodoKey) === 1;
     }
 
     private function calcularCoberturaPedidos(int $pedidosAprobados, int $pedidosPagados): float

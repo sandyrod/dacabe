@@ -123,6 +123,7 @@ Route::group(['middleware' => 'auth'], function () {
         ->name('sincronizar.clientes.buscar.cliente');
 
     // Historial de pedidos para vendedores
+    Route::get('vendedor/dashboard/logros', 'App\Http\Controllers\Vendedor\DashboardLogrosController@index')->name('vendedor.dashboard.logros');
     Route::get('vendedor/pedidos/historial', [App\Http\Controllers\Vendedor\PedidoHistorialController::class, 'index'])->name('vendedor.pedidos.historial');
     Route::get('vendedor/pedidos/historial/exportar', [App\Http\Controllers\Vendedor\PedidoHistorialController::class, 'exportExcel'])->name('vendedor.pedidos.historial.exportar');
 

@@ -10,6 +10,8 @@
  
     <!-- Main content -->
     <section class="content">
+    
+
         <!-- Small boxes (Stat box) -->        
       @if (Auth::user()->dashboard)
         @include('dashboards.'.Auth::user()->dashboard)

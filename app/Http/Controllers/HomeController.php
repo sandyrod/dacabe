@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use Auth;
 use App\Models\{Rate, Module, Company, Tasa};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -25,12 +24,17 @@ class HomeController extends Controller
     /**
      * Show the application dashboard.
      *
-     * @return \Illuminate\Contracts\Support\Renderable
+        * @return mixed
      */
     public function index()
     {
-        $permissions = (new Module)->getPermissions(Auth::user()->company->id);
-        $company = Company::select('company_status_id')->find(Auth::user()->company->id);
+        $user = auth()->user();
+        $permissions = (new Module)->getPermissions($user->company->id);
+        $company = Company::select('company_status_id')->find($user->company->id);
+        $isVendedor = DB::connection('company')
+            ->table('vendedores')
+            ->whereRaw('LOWER(TRIM(COALESCE(email, ""))) = ?', [strtolower(trim((string) $user->email))])
+            ->exists();
 
         if (hasOnlyOrderClient()) {
             return redirect()->route('facturacion.dashboard');
@@ -43,12 +47,12 @@ class HomeController extends Controller
         
         // Detectar pedidos vencidos para vendedores
         $pedidosVencidos = [];
-        if (Auth::user()->hasRole('vendedor')) {
+        if ($isVendedor) {
             $pedidosVencidos = DB::connection('company')
                 ->table('pedidos')
                 ->select('pedidos.id', 'pedidos.descripcion', 'pedidos.dias_credito', 'pedidos.fecha_despacho')
                 ->selectRaw('DATEDIFF(CURDATE(), DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY)) as dias_vencidos')
-                ->where('pedidos.user_id', Auth::user()->id)
+            ->where('pedidos.user_id', $user->id)
                 ->where('pedidos.estatus', 'APROBADO')
                 ->whereNotNull('pedidos.dias_credito')
                 ->where('pedidos.dias_credito', '>', 0)
@@ -58,7 +62,9 @@ class HomeController extends Controller
                 ->get();
         }
         
-        return view('dashboard', compact(['permissions', 'company', 'pedidosVencidos']));
+        $showLogrosButton = $isVendedor;
+
+        return view('dashboard', compact(['permissions', 'company', 'pedidosVencidos', 'showLogrosButton']));
     }
 
     public function getBcvRate()

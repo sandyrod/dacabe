@@ -320,6 +320,9 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('modificar-precios', 'OrderInvenPriceController@index')->name('order-inven.modify-prices');
     Route::post('update-product-price', 'OrderInvenPriceController@updatePrice')->name('order-inven.update-price');
     Route::post('batch-update-prices', 'OrderInvenPriceController@batchUpdate')->name('order-inven.batch-update');
+
+    Route::get('modificar-comisiones', 'OrderInvenPriceController@indexComision')->name('order-inven.modify-comisiones');
+    Route::post('batch-update-comisiones', 'OrderInvenPriceController@batchUpdateComision')->name('order-inven.batch-update-comisiones');
 });
 Route::post('store-inven-photo', ['as' => 'store-inven-photo', 'uses' => 'OrderInvenController@storePhoto']);
 

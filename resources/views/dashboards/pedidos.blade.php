@@ -498,6 +498,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span class="badge badge-success ml-2" style="font-size: 0.8em;">Nuevo</span>
                       </a>
                     </li>
+                    <li class="nav-item" style="background-color: #e2f1f8;">
+                      <a href="{{ url('modificar-comisiones')}}" class="nav-link">
+                        <i class="fas fa-percentage"></i> Modificar Comisiones
+                        <span class="badge badge-success ml-2" style="font-size: 0.8em;">Nuevo</span>
+                      </a>
+                    </li>
                     <li class="nav-item">
                       <a href="{{ url('productos-futuros')}}" class="nav-link">
                         <i class="fas fa-rocket"></i> Inventario Futuro

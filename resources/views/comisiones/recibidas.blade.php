@@ -733,8 +733,8 @@
                                     <td><small class="font-weight-bold">${item.cliente}</small></td>
                                     <td class="text-right font-weight-bold">$${parseFloat(item.total_comision).toFixed(2)}</td>
                                     <td class="text-center">
-                                        <button class="btn btn-xs btn-outline-primary btn-ver-detalle" 
-                                                data-pago-id="${item.pago_id}"
+                                        <button class="btn btn-xs btn-outline-primary btn-ver-detalle"
+                                                data-pedido-id="${item.pedido_id}"
                                                 data-toggle="tooltip" title="Ver productos">
                                             <i class="fas fa-eye"></i>
                                         </button>
@@ -787,12 +787,12 @@
 
             // Lógica para Ver Detalle de Productos (Nivel 2)
             $(document).on('click', '.btn-ver-detalle', function() {
-                const pagoId = $(this).data('pago-id');
-                cargarDetalleComisiones(pagoId);
+                const pedidoId = $(this).data('pedido-id');
+                cargarDetalleComisiones(pedidoId);
             });
 
-            function cargarDetalleComisiones(pagoId) {
-                const url = '{{ url('comisiones') }}/' + pagoId + '/detalles';
+            function cargarDetalleComisiones(pedidoId) {
+                const url = '{{ url('comisiones') }}/' + pedidoId + '/detalles';
                 $.get(url, function(response) {
                     if (response.success) {
                         const tbody = $('#detalleComisionesBody');

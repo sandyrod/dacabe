@@ -26,8 +26,8 @@
             <div class="row">
                 <div class="col-md-3">
                     <label>Bulto</label>
-                    <input type="text" class="form-control" name="bulto_codigo" value="{{ old('bulto_codigo', $caja->bulto_codigo) }}" placeholder="Opcional">
-                    <small class="text-muted">Código o referencia del grupo de cajas.</small>
+                    <input type="text" class="form-control" name="bulto_codigo" id="bulto_codigo" value="{{ old('bulto_codigo', $caja->bulto_codigo) }}" placeholder="Ej: LOT-RIF-20260709">
+                    <small class="text-muted">Usa el mismo código en todas las cajas del lote. Se sugiere uno al elegir el cliente.</small>
                 </div>
                 <div class="col-md-2">
                     <label>Nro. caja</label>
@@ -146,6 +146,7 @@
     const ciudad = document.getElementById('ciudad');
     const estado = document.getElementById('estado');
     const vendedorNombre = document.getElementById('vendedor_nombre');
+    const bultoCodigo = document.getElementById('bulto_codigo');
     const clienteFeedback = document.getElementById('cliente-feedback');
     const hiddenItems = document.getElementById('items-hidden');
     const form = document.getElementById('logistica-form');
@@ -367,6 +368,12 @@
         }
 
         setClienteFromOption(option, true);
+        if (bultoCodigo && !bultoCodigo.value) {
+            const rifRaw = (option.dataset.codcli || option.value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            const today = new Date();
+            const stamp = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+            bultoCodigo.value = `LOT-${rifRaw || 'CLIENTE'}-${stamp}`;
+        }
         pedidosData = [];
         drawPedidos();
 

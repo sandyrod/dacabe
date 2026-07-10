@@ -15,6 +15,8 @@ class LogisticaCaja extends Model
         'bulto_codigo',
         'bulto_posicion',
         'bulto_total',
+        'lote_cerrado_at',
+        'lote_cerrado_por',
         'cliente_rif',
         'cliente_codcli',
         'cliente_nombre',
@@ -38,6 +40,7 @@ class LogisticaCaja extends Model
     protected $casts = [
         'fecha_armado' => 'datetime',
         'fecha_entrega' => 'datetime',
+        'lote_cerrado_at' => 'datetime',
     ];
 
     public function items()

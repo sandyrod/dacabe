@@ -382,6 +382,9 @@ Route::post('consulta-cliente-seniat', ['as' => 'consulta-cliente-seniat', 'uses
 Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pedidos|gerente|vendedor|facturacion_dacabe']], function () {
     Route::get('logistica/dashboard', 'Admin\LogisticaController@dashboard')->name('admin.logistica.dashboard');
     Route::get('logistica/clientes/{rif}/pedidos', 'Admin\LogisticaController@getPedidosCliente')->name('admin.logistica.pedidos_cliente');
+    Route::post('logistica/lote/cerrar', 'Admin\LogisticaController@cerrarLoteCliente')->name('admin.logistica.lote.cerrar');
+    Route::post('logistica/lote/status', 'Admin\LogisticaController@updateLoteStatus')->name('admin.logistica.lote.update_status');
+    Route::get('logistica/lote/{clienteRif}/{bultoCodigo}', 'Admin\LogisticaController@loteEtiquetas')->name('admin.logistica.lote.etiquetas');
     Route::get('logistica/{id}/label', 'Admin\LogisticaController@label')->name('admin.logistica.label');
     Route::post('logistica/{id}/status', 'Admin\LogisticaController@updateStatus')->name('admin.logistica.update_status');
     Route::resource('logistica', 'Admin\LogisticaController')->names('admin.logistica');

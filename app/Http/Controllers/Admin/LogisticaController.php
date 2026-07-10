@@ -106,6 +106,11 @@ class LogisticaController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateCaja($request);
+
+        if (!empty($data['bulto_codigo']) && $this->loteEstaCerrado($data['cliente_rif'], $data['bulto_codigo'])) {
+            return back()->withInput()->with('error', 'El lote indicado está cerrado. No se pueden agregar más cajas.');
+        }
+
         $caja = null;
 
         DB::connection('company')->transaction(function () use ($data, &$caja) {
@@ -147,13 +152,19 @@ class LogisticaController extends Controller
     public function show(int $id)
     {
         $caja = LogisticaCaja::with('items')->findOrFail($id);
+        $loteCajas = $this->getCajasDelLote($caja->cliente_rif, $caja->bulto_codigo, true);
 
-        return view('admin.logistica.show', compact('caja'));
+        return view('admin.logistica.show', compact('caja', 'loteCajas'));
     }
 
     public function edit(int $id)
     {
         $caja = LogisticaCaja::with('items')->findOrFail($id);
+        if ($this->cajaEstaBloqueadaPorLoteCerrado($caja)) {
+            return redirect()->route('admin.logistica.show', $caja->id)
+                ->with('error', 'La caja pertenece a un lote cerrado y no puede editarse.');
+        }
+
         $clientes = $this->getClientesConPedidosAprobados();
         $choferes = User::select('id', 'name', 'last_name')->orderBy('name')->get();
         $pedidosDisponibles = $this->pedidosDisponiblesPorCliente($caja->cliente_rif, $caja->id);
@@ -177,7 +188,15 @@ class LogisticaController extends Controller
     public function update(Request $request, int $id)
     {
         $caja = LogisticaCaja::findOrFail($id);
+        if ($this->cajaEstaBloqueadaPorLoteCerrado($caja)) {
+            return back()->withInput()->with('error', 'La caja pertenece a un lote cerrado y no puede modificarse.');
+        }
+
         $data = $this->validateCaja($request, $caja->id);
+
+        if (!empty($data['bulto_codigo']) && $this->loteEstaCerrado($data['cliente_rif'], $data['bulto_codigo'], $caja->id)) {
+            return back()->withInput()->with('error', 'No puedes mover esta caja a un lote cerrado.');
+        }
 
         DB::connection('company')->transaction(function () use ($caja, $data) {
             $estatusAnterior = $caja->estatus;
@@ -228,6 +247,7 @@ class LogisticaController extends Controller
         ]);
 
         $caja = LogisticaCaja::findOrFail($id);
+
         $caja->estatus = $request->estatus;
         $caja->updated_by = Auth::id();
 
@@ -242,9 +262,42 @@ class LogisticaController extends Controller
         return redirect()->route('admin.logistica.index')->with('success', 'Estatus actualizado.');
     }
 
+    public function updateLoteStatus(Request $request)
+    {
+        $data = $request->validate([
+            'cliente_rif' => 'required|string|max:40',
+            'bulto_codigo' => 'required|string|max:40',
+            'estatus' => 'required|in:' . implode(',', self::ESTATUS),
+        ]);
+
+        $cajas = LogisticaCaja::query()
+            ->where('cliente_rif', $data['cliente_rif'])
+            ->whereRaw('LOWER(TRIM(COALESCE(bulto_codigo, ""))) = ?', [strtolower(trim($data['bulto_codigo']))])
+            ->orderBy('id')
+            ->get();
+
+        if ($cajas->isEmpty()) {
+            return back()->with('error', 'No se encontraron cajas para ese lote.');
+        }
+
+        DB::connection('company')->transaction(function () use ($cajas, $data) {
+            foreach ($cajas as $caja) {
+                $caja->estatus = $data['estatus'];
+                $caja->updated_by = Auth::id();
+                $caja->fecha_entrega = $data['estatus'] === 'ENTREGADA' ? now() : null;
+                $caja->save();
+            }
+        });
+
+        return back()->with('success', 'Estatus del lote actualizado en ' . $cajas->count() . ' caja(s).');
+    }
+
     public function destroy(int $id)
     {
         $caja = LogisticaCaja::findOrFail($id);
+        if ($this->cajaEstaBloqueadaPorLoteCerrado($caja)) {
+            return back()->with('error', 'La caja pertenece a un lote cerrado y no puede eliminarse.');
+        }
 
         DB::connection('company')->transaction(function () use ($caja) {
             $caja->delete();
@@ -277,6 +330,60 @@ class LogisticaController extends Controller
             : null;
 
         return view('admin.logistica.label', compact('caja', 'publicUrl', 'pedidoIds', 'facturas', 'bultoEtiqueta'));
+    }
+
+    public function loteEtiquetas(string $clienteRif, string $bultoCodigo)
+    {
+        $cajas = $this->getCajasDelLote($clienteRif, $bultoCodigo, true);
+
+        if ($cajas->isEmpty()) {
+            abort(404, 'No se encontraron cajas para el lote indicado.');
+        }
+
+        $cliente = $cajas->first();
+
+        return view('admin.logistica.lote_etiquetas', [
+            'cajas' => $cajas,
+            'clienteRif' => $clienteRif,
+            'bultoCodigo' => $bultoCodigo,
+            'loteCerradoAt' => $cliente->lote_cerrado_at,
+            'loteCerradoPor' => $cliente->lote_cerrado_por,
+        ]);
+    }
+
+    public function cerrarLoteCliente(Request $request)
+    {
+        $data = $request->validate([
+            'cliente_rif' => 'required|string|max:40',
+            'bulto_codigo' => 'required|string|max:40',
+        ]);
+
+        $cajas = $this->getCajasDelLote($data['cliente_rif'], $data['bulto_codigo'], false);
+
+        if ($cajas->isEmpty()) {
+            return back()->with('error', 'No hay cajas activas para cerrar en este lote.');
+        }
+
+        if ($cajas->every(function ($caja) { return !empty($caja->lote_cerrado_at); })) {
+            return redirect()->route('admin.logistica.lote.etiquetas', [
+                'clienteRif' => $data['cliente_rif'],
+                'bultoCodigo' => $data['bulto_codigo'],
+            ])->with('success', 'El lote ya estaba cerrado.');
+        }
+
+        DB::connection('company')->transaction(function () use ($cajas) {
+            foreach ($cajas as $caja) {
+                $caja->lote_cerrado_at = now();
+                $caja->lote_cerrado_por = Auth::id();
+                $caja->updated_by = Auth::id();
+                $caja->save();
+            }
+        });
+
+        return redirect()->route('admin.logistica.lote.etiquetas', [
+            'clienteRif' => $data['cliente_rif'],
+            'bultoCodigo' => $data['bulto_codigo'],
+        ])->with('success', 'Lote cerrado correctamente. Puedes imprimir todas las etiquetas ahora.');
     }
 
     public function publicShow(string $token)
@@ -318,6 +425,50 @@ class LogisticaController extends Controller
         Config::set('database.connections.company.database', 'dacabe');
         DB::purge('company');
         DB::reconnect('company');
+    }
+
+    private function getCajasDelLote(string $clienteRif, ?string $bultoCodigo, bool $withItems = false)
+    {
+        $query = LogisticaCaja::query()
+            ->where('cliente_rif', $clienteRif)
+            ->when($bultoCodigo !== null && trim($bultoCodigo) !== '', function ($q) use ($bultoCodigo) {
+                $q->whereRaw('LOWER(TRIM(COALESCE(bulto_codigo, ""))) = ?', [strtolower(trim($bultoCodigo))]);
+            })
+            ->where('estatus', '!=', 'CANCELADA')
+            ->orderByRaw('COALESCE(bulto_posicion, 0) ASC')
+            ->orderBy('id');
+
+        if ($withItems) {
+            $query->with('items');
+        }
+
+        return $query->get();
+    }
+
+    private function loteEstaCerrado(string $clienteRif, string $bultoCodigo, ?int $excludeCajaId = null): bool
+    {
+        return LogisticaCaja::query()
+            ->where('cliente_rif', $clienteRif)
+            ->whereRaw('LOWER(TRIM(COALESCE(bulto_codigo, ""))) = ?', [strtolower(trim($bultoCodigo))])
+            ->when($excludeCajaId, function ($q) use ($excludeCajaId) {
+                $q->where('id', '!=', $excludeCajaId);
+            })
+            ->whereNotNull('lote_cerrado_at')
+            ->where('estatus', '!=', 'CANCELADA')
+            ->exists();
+    }
+
+    private function cajaEstaBloqueadaPorLoteCerrado(LogisticaCaja $caja): bool
+    {
+        if (!empty($caja->lote_cerrado_at)) {
+            return true;
+        }
+
+        if (empty($caja->bulto_codigo)) {
+            return false;
+        }
+
+        return $this->loteEstaCerrado($caja->cliente_rif, $caja->bulto_codigo, $caja->id);
     }
 
     private function validateCaja(Request $request, ?int $cajaId = null): array

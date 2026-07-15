@@ -23,7 +23,7 @@
                 <div>
                     @if($caja->bulto_codigo)
                         @if(!$loteCerrado)
-                            <form action="{{ route('admin.logistica.lote.cerrar') }}" method="POST" class="d-inline mr-1">
+                            <form action="{{ route('admin.logistica.lote.cerrar') }}" method="POST" target="_blank" class="d-inline mr-1">
                                 @csrf
                                 <input type="hidden" name="cliente_rif" value="{{ $caja->cliente_rif }}">
                                 <input type="hidden" name="bulto_codigo" value="{{ $caja->bulto_codigo }}">

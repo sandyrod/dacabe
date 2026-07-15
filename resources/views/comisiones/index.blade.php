@@ -612,6 +612,7 @@
 
                                                                         <button class="btn btn-sm btn-info btn-ver-detalle"
                                                                             data-pedido-id="{{ $comision->pedido_id }}"
+                                                                            data-correo-vendedor="{{ $comision->correo_vendedor }}"
                                                                             data-toggle="tooltip"
                                                                             title="Ver detalle de comisiones"
                                                                             style="min-width: 90px;">
@@ -2064,7 +2065,8 @@
                 $(document).on('click', '.btn-ver-detalle', function(event) {
                     event.preventDefault();
                     const pedidoId = $(this).data('pedido-id');
-                    cargarDetalleComisiones(pedidoId);
+                    const correoVendedor = $(this).data('correo-vendedor') || '';
+                    cargarDetalleComisiones(pedidoId, correoVendedor);
                 });
 
                 // Manejar clic en botón Ver Pago
@@ -2195,8 +2197,11 @@
                 });
 
                 // Función para cargar el detalle de comisiones
-                function cargarDetalleComisiones(pedidoId) {
-                    const url = '{{ url('comisiones') }}/' + pedidoId + '/detalles';
+                function cargarDetalleComisiones(pedidoId, correoVendedor = '') {
+                    let url = '{{ url('comisiones') }}/' + pedidoId + '/detalles';
+                    if (correoVendedor) {
+                        url += '?correo_vendedor=' + encodeURIComponent(correoVendedor);
+                    }
 
                     $.ajax({
                         url: url,

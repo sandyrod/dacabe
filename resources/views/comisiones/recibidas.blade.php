@@ -735,6 +735,7 @@
                                     <td class="text-center">
                                         <button class="btn btn-xs btn-outline-primary btn-ver-detalle"
                                                 data-pedido-id="${item.pedido_id}"
+                                                data-correo-vendedor="{{ auth()->user()->email }}"
                                                 data-toggle="tooltip" title="Ver productos">
                                             <i class="fas fa-eye"></i>
                                         </button>
@@ -788,11 +789,15 @@
             // Lógica para Ver Detalle de Productos (Nivel 2)
             $(document).on('click', '.btn-ver-detalle', function() {
                 const pedidoId = $(this).data('pedido-id');
-                cargarDetalleComisiones(pedidoId);
+                const correoVendedor = $(this).data('correo-vendedor') || '{{ auth()->user()->email }}';
+                cargarDetalleComisiones(pedidoId, correoVendedor);
             });
 
-            function cargarDetalleComisiones(pedidoId) {
-                const url = '{{ url('comisiones') }}/' + pedidoId + '/detalles';
+            function cargarDetalleComisiones(pedidoId, correoVendedor = '') {
+                let url = '{{ url('comisiones') }}/' + pedidoId + '/detalles';
+                if (correoVendedor) {
+                    url += '?correo_vendedor=' + encodeURIComponent(correoVendedor);
+                }
                 $.get(url, function(response) {
                     if (response.success) {
                         const tbody = $('#detalleComisionesBody');

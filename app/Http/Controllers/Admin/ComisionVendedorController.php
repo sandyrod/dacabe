@@ -554,13 +554,25 @@ class ComisionVendedorController extends Controller
     /**
      * Get commission details for a specific pedido_id.
      */
-    public function getDetalles($pedidoId)
+    public function getDetalles(Request $request, $pedidoId)
     {
-        $detalles = DB::connection('company')->table('comision_vendedores as cv')
+        $detallesQuery = DB::connection('company')->table('comision_vendedores as cv')
             ->join('pago_grupo_detalles as pgd', 'cv.pago_id', '=', 'pgd.id')
             ->where('pgd.pedido_id', $pedidoId)
-            ->select('cv.codigo_producto', 'cv.nombre_producto', 'cv.cantidad', 'cv.monto_comision', 'cv.porcentaje_comision')
-            ->get();
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('pedido_detalle as pd')
+                    ->whereColumn('pd.pedido_id', 'pgd.pedido_id')
+                    ->whereColumn('pd.codigo_inven', 'cv.codigo_producto');
+            })
+            ->select('cv.codigo_producto', 'cv.nombre_producto', 'cv.cantidad', 'cv.monto_comision', 'cv.porcentaje_comision');
+
+        // Si se indica vendedor, limitar solo a las comisiones de ese vendedor para el pedido.
+        if ($request->filled('correo_vendedor')) {
+            $detallesQuery->where('cv.correo_vendedor', $request->correo_vendedor);
+        }
+
+        $detalles = $detallesQuery->get();
 
         return response()->json([
             'success' => true,

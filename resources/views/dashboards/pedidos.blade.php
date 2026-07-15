@@ -16,6 +16,22 @@
         ->where('estatus', 'RECHAZADO')
         ->whereNotNull('observaciones')
         ->where('observaciones', '!=', '')
+        // No mostrar la alerta cuando cada pedido de este pago rechazado
+        // ya fue cubierto por un pago posterior aprobado del mismo vendedor.
+        /*
+        ->whereNotExists(function ($query) {
+            $query->from('pagos_pedidos as pp_rech')
+                ->whereColumn('pp_rech.pago_id', 'pagos.id')
+                ->whereNotExists(function ($inner) {
+                    $inner->from('pagos_pedidos as pp_apr')
+                        ->join('pagos as p_apr', 'p_apr.id', '=', 'pp_apr.pago_id')
+                        ->whereColumn('pp_apr.pedido_id', 'pp_rech.pedido_id')
+                        ->whereColumn('p_apr.user_id', 'pagos.user_id')
+                        ->where('p_apr.estatus', 'APROBADO')
+                        ->whereColumn('p_apr.created_at', '>', 'pagos.created_at');
+                });
+        })
+        */
         ->orderByDesc('updated_at')
         ->take(5)
         ->get();

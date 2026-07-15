@@ -101,7 +101,7 @@
                                             </select>
                                         </form>
                                         @if(!$loteCerrado)
-                                            <form action="{{ route('admin.logistica.lote.cerrar') }}" method="POST" class="d-inline" onsubmit="return confirm('Esto marcará el lote como finalizado e irá a imprimir todas las etiquetas del lote. ¿Continuar?');">
+                                            <form action="{{ route('admin.logistica.lote.cerrar') }}" method="POST" target="_blank" class="d-inline" onsubmit="return confirm('Esto marcará el lote como finalizado e irá a imprimir todas las etiquetas del lote. ¿Continuar?');">
                                                 @csrf
                                                 <input type="hidden" name="cliente_rif" value="{{ $caja->cliente_rif }}">
                                                 <input type="hidden" name="bulto_codigo" value="{{ $caja->bulto_codigo }}">

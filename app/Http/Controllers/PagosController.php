@@ -6,8 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\Pago;
 use App\Models\PagoPedido;
 use App\Models\PedidoAjuste;
-use DB;
 use App\Models\Pedido;
+use Illuminate\Support\Facades\DB;
 
 class PagosController extends Controller
 {

@@ -15,6 +15,9 @@ use Barryvdh\DomPDF\Facade\Pdf as PDF;
 use App\Models\ComisionPago;
 use App\Models\ComisionMovimiento;
 use App\Models\PagoDestino;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class ComisionVendedorController extends Controller
 {
@@ -265,8 +268,11 @@ class ComisionVendedorController extends Controller
             );
         } else {
             // Normal pagination when no filters
-            $comisiones = $query->paginate(20)->withQueryString();
+            $comisiones = $query->paginate(20);
+            $comisiones->appends($request->query());
         }
+
+        $this->appendUltimaAuditoriaAComisiones($comisiones);
 
         return view('comisiones.index', compact(
             'comisiones',
@@ -289,7 +295,16 @@ class ComisionVendedorController extends Controller
     {
         $request->validate([
             'nuevo_monto' => 'required|numeric|min:0',
+            'correo_vendedor' => 'required|string',
+            'motivo' => 'required|string|max:1000',
         ]);
+
+        if (!$this->auditTableExists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La tabla de auditoría de comisiones no existe. Ejecute primero el script SQL de comision_vendedor_auditorias.'
+            ], 422);
+        }
 
         // Resolver los pagos del pedido y actualizar sus comisiones asociadas.
         $pagoIds = DB::connection('company')
@@ -297,30 +312,107 @@ class ComisionVendedorController extends Controller
             ->where('pedido_id', $pedidoId)
             ->pluck('id');
 
-        $comisiones = \App\Models\ComisionVendedor::whereIn('pago_id', $pagoIds)->get();
+        $comisiones = \App\Models\ComisionVendedor::whereIn('pago_id', $pagoIds)
+            ->where('correo_vendedor', $request->correo_vendedor)
+            ->orderBy('id')
+            ->get();
 
         if ($comisiones->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No se encontraron comisiones para este pedido.']);
         }
 
-        // Repartir el nuevo monto proporcionalmente según el monto original de cada registro
-        $totalActual = $comisiones->sum('monto_comision');
-        if ($totalActual == 0) {
-            // Si el total actual es 0, repartir igual
-            $nuevoMontoPorComision = $request->nuevo_monto / $comisiones->count();
-            foreach ($comisiones as $comision) {
-                $comision->monto_comision = $nuevoMontoPorComision;
-                $comision->save();
-            }
-        } else {
-            foreach ($comisiones as $comision) {
-                $proporcion = $comision->monto_comision / $totalActual;
-                $comision->monto_comision = $request->nuevo_monto * $proporcion;
-                $comision->save();
-            }
-        }
+        $usuario = auth()->user();
+        $totalActual = round((float) $comisiones->sum('monto_comision'), 2);
+        $nuevoMontoTotal = round((float) $request->nuevo_monto, 2);
+        $cantidadComisiones = $comisiones->count();
+        $loteUuid = (string) Str::uuid();
+        $restante = $nuevoMontoTotal;
+        $auditorias = [];
 
-        return response()->json(['success' => true, 'message' => 'Monto de comisión actualizado correctamente.']);
+        DB::connection('company')->beginTransaction();
+
+        try {
+            foreach ($comisiones->values() as $index => $comision) {
+                $montoAnterior = round((float) $comision->monto_comision, 2);
+
+                if ($totalActual == 0.0) {
+                    $nuevoMonto = $index === ($cantidadComisiones - 1)
+                        ? $restante
+                        : round($nuevoMontoTotal / $cantidadComisiones, 2);
+                } else {
+                    $proporcion = $montoAnterior / $totalActual;
+                    $nuevoMonto = $index === ($cantidadComisiones - 1)
+                        ? $restante
+                        : round($nuevoMontoTotal * $proporcion, 2);
+                }
+
+                $nuevoMonto = round(max($nuevoMonto, 0), 2);
+                $restante = round($restante - $nuevoMonto, 2);
+
+                $comision->monto_comision = $nuevoMonto;
+                $comision->save();
+
+                $auditorias[] = [
+                    'lote_uuid' => $loteUuid,
+                    'comision_vendedor_id' => $comision->id,
+                    'pedido_id' => $pedidoId,
+                    'pago_id' => $comision->pago_id,
+                    'correo_vendedor' => $comision->correo_vendedor,
+                    'nombre_vendedor' => $comision->nombre_vendedor,
+                    'codigo_producto' => $comision->codigo_producto,
+                    'tipo_accion' => 'ajuste_monto',
+                    'motivo' => $request->motivo,
+                    'monto_base_comision' => $comision->monto_base_comision,
+                    'porcentaje_comision' => $comision->porcentaje_comision,
+                    'monto_formula_original' => $comision->monto_base_comision !== null
+                        ? round((float) $comision->monto_base_comision * ((float) $comision->porcentaje_comision / 100), 2)
+                        : null,
+                    'monto_comision_anterior' => $montoAnterior,
+                    'monto_comision_nuevo' => $nuevoMonto,
+                    'total_pedido_anterior' => $totalActual,
+                    'total_pedido_nuevo' => $nuevoMontoTotal,
+                    'modificado_por_user_id' => $usuario?->id,
+                    'modificado_por_nombre' => $usuario?->name,
+                    'modificado_por_email' => $usuario?->email,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+
+            DB::connection('company')
+                ->table('comision_vendedor_auditorias')
+                ->insert($auditorias);
+
+            DB::connection('company')->commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Monto de comisión actualizado correctamente.',
+                'auditoria' => [
+                    'lote_uuid' => $loteUuid,
+                    'pedido_id' => (int) $pedidoId,
+                    'correo_vendedor' => $request->correo_vendedor,
+                    'motivo' => $request->motivo,
+                    'modificado_por_nombre' => $usuario?->name,
+                    'modificado_por_email' => $usuario?->email,
+                    'total_pedido_anterior' => $totalActual,
+                    'total_pedido_nuevo' => $nuevoMontoTotal,
+                    'created_at' => now()->toDateTimeString(),
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            DB::connection('company')->rollBack();
+            Log::error('Error al auditar ajuste de comisiones', [
+                'pedido_id' => $pedidoId,
+                'correo_vendedor' => $request->correo_vendedor,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se pudo actualizar la comisión: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
@@ -565,7 +657,7 @@ class ComisionVendedorController extends Controller
                     ->whereColumn('pd.pedido_id', 'pgd.pedido_id')
                     ->whereColumn('pd.codigo_inven', 'cv.codigo_producto');
             })
-            ->select('cv.codigo_producto', 'cv.nombre_producto', 'cv.cantidad', 'cv.monto_comision', 'cv.porcentaje_comision');
+                    ->select('cv.id as comision_vendedor_id', 'cv.codigo_producto', 'cv.nombre_producto', 'cv.cantidad', 'cv.monto_comision', 'cv.porcentaje_comision', 'cv.correo_vendedor', 'cv.nombre_vendedor');
 
         // Si se indica vendedor, limitar solo a las comisiones de ese vendedor para el pedido.
         if ($request->filled('correo_vendedor')) {
@@ -573,10 +665,26 @@ class ComisionVendedorController extends Controller
         }
 
         $detalles = $detallesQuery->get();
+        $auditorias = $this->latestAuditByComisionIds($detalles->pluck('comision_vendedor_id')->all());
+
+        $detalles = $detalles->map(function ($detalle) use ($auditorias) {
+            $auditoria = $auditorias->get((int) $detalle->comision_vendedor_id);
+            $detalle->auditado = (bool) $auditoria;
+            $detalle->auditoria = $auditoria;
+
+            return $detalle;
+        });
+
+        $auditoriaResumen = $detalles
+            ->pluck('auditoria')
+            ->filter()
+            ->sortByDesc('created_at')
+            ->first();
 
         return response()->json([
             'success' => true,
-            'detalles' => $detalles
+            'detalles' => $detalles,
+            'auditoria_resumen' => $auditoriaResumen,
         ]);
     }
 
@@ -1099,6 +1207,99 @@ class ComisionVendedorController extends Controller
         $saldoActual = ComisionMovimiento::saldoActual($correo);
 
         return view('comisiones.mi_estado_cuenta', compact('movimientos', 'saldoActual'));
+    }
+
+    private function auditTableExists(): bool
+    {
+        try {
+            return DB::connection('company')->getSchemaBuilder()->hasTable('comision_vendedor_auditorias');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function appendUltimaAuditoriaAComisiones($comisiones): void
+    {
+        if (!$this->auditTableExists()) {
+            return;
+        }
+
+        $items = $comisiones instanceof LengthAwarePaginator
+            ? collect($comisiones->items())
+            : collect($comisiones);
+
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $auditorias = $this->latestAuditByPedidoVendedor($items);
+
+        $items = $items->map(function ($item) use ($auditorias) {
+            $key = $this->auditPedidoVendedorKey($item->pedido_id, $item->correo_vendedor ?? '');
+            $auditoria = $auditorias->get($key);
+
+            $item->auditado = (bool) $auditoria;
+            $item->ultima_auditoria = $auditoria;
+
+            return $item;
+        });
+
+        if ($comisiones instanceof LengthAwarePaginator) {
+            $comisiones->setCollection($items);
+        }
+    }
+
+    private function latestAuditByPedidoVendedor(Collection $items): Collection
+    {
+        $pedidoIds = $items->pluck('pedido_id')->filter()->unique()->values();
+        $correos = $items->pluck('correo_vendedor')->filter()->unique()->values();
+
+        if ($pedidoIds->isEmpty() || $correos->isEmpty()) {
+            return collect();
+        }
+
+        try {
+            return DB::connection('company')
+                ->table('comision_vendedor_auditorias')
+                ->whereIn('pedido_id', $pedidoIds)
+                ->whereIn('correo_vendedor', $correos)
+                ->orderByDesc('id')
+                ->get()
+                ->unique(function ($row) {
+                    return $this->auditPedidoVendedorKey($row->pedido_id, $row->correo_vendedor);
+                })
+                ->keyBy(function ($row) {
+                    return $this->auditPedidoVendedorKey($row->pedido_id, $row->correo_vendedor);
+                });
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
+
+    private function latestAuditByComisionIds(array $comisionIds): Collection
+    {
+        if (!$this->auditTableExists() || empty($comisionIds)) {
+            return collect();
+        }
+
+        try {
+            return DB::connection('company')
+                ->table('comision_vendedor_auditorias')
+                ->whereIn('comision_vendedor_id', $comisionIds)
+                ->orderByDesc('id')
+                ->get()
+                ->unique('comision_vendedor_id')
+                ->keyBy(function ($row) {
+                    return (int) $row->comision_vendedor_id;
+                });
+        } catch (\Throwable $e) {
+            return collect();
+        }
+    }
+
+    private function auditPedidoVendedorKey($pedidoId, string $correoVendedor): string
+    {
+        return trim((string) $pedidoId) . '|' . mb_strtolower(trim($correoVendedor));
     }
 }
 

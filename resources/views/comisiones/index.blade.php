@@ -13,6 +13,7 @@
                         <form id="formEditarMontoComision">
                             @csrf
                             <input type="hidden" name="pago_id" id="editar_monto_pago_id">
+                            <input type="hidden" name="correo_vendedor" id="editar_monto_correo_vendedor">
                             <div class="modal-body p-4 bg-light">
                                 <div class="form-group">
                                     <label class="font-weight-bold text-navy"><i class="fas fa-tag mr-1"></i> % Comisión aplicada</label>
@@ -29,6 +30,11 @@
                                     <label class="font-weight-bold text-navy"><i class="fas fa-dollar-sign mr-1"></i> Nuevo Monto de Comisión ($)</label>
                                     <input type="number" step="0.01" min="0" name="nuevo_monto" id="nuevo_monto_comision" class="form-control" required>
                                     <small class="form-text text-muted">Ingrese el nuevo monto total de comisión para este pago.</small>
+                                </div>
+                                <div class="form-group mb-0">
+                                    <label class="font-weight-bold text-navy"><i class="fas fa-clipboard-list mr-1"></i> Motivo del ajuste</label>
+                                    <textarea name="motivo" id="motivo_ajuste_comision" class="form-control" rows="3" maxlength="1000" required placeholder="Explique por qué se está modificando este monto."></textarea>
+                                    <small class="form-text text-muted">Se guardará junto con el usuario y la fecha en la auditoría.</small>
                                 </div>
                             </div>
                             <div class="modal-footer border-0 bg-white">
@@ -513,6 +519,19 @@
                                                                     </div>
                                                                     <small
                                                                         class="text-muted">{{ $comision->correo_vendedor }}</small>
+                                                                    @if (!empty($comision->auditado) && !empty($comision->ultima_auditoria))
+                                                                        <div class="mt-2">
+                                                                            <span class="badge badge-warning badge-pill px-3 py-2">
+                                                                                <i class="fas fa-history mr-1"></i>Ajustada manualmente
+                                                                            </span>
+                                                                            <div class="small text-warning font-weight-bold mt-1">
+                                                                                {{ $comision->ultima_auditoria->modificado_por_nombre ?? 'Usuario no disponible' }}
+                                                                            </div>
+                                                                            <div class="small text-muted">
+                                                                                {{ \Carbon\Carbon::parse($comision->ultima_auditoria->created_at)->format('d/m/Y H:i') }}
+                                                                            </div>
+                                                                        </div>
+                                                                    @endif
                                                                 </div>
                                                             </td>
                                                             <td class="text-center">
@@ -587,6 +606,7 @@
                                                                         <button
                                                                             class="btn btn-sm btn-warning btn-editar-monto"
                                                                             data-pedido-id="{{ $comision->pedido_id }}"
+                                                                            data-correo-vendedor="{{ $comision->correo_vendedor }}"
                                                                             data-monto="{{ $comision->total_comision }}"
                                                                             data-porcentaje="{{ number_format((float)($comision->porcentaje_comision ?? 0), 2, '.', '') }}"
                                                                             data-moneda="{{ $comision->moneda_pago ?? '' }}"
@@ -623,6 +643,14 @@
                                                                             <button
                                                                                 class="btn btn-sm btn-success btn-ver-pago-comision"
                                                                                 data-pedido-id="{{ $comision->pedido_id }}"
+                                                                                data-pago-id="{{ $comision->pedido_id }}"
+                                                                                data-auditado="{{ !empty($comision->auditado) ? 1 : 0 }}"
+                                                                                data-audit-usuario="{{ $comision->ultima_auditoria->modificado_por_nombre ?? '' }}"
+                                                                                data-audit-email="{{ $comision->ultima_auditoria->modificado_por_email ?? '' }}"
+                                                                                data-audit-fecha="{{ !empty($comision->ultima_auditoria->created_at) ? \Carbon\Carbon::parse($comision->ultima_auditoria->created_at)->toIso8601String() : '' }}"
+                                                                                data-audit-motivo="{{ $comision->ultima_auditoria->motivo ?? '' }}"
+                                                                                data-audit-total-anterior="{{ $comision->ultima_auditoria->total_pedido_anterior ?? '' }}"
+                                                                                data-audit-total-nuevo="{{ $comision->ultima_auditoria->total_pedido_nuevo ?? '' }}"
                                                                                 data-toggle="tooltip"
                                                                                 title="Ver comprobante de pago de comisión"
                                                                                 style="min-width: 90px;">
@@ -827,6 +855,7 @@
                             </button>
                         </div>
                         <div class="modal-body p-0">
+                            <div id="detalleAuditoriaResumen" class="p-3 border-bottom bg-warning-light" style="display:none;"></div>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0">
                                     <thead class="bg-light">
@@ -1123,6 +1152,8 @@
                                 </div>
                             </div>
 
+                            <div id="verPagoAuditoriaResumen" class="mt-3" style="display:none;"></div>
+
                             <!-- Detalle en Grid -->
                             <div class="row g-3">
                                 <div class="col-md-4 mb-3">
@@ -1199,6 +1230,25 @@
             <style>
                 .bg-lightblue {
                     background-color: #3c8dbc !important;
+                }
+
+                .bg-warning-light {
+                    background: linear-gradient(135deg, #fff7d6 0%, #ffe8a3 100%);
+                }
+
+                .audit-highlight-card {
+                    border-left: 4px solid #f0ad4e;
+                    background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+                    border-radius: 12px;
+                    box-shadow: 0 8px 20px rgba(240, 173, 78, 0.15);
+                }
+
+                .audit-inline-note {
+                    display: block;
+                    margin-top: .35rem;
+                    color: #856404;
+                    font-size: .8rem;
+                    font-weight: 600;
                 }
 
                 /* Estilo elegante para comisiones en DIVISA EFECTIVO */
@@ -1998,12 +2048,15 @@
                 $(document).on('click', '.btn-editar-monto', function(event) {
                     event.preventDefault();
                     const pagoId   = $(this).data('pedido-id');
+                    const correoVendedor = $(this).data('correo-vendedor') || '';
                     const monto    = $(this).data('monto');
                     const porcentaje = parseFloat($(this).data('porcentaje')) || 0;
                     const moneda   = $(this).data('moneda') || '';
 
                     $('#editar_monto_pago_id').val(pagoId);
+                    $('#editar_monto_correo_vendedor').val(correoVendedor);
                     $('#nuevo_monto_comision').val(monto);
+                    $('#motivo_ajuste_comision').val('');
 
                     $('#dcto_display').val(porcentaje.toFixed(2));
 
@@ -2013,9 +2066,15 @@
                 $('#formEditarMontoComision').on('submit', function(e) {
                     e.preventDefault();
                     const pagoId = $('#editar_monto_pago_id').val();
+                    const correoVendedor = $('#editar_monto_correo_vendedor').val();
                     const nuevoMonto = $('#nuevo_monto_comision').val();
+                    const motivo = $('#motivo_ajuste_comision').val();
                     if (!pagoId) {
                         toastr.error('No se pudo identificar el pedido para actualizar el monto.');
+                        return;
+                    }
+                    if (!correoVendedor) {
+                        toastr.error('No se pudo identificar el vendedor de la comisión.');
                         return;
                     }
                     const urlTemplate = "{{ route('comisiones.editar_monto', ['pedidoId' => '__ID__']) }}";
@@ -2028,7 +2087,9 @@
                         type: 'POST',
                         data: {
                             _token: '{{ csrf_token() }}',
-                            nuevo_monto: nuevoMonto
+                            nuevo_monto: nuevoMonto,
+                            correo_vendedor: correoVendedor,
+                            motivo: motivo
                         },
                         success: function(response) {
                             if (response.success) {
@@ -2111,6 +2172,15 @@
                 $(document).on('click', '.btn-ver-pago-comision', function(event) {
                     event.preventDefault();
                     const pagoId = $(this).data('pago-id');
+                    const auditado = Number($(this).data('auditado')) === 1;
+                    const auditoria = {
+                        usuario: $(this).data('audit-usuario') || '',
+                        email: $(this).data('audit-email') || '',
+                        fecha: $(this).data('audit-fecha') || '',
+                        motivo: $(this).data('audit-motivo') || '',
+                        totalAnterior: $(this).data('audit-total-anterior') || '',
+                        totalNuevo: $(this).data('audit-total-nuevo') || ''
+                    };
                     const url = '{{ url('comisiones') }}/' + pagoId + '/pago-comision';
 
                     $.ajax({
@@ -2139,6 +2209,30 @@
                                     'N/A');
                                 $('#ver_pago_observaciones').text(pago.observaciones ||
                                     'Sin observaciones');
+
+                                const auditWrap = $('#verPagoAuditoriaResumen');
+                                auditWrap.hide().empty();
+                                if (auditado) {
+                                    const fechaAuditoria = auditoria.fecha ? new Date(auditoria.fecha).toLocaleString('es-ES') : '-';
+                                    auditWrap.html(`
+                                        <div class="audit-highlight-card p-3">
+                                            <div class="d-flex justify-content-between align-items-start flex-wrap">
+                                                <div class="pr-3">
+                                                    <div class="font-weight-bold text-warning mb-1"><i class="fas fa-user-shield mr-2"></i>Comisión ajustada manualmente</div>
+                                                    <div class="small text-dark mb-1"><strong>Modificado por:</strong> ${auditoria.usuario || 'Usuario no disponible'}${auditoria.email ? ' (' + auditoria.email + ')' : ''}</div>
+                                                    <div class="small text-muted mb-2"><strong>Fecha:</strong> ${fechaAuditoria}</div>
+                                                    <div class="small text-dark mb-0"><strong>Motivo:</strong> ${auditoria.motivo || 'Sin motivo registrado'}</div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <div class="small text-muted">Total anterior</div>
+                                                    <div class="font-weight-bold text-danger">$${parseFloat(auditoria.totalAnterior || 0).toFixed(2)}</div>
+                                                    <div class="small text-muted mt-2">Total nuevo</div>
+                                                    <div class="font-weight-bold text-success">$${parseFloat(auditoria.totalNuevo || 0).toFixed(2)}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `).show();
+                                }
 
                                 // Manejar estado de recibido
                                 $('#ver_pago_id_oculto').val(pagoId);
@@ -2208,7 +2302,7 @@
                         type: 'GET',
                         success: function(response) {
                             if (response.success) {
-                                mostrarDetalleModal(response.detalles);
+                                mostrarDetalleModal(response.detalles, response.auditoria_resumen || null);
                             } else {
                                 toastr.error('Error al cargar los detalles');
                             }
@@ -2221,21 +2315,54 @@
                 }
 
                 // Función para mostrar el modal con los detalles
-                function mostrarDetalleModal(detalles) {
+                function mostrarDetalleModal(detalles, auditoriaResumen = null) {
                     const tbody = $('#detalleComisionesBody');
+                    const auditWrap = $('#detalleAuditoriaResumen');
                     tbody.empty();
+                    auditWrap.hide().empty();
 
                     let totalComision = 0;
 
+                    if (auditoriaResumen) {
+                        const fecha = auditoriaResumen.created_at ? new Date(auditoriaResumen.created_at).toLocaleString('es-ES') : '-';
+                        const montoAnterior = parseFloat(auditoriaResumen.total_pedido_anterior || 0).toFixed(2);
+                        const montoNuevo = parseFloat(auditoriaResumen.total_pedido_nuevo || 0).toFixed(2);
+
+                        auditWrap.html(`
+                            <div class="audit-highlight-card p-3">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap">
+                                    <div class="pr-3">
+                                        <div class="font-weight-bold text-warning mb-1"><i class="fas fa-user-shield mr-2"></i>Comisión ajustada manualmente</div>
+                                        <div class="small text-dark mb-1"><strong>Modificado por:</strong> ${auditoriaResumen.modificado_por_nombre || 'Usuario no disponible'}${auditoriaResumen.modificado_por_email ? ' (' + auditoriaResumen.modificado_por_email + ')' : ''}</div>
+                                        <div class="small text-muted mb-2"><strong>Fecha:</strong> ${fecha}</div>
+                                        <div class="small text-dark mb-2"><strong>Motivo:</strong> ${auditoriaResumen.motivo || 'Sin motivo registrado'}</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="small text-muted">Total anterior</div>
+                                        <div class="font-weight-bold text-danger">$${montoAnterior}</div>
+                                        <div class="small text-muted mt-2">Total nuevo</div>
+                                        <div class="font-weight-bold text-success">$${montoNuevo}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).show();
+                    }
+
                     detalles.forEach(function(detalle) {
                         totalComision += parseFloat(detalle.monto_comision);
+
+                        const auditNote = detalle.auditado && detalle.auditoria ? `
+                            <span class="audit-inline-note">
+                                <i class="fas fa-history mr-1"></i>
+                                Ajustada por ${detalle.auditoria.modificado_por_nombre || 'usuario'} el ${new Date(detalle.auditoria.created_at).toLocaleString('es-ES')}
+                            </span>` : '';
 
                         const row = `
                         <tr>
                             <td><span class="badge badge-secondary">${detalle.codigo_producto}</span></td>
                             <td>${detalle.nombre_producto || 'N/A'}</td>
                             <td class="text-center"><span class="badge badge-primary badge-pill">${detalle.cantidad}</span></td>
-                            <td class="text-right font-weight-bold text-success">$${parseFloat(detalle.monto_comision).toFixed(2)}</td>
+                            <td class="text-right font-weight-bold text-success">$${parseFloat(detalle.monto_comision).toFixed(2)}${auditNote}</td>
                             <td class="text-center">${parseFloat(detalle.porcentaje_comision).toFixed(2)}%</td>
                         </tr>
                     `;

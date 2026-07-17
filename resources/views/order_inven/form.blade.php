@@ -95,6 +95,28 @@
           </div>
 		</div>
 	</div>
+	<div class="row mt-2">
+		<div class="col-xs-12 col-sm-12 col-md-3 col-lg-3">
+			{{ Form::label('peso_gramos', 'Peso (gramos)', ['class' => 'control-label']) }}
+			{!! Form::number('peso_gramos', @$order_inven->informacion->peso_gramos, ['class' => 'form-control', 'id' => 'peso_gramos', 'step' => '0.001', 'min' => '0', 'placeholder' => 'Ej: 250']) !!}
+		</div>
+		<div class="col-xs-12 col-sm-12 col-md-3 col-lg-3 d-flex align-items-end">
+			<div class="form-group mb-0 w-100">
+				<input type="hidden" name="requiere_etiqueta" value="0">
+				<div class="custom-control custom-switch custom-switch-off-danger custom-switch-on-success">
+					<input
+						type="checkbox"
+						class="custom-control-input"
+						id="requiere_etiqueta"
+						name="requiere_etiqueta"
+						value="1"
+						{{ !isset($order_inven->informacion) || (int) @$order_inven->informacion->requiere_etiqueta === 1 ? 'checked' : '' }}
+					>
+					<label class="custom-control-label" for="requiere_etiqueta">Requiere etiqueta</label>
+				</div>
+			</div>
+		</div>
+	</div>
 	<div class="row">
 		<div class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
 			{{ Form::label('detalle', 'Detalle del producto', ['class' => 'control-label']) }}

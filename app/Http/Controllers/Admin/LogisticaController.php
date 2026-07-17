@@ -95,11 +95,15 @@ class LogisticaController extends Controller
     {
         $cajaId = $request->query('caja_id');
         $pedidos = $this->pedidosDisponiblesPorCliente($rif, $cajaId ? (int) $cajaId : null);
+        $cliente = $this->getClienteByRif($rif);
+        $ultimaCaja = $this->getUltimaCajaCliente($rif, $cajaId ? (int) $cajaId : null);
 
         return response()->json([
             'success' => true,
             'pedidos' => $pedidos,
-            'cliente' => $this->getClienteByRif($rif),
+            'cliente' => $cliente,
+            'ultima_caja' => $ultimaCaja,
+            'sugerido_bulto_codigo' => $this->buildSuggestedLoteCodigo($rif, optional($cliente)->codcli),
         ]);
     }
 
@@ -120,6 +124,7 @@ class LogisticaController extends Controller
                 'bulto_codigo' => $data['bulto_codigo'] ?? null,
                 'bulto_posicion' => $data['bulto_posicion'] ?? null,
                 'bulto_total' => $data['bulto_total'] ?? null,
+                'peso_kg' => $this->resolvePesoKg($data),
                 'cliente_rif' => $data['cliente_rif'],
                 'cliente_codcli' => $data['cliente_codcli'] ?? null,
                 'cliente_nombre' => $data['cliente_nombre'],
@@ -206,6 +211,7 @@ class LogisticaController extends Controller
                 'bulto_codigo' => $data['bulto_codigo'] ?? null,
                 'bulto_posicion' => $data['bulto_posicion'] ?? null,
                 'bulto_total' => $data['bulto_total'] ?? null,
+                'peso_kg' => $this->resolvePesoKg($data),
                 'cliente_rif' => $data['cliente_rif'],
                 'cliente_codcli' => $data['cliente_codcli'] ?? null,
                 'cliente_nombre' => $data['cliente_nombre'],
@@ -477,6 +483,7 @@ class LogisticaController extends Controller
             'bulto_codigo' => 'nullable|string|max:40|required_with:bulto_posicion,bulto_total',
             'bulto_posicion' => 'nullable|integer|min:1|required_with:bulto_codigo,bulto_total',
             'bulto_total' => 'nullable|integer|min:1|required_with:bulto_codigo,bulto_posicion',
+            'peso_kg' => 'nullable|numeric|min:0',
             'cliente_rif' => 'required|string|max:40',
             'cliente_codcli' => 'nullable|string|max:40',
             'cliente_nombre' => 'required|string|max:255',
@@ -499,6 +506,7 @@ class LogisticaController extends Controller
             'items.*.producto_descripcion' => 'required|string|max:255',
             'items.*.unidad' => 'nullable|string|max:40',
             'items.*.cantidad' => 'required|numeric|min:0.01',
+            'items.*.peso_gramos' => 'nullable|numeric|min:0',
             'items.*.vendedor_codigo' => 'nullable|string|max:80',
             'items.*.vendedor_nombre' => 'nullable|string|max:150',
         ]);
@@ -583,6 +591,64 @@ class LogisticaController extends Controller
         }
     }
 
+    private function resolvePesoKg(array $data): ?float
+    {
+        if (array_key_exists('peso_kg', $data) && $data['peso_kg'] !== null && $data['peso_kg'] !== '') {
+            return round((float) $data['peso_kg'], 3);
+        }
+
+        return $this->calculatePesoKgByItems($data['items'] ?? []);
+    }
+
+    private function calculatePesoKgByItems(array $items): ?float
+    {
+        if (empty($items)) {
+            return null;
+        }
+
+        $codigos = collect($items)
+            ->pluck('producto_codigo')
+            ->filter()
+            ->map(fn ($code) => trim((string) $code))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($codigos)) {
+            return null;
+        }
+
+        $weights = collect();
+        if ($this->invenInformacionHasColumn('peso_gramos')) {
+            $weights = DB::connection('company')
+                ->table('inven_informacion')
+                ->whereIn('codigo', $codigos)
+                ->pluck('peso_gramos', 'codigo');
+        }
+
+        $totalGramos = 0.0;
+        foreach ($items as $item) {
+            $codigo = trim((string) ($item['producto_codigo'] ?? ''));
+            if ($codigo === '') {
+                continue;
+            }
+
+            $cantidad = (float) ($item['cantidad'] ?? 0);
+            $pesoGramos = (float) ($weights[$codigo] ?? ($item['peso_gramos'] ?? 0));
+            if ($cantidad <= 0 || $pesoGramos <= 0) {
+                continue;
+            }
+
+            $totalGramos += ($cantidad * $pesoGramos);
+        }
+
+        if ($totalGramos <= 0) {
+            return null;
+        }
+
+        return round($totalGramos / 1000, 3);
+    }
+
     private function buildCodigo(int $id): string
     {
         return 'CJ-' . now()->format('Ymd') . '-' . str_pad((string) $id, 6, '0', STR_PAD_LEFT);
@@ -619,10 +685,15 @@ class LogisticaController extends Controller
 
     private function pedidosDisponiblesPorCliente(string $rif, ?int $cajaId = null): array
     {
+        $invenFields = $this->invenInfoFieldsRaw();
+
         $rows = DB::connection('company')
             ->table('pedidos as p')
             ->join('pedido_detalle as pd', 'pd.pedido_id', '=', 'p.id')
             ->leftJoin('pedidos_facturas as pf', 'pf.pedido_id', '=', 'p.id')
+            ->leftJoin('inven_informacion as ii', function ($join) {
+                $join->on(DB::raw('BINARY ii.codigo'), '=', DB::raw('BINARY pd.codigo_inven'));
+            })
             ->leftJoin('sdcloud.users as u', 'u.id', '=', 'p.user_id')
             ->selectRaw('p.id as pedido_id')
             ->selectRaw('p.fecha as pedido_fecha')
@@ -630,6 +701,8 @@ class LogisticaController extends Controller
             ->selectRaw('CONCAT(COALESCE(u.name, ""), " ", COALESCE(u.last_name, "")) as vendedor_nombre')
             ->selectRaw('COALESCE(pf.factura, "") as factura_numero')
             ->selectRaw('pd.id as pedido_detalle_id, pd.codigo_inven, pd.inven_descr, pd.inven_unidad, pd.cantidad as cantidad_total')
+            ->selectRaw($invenFields['peso_gramos'])
+            ->selectRaw($invenFields['requiere_etiqueta'])
             ->where('p.rif', $rif)
             ->where('p.estatus', 'APROBADO')
             ->orderBy('p.id')
@@ -653,6 +726,10 @@ class LogisticaController extends Controller
         $pedidos = [];
 
         foreach ($rows as $row) {
+            if ((int) ($row->requiere_etiqueta ?? 1) !== 1) {
+                continue;
+            }
+
             $detalleId = (int) $row->pedido_detalle_id;
             $total = (float) $row->cantidad_total;
             $packed = (float) ($yaEmpacado[$detalleId] ?? 0);
@@ -679,6 +756,7 @@ class LogisticaController extends Controller
                 'producto_codigo' => $row->codigo_inven,
                 'producto_descripcion' => $row->inven_descr,
                 'unidad' => $row->inven_unidad,
+                'peso_gramos' => (float) ($row->peso_gramos ?? 0),
                 'cantidad_total' => $total,
                 'cantidad_disponible' => $disponible,
             ];
@@ -711,5 +789,82 @@ class LogisticaController extends Controller
             $pick(['CIUDAD', 'MUNICIPIO'], 'ciudad'),
             $pick(['ESTADO'], 'estado'),
         ]);
+    }
+
+    private function getUltimaCajaCliente(string $rif, ?int $excludeCajaId = null): ?object
+    {
+        $query = LogisticaCaja::query()
+            ->select('id', 'ciudad', 'estado', 'direccion_entrega')
+            ->where('cliente_rif', $rif)
+            ->where('estatus', '!=', 'CANCELADA');
+
+        if ($excludeCajaId !== null) {
+            $query->where('id', '!=', $excludeCajaId);
+        }
+
+        return $query->orderByDesc('id')->first();
+    }
+
+    private function buildSuggestedLoteCodigo(string $clienteRif, ?string $clienteCodcli = null): string
+    {
+        $baseRaw = $clienteCodcli ?: $clienteRif;
+        $base = preg_replace('/[^a-zA-Z0-9]/', '', (string) $baseRaw);
+        $base = strtoupper((string) $base);
+        if ($base === '') {
+            $base = 'CLIENTE';
+        }
+
+        $prefix = 'LOT-' . $base . '-' . now()->format('Ymd');
+
+        $existing = LogisticaCaja::query()
+            ->where('cliente_rif', $clienteRif)
+            ->whereRaw('LOWER(TRIM(COALESCE(bulto_codigo, ""))) LIKE ?', [strtolower($prefix) . '%'])
+            ->pluck('bulto_codigo')
+            ->filter()
+            ->map(fn ($code) => strtoupper(trim((string) $code)))
+            ->all();
+
+        if (!in_array(strtoupper($prefix), $existing, true)) {
+            return $prefix;
+        }
+
+        for ($i = 2; $i <= 999; $i++) {
+            $candidate = $prefix . '-' . str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+            if (!in_array(strtoupper($candidate), $existing, true)) {
+                return $candidate;
+            }
+        }
+
+        return $prefix . '-' . now()->format('His');
+    }
+
+    private function invenInfoFieldsRaw(): array
+    {
+        $available = collect(DB::connection('company')->select('SHOW COLUMNS FROM inven_informacion'))
+            ->pluck('Field')
+            ->map(fn ($field) => strtolower((string) $field))
+            ->all();
+
+        $hasPeso = in_array('peso_gramos', $available, true);
+        $hasEtiqueta = in_array('requiere_etiqueta', $available, true);
+
+        return [
+            'peso_gramos' => $hasPeso
+                ? 'COALESCE(ii.peso_gramos, 0) as peso_gramos'
+                : '0 as peso_gramos',
+            'requiere_etiqueta' => $hasEtiqueta
+                ? 'COALESCE(ii.requiere_etiqueta, 1) as requiere_etiqueta'
+                : '1 as requiere_etiqueta',
+        ];
+    }
+
+    private function invenInformacionHasColumn(string $column): bool
+    {
+        $fields = collect(DB::connection('company')->select('SHOW COLUMNS FROM inven_informacion'))
+            ->pluck('Field')
+            ->map(fn ($field) => strtolower((string) $field))
+            ->all();
+
+        return in_array(strtolower($column), $fields, true);
     }
 }

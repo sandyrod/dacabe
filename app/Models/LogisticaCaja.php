@@ -15,6 +15,7 @@ class LogisticaCaja extends Model
         'bulto_codigo',
         'bulto_posicion',
         'bulto_total',
+        'peso_kg',
         'lote_cerrado_at',
         'lote_cerrado_por',
         'cliente_rif',
@@ -41,6 +42,7 @@ class LogisticaCaja extends Model
         'fecha_armado' => 'datetime',
         'fecha_entrega' => 'datetime',
         'lote_cerrado_at' => 'datetime',
+        'peso_kg' => 'float',
     ];
 
     public function items()

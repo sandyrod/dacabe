@@ -57,6 +57,7 @@
                     <div class="small-item"><strong>Estado:</strong> {{ $caja->estado ?: '-' }}</div>
                     <div class="small-item phone"><strong>Teléfono:</strong> {{ $caja->telefono ?: 'Sin teléfono' }}</div>
                     <div class="small-item"><strong>Vendedor:</strong> {{ $caja->vendedor_nombre ?: '-' }}</div>
+                    <div class="small-item"><strong>Peso:</strong> {{ $caja->peso_kg !== null ? number_format((float) $caja->peso_kg, 3, ',', '.') . ' kg' : '-' }}</div>
                 </div>
             </div>
         </div>

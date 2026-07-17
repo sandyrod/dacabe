@@ -28,6 +28,8 @@ class OrderInvenRequest extends FormRequest
         return [
             //'CODIGO' => 'required|string|min:2|max:6',
             //'descripcion' => 'required|string|min:3|max:100',
+            'peso_gramos' => 'nullable|numeric|min:0',
+            'requiere_etiqueta' => 'nullable|in:0,1',
         ];
     }
 

@@ -194,7 +194,14 @@ class OrderInvenController extends Controller
         if ($request->base1 || $request->base2) {
             (new OrderInven)->updatePrices($code, $request->base1, $request->base2);
         }
-        if ($request->detalle || $request->observaciones || $request->stock_minimo || $request->comision) {
+        if ($request->hasAny([
+            'detalle',
+            'observaciones',
+            'stock_minimo',
+            'comision',
+            'peso_gramos',
+            'requiere_etiqueta',
+        ])) {
             (new InvenInformacion)->saveDetails($code, $request);
         }
         if (! $request->promocion && ! $request->nuevo) {

@@ -107,6 +107,195 @@ class LogisticaController extends Controller
         ]);
     }
 
+    public function autoCrearBultosSugeridos(Request $request)
+    {
+        $data = $request->validate([
+            'bulto_codigo' => 'nullable|string|max:40',
+            'cliente_rif' => 'required|string|max:40',
+            'cliente_codcli' => 'nullable|string|max:40',
+            'cliente_nombre' => 'required|string|max:255',
+            'telefono' => 'nullable|string|max:80',
+            'direccion_fiscal' => 'nullable|string|max:255',
+            'direccion_entrega' => 'required|string|max:255',
+            'ciudad' => 'nullable|string|max:120',
+            'estado' => 'nullable|string|max:120',
+            'vendedor_user_id' => 'nullable|integer',
+            'vendedor_nombre' => 'nullable|string|max:150',
+            'chofer_user_id' => 'nullable|integer',
+            'chofer_nombre' => 'nullable|string|max:150',
+            'estatus' => 'required|in:' . implode(',', self::ESTATUS),
+            'observaciones' => 'nullable|string|max:1000',
+            'sugerencias' => 'required|array|min:1',
+            'sugerencias.*.pedido_id' => 'required|integer',
+            'sugerencias.*.pedido_detalle_id' => 'required|integer',
+            'sugerencias.*.producto_codigo' => 'required|string|max:80',
+            'sugerencias.*.producto_descripcion' => 'required|string|max:255',
+            'sugerencias.*.unidad' => 'nullable|string|max:40',
+            'sugerencias.*.factura_numero' => 'nullable|string|max:80',
+            'sugerencias.*.vendedor_codigo' => 'nullable|string|max:80',
+            'sugerencias.*.vendedor_nombre' => 'nullable|string|max:150',
+            'sugerencias.*.cantidad_por_bulto' => 'required|numeric|min:0.01',
+            'sugerencias.*.cantidad_disponible' => 'required|numeric|min:0.01',
+            'sugerencias.*.bultos' => 'required|integer|min:1|max:200',
+            'sugerencias.*.peso_gramos' => 'nullable|numeric|min:0',
+            'sugerencias.*.unidades_por_bulto' => 'required|numeric|min:1',
+        ]);
+
+        $pedidosDisponibles = $this->pedidosDisponiblesPorCliente($data['cliente_rif'], null);
+        $itemsDisponibles = [];
+        foreach ($pedidosDisponibles as $pedido) {
+            foreach ($pedido['items'] as $item) {
+                $itemsDisponibles[(int) $item['pedido_detalle_id']] = [
+                    'pedido_id' => (int) $pedido['pedido_id'],
+                    'factura_numero' => $pedido['factura_numero'] ?? null,
+                    'vendedor_codigo' => $pedido['vendedor_codigo'] ?? null,
+                    'vendedor_nombre' => $pedido['vendedor_nombre'] ?? null,
+                    'producto_codigo' => $item['producto_codigo'],
+                    'producto_descripcion' => $item['producto_descripcion'],
+                    'unidad' => $item['unidad'] ?? null,
+                    'cantidad_disponible' => (float) ($item['cantidad_disponible'] ?? 0),
+                    'unidades_por_bulto' => (float) ($item['unidades_por_bulto'] ?? 0),
+                    'peso_gramos' => (float) ($item['peso_gramos'] ?? 0),
+                ];
+            }
+        }
+
+        $cajasPlan = [];
+        foreach ($data['sugerencias'] as $sugerencia) {
+            $detalleId = (int) $sugerencia['pedido_detalle_id'];
+            if (!isset($itemsDisponibles[$detalleId])) {
+                throw ValidationException::withMessages([
+                    'sugerencias' => 'Una sugerencia ya no está disponible para armar cajas.',
+                ]);
+            }
+
+            $disponible = $itemsDisponibles[$detalleId];
+            $upbConfigurado = (float) $disponible['unidades_por_bulto'];
+            $cantidadPorBulto = (float) $sugerencia['cantidad_por_bulto'];
+            $cantidadDisponible = (float) $disponible['cantidad_disponible'];
+            $bultos = (int) $sugerencia['bultos'];
+
+            if ($upbConfigurado <= 0 || abs($upbConfigurado - $cantidadPorBulto) > 0.0001) {
+                throw ValidationException::withMessages([
+                    'sugerencias' => 'La configuración de unidades por bulto cambió para un producto. Recarga la pantalla.',
+                ]);
+            }
+
+            $maxBultos = (int) floor($cantidadDisponible / $cantidadPorBulto);
+            if ($maxBultos < 1 || $bultos > $maxBultos) {
+                throw ValidationException::withMessages([
+                    'sugerencias' => 'La cantidad disponible cambió y no permite crear los bultos sugeridos.',
+                ]);
+            }
+
+            for ($i = 0; $i < $bultos; $i++) {
+                $cajasPlan[] = [
+                    'pedido_id' => $disponible['pedido_id'],
+                    'pedido_detalle_id' => $detalleId,
+                    'factura_numero' => $disponible['factura_numero'],
+                    'producto_codigo' => $disponible['producto_codigo'],
+                    'producto_descripcion' => $disponible['producto_descripcion'],
+                    'unidad' => $disponible['unidad'],
+                    'cantidad' => $cantidadPorBulto,
+                    'peso_gramos' => $disponible['peso_gramos'],
+                    'vendedor_codigo' => $disponible['vendedor_codigo'],
+                    'vendedor_nombre' => $disponible['vendedor_nombre'],
+                ];
+            }
+        }
+
+        if (empty($cajasPlan)) {
+            throw ValidationException::withMessages([
+                'sugerencias' => 'No hay bultos válidos para crear.',
+            ]);
+        }
+
+        $bultoCodigo = trim((string) ($data['bulto_codigo'] ?? ''));
+        if ($bultoCodigo === '') {
+            $bultoCodigo = $this->buildSuggestedLoteCodigo($data['cliente_rif'], $data['cliente_codcli'] ?? null);
+        }
+
+        if ($this->loteEstaCerrado($data['cliente_rif'], $bultoCodigo)) {
+            throw ValidationException::withMessages([
+                'bulto_codigo' => 'El lote indicado está cerrado. Debes usar un nuevo código de lote.',
+            ]);
+        }
+
+        $created = [];
+        DB::connection('company')->transaction(function () use ($data, $bultoCodigo, $cajasPlan, &$created) {
+            $existentes = $this->getCajasDelLote($data['cliente_rif'], $bultoCodigo, false);
+            $existingCount = $existentes->count();
+            $newCount = count($cajasPlan);
+            $finalTotal = $existingCount + $newCount;
+
+            if ($existingCount > 0) {
+                foreach ($existentes as $cajaExistente) {
+                    $cajaExistente->bulto_total = $finalTotal;
+                    $cajaExistente->updated_by = Auth::id();
+                    $cajaExistente->save();
+                }
+            }
+
+            $position = $existingCount + 1;
+            foreach ($cajasPlan as $plan) {
+                $item = [
+                    'pedido_id' => $plan['pedido_id'],
+                    'pedido_detalle_id' => $plan['pedido_detalle_id'],
+                    'factura_numero' => $plan['factura_numero'],
+                    'producto_codigo' => $plan['producto_codigo'],
+                    'producto_descripcion' => $plan['producto_descripcion'],
+                    'unidad' => $plan['unidad'],
+                    'cantidad' => $plan['cantidad'],
+                    'peso_gramos' => $plan['peso_gramos'],
+                    'vendedor_codigo' => $plan['vendedor_codigo'],
+                    'vendedor_nombre' => $plan['vendedor_nombre'],
+                ];
+
+                $caja = LogisticaCaja::create([
+                    'codigo' => 'PENDIENTE',
+                    'public_token' => Str::uuid()->toString(),
+                    'bulto_codigo' => $bultoCodigo,
+                    'bulto_posicion' => $position,
+                    'bulto_total' => $finalTotal,
+                    'peso_kg' => $this->calculatePesoKgByItems([$item]),
+                    'cliente_rif' => $data['cliente_rif'],
+                    'cliente_codcli' => $data['cliente_codcli'] ?? null,
+                    'cliente_nombre' => $data['cliente_nombre'],
+                    'telefono' => $data['telefono'] ?? null,
+                    'direccion_fiscal' => $data['direccion_fiscal'] ?? null,
+                    'direccion_entrega' => $data['direccion_entrega'] ?? null,
+                    'ciudad' => $data['ciudad'] ?? null,
+                    'estado' => $data['estado'] ?? null,
+                    'vendedor_user_id' => $data['vendedor_user_id'] ?? null,
+                    'vendedor_nombre' => $data['vendedor_nombre'] ?? $plan['vendedor_nombre'] ?? null,
+                    'chofer_user_id' => $data['chofer_user_id'] ?? null,
+                    'chofer_nombre' => $data['chofer_nombre'] ?? null,
+                    'estatus' => $data['estatus'] ?? 'ARMADA',
+                    'fecha_armado' => now(),
+                    'fecha_entrega' => ($data['estatus'] ?? 'ARMADA') === 'ENTREGADA' ? now() : null,
+                    'observaciones' => $data['observaciones'] ?? null,
+                    'created_by' => Auth::id(),
+                    'updated_by' => Auth::id(),
+                ]);
+
+                $caja->codigo = $this->buildCodigo((int) $caja->id);
+                $caja->save();
+
+                $this->persistItems($caja, [$item]);
+
+                $created[] = $caja->id;
+                $position++;
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'created' => count($created),
+            'bulto_codigo' => $bultoCodigo,
+            'message' => 'Se crearon ' . count($created) . ' caja(s) sugeridas para el lote ' . $bultoCodigo . '.',
+        ]);
+    }
+
     public function store(Request $request)
     {
         $data = $this->validateCaja($request);
@@ -686,8 +875,9 @@ class LogisticaController extends Controller
     private function pedidosDisponiblesPorCliente(string $rif, ?int $cajaId = null): array
     {
         $invenFields = $this->invenInfoFieldsRaw();
+        $hasProductoBultos = $this->companyTableExists('producto_bultos');
 
-        $rows = DB::connection('company')
+        $query = DB::connection('company')
             ->table('pedidos as p')
             ->join('pedido_detalle as pd', 'pd.pedido_id', '=', 'p.id')
             ->leftJoin('pedidos_facturas as pf', 'pf.pedido_id', '=', 'p.id')
@@ -706,8 +896,18 @@ class LogisticaController extends Controller
             ->where('p.rif', $rif)
             ->where('p.estatus', 'APROBADO')
             ->orderBy('p.id')
-            ->orderBy('pd.id')
-            ->get();
+            ->orderBy('pd.id');
+
+        if ($hasProductoBultos) {
+            $query->leftJoin('producto_bultos as pb', function ($join) {
+                $join->on(DB::raw('BINARY pb.codigo'), '=', DB::raw('BINARY pd.codigo_inven'));
+            });
+            $query->selectRaw('COALESCE(pb.unidades_por_bulto, 0) as unidades_por_bulto');
+        } else {
+            $query->selectRaw('0 as unidades_por_bulto');
+        }
+
+        $rows = $query->get();
 
         $detalleIds = $rows->pluck('pedido_detalle_id')->unique()->values()->all();
 
@@ -756,6 +956,7 @@ class LogisticaController extends Controller
                 'producto_codigo' => $row->codigo_inven,
                 'producto_descripcion' => $row->inven_descr,
                 'unidad' => $row->inven_unidad,
+                'unidades_por_bulto' => (float) ($row->unidades_por_bulto ?? 0),
                 'peso_gramos' => (float) ($row->peso_gramos ?? 0),
                 'cantidad_total' => $total,
                 'cantidad_disponible' => $disponible,
@@ -866,5 +1067,13 @@ class LogisticaController extends Controller
             ->all();
 
         return in_array(strtolower($column), $fields, true);
+    }
+
+    private function companyTableExists(string $table): bool
+    {
+        $escaped = str_replace('`', '``', $table);
+        $rows = DB::connection('company')->select("SHOW TABLES LIKE '{$escaped}'");
+
+        return !empty($rows);
     }
 }

@@ -124,6 +124,17 @@
                 <h5 class="mb-0 font-weight-bold"><i class="fas fa-boxes mr-1"></i>Productos de pedidos aprobados</h5>
                 <small class="text-muted">Seleccione cantidades para armar la caja</small>
             </div>
+            <div id="bulto-sugerencias-wrapper" class="alert alert-warning d-none py-2 px-3 mb-2">
+                <div class="d-flex justify-content-between align-items-center flex-wrap" style="gap: 8px;">
+                    <div>
+                        <strong>Asistente de bultos</strong>
+                        <div id="bulto-sugerencias-text" class="small mb-0"></div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btn-auto-bultos">
+                        Crear bultos sugeridos
+                    </button>
+                </div>
+            </div>
             <div id="cliente-feedback" class="alert alert-info py-2 px-3 mb-2 d-none"></div>
             <div id="pedidos-contenedor" class="border rounded p-2" style="min-height: 170px; max-height: 480px; overflow:auto;"></div>
 
@@ -163,6 +174,9 @@
     const clienteFeedback = document.getElementById('cliente-feedback');
     const hiddenItems = document.getElementById('items-hidden');
     const form = document.getElementById('logistica-form');
+    const bultoSugerenciasWrapper = document.getElementById('bulto-sugerencias-wrapper');
+    const bultoSugerenciasText = document.getElementById('bulto-sugerencias-text');
+    const btnAutoBultos = document.getElementById('btn-auto-bultos');
 
     if (window.jQuery && typeof window.jQuery.fn.select2 === 'function') {
         window.jQuery('#cliente_rif_select').select2({
@@ -178,6 +192,8 @@
     const cajaId = JSON.parse(document.getElementById('caja-id-json').textContent || 'null');
     let suggestedPesoKg = null;
     let userEditedPesoKg = Boolean((pesoKgInput.value || '').trim());
+    let bultoSuggestions = [];
+    let bultoSuggestionsIndex = {};
 
     function parseNum(value) {
         const parsed = parseFloat(value);
@@ -223,6 +239,186 @@
 
         element.textContent = message;
         element.classList.remove('d-none');
+    }
+
+    function collectBultoSuggestions() {
+        const suggestions = [];
+
+        pedidosData.forEach((pedido) => {
+            (pedido.items || []).forEach((item) => {
+                const upb = parseNum(item.unidades_por_bulto || 0);
+                const disponible = parseNum(item.cantidad_disponible || 0);
+
+                if (!(upb > 0) || !(disponible >= upb)) {
+                    return;
+                }
+
+                const bultosSugeridos = Math.floor(disponible / upb);
+                if (bultosSugeridos < 1) {
+                    return;
+                }
+
+                const sobrante = Math.max(0, disponible - (bultosSugeridos * upb));
+                const suggestionId = `${pedido.pedido_id}-${item.pedido_detalle_id}`;
+
+                suggestions.push({
+                    id: suggestionId,
+                    pedido_id: pedido.pedido_id,
+                    pedido_detalle_id: item.pedido_detalle_id,
+                    factura_numero: pedido.factura_numero || '',
+                    vendedor_codigo: pedido.vendedor_codigo || '',
+                    vendedor_nombre: pedido.vendedor_nombre || '',
+                    producto_codigo: item.producto_codigo || '',
+                    producto_descripcion: item.producto_descripcion || '',
+                    unidad: item.unidad || '',
+                    unidades_por_bulto: upb,
+                    cantidad_por_bulto: upb,
+                    cantidad_disponible: disponible,
+                    bultos_sugeridos: bultosSugeridos,
+                    bultos: bultosSugeridos,
+                    sobrante: sobrante,
+                    peso_gramos: parseNum(item.peso_gramos || 0),
+                });
+            });
+        });
+
+        return suggestions;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getSelectedBultoSuggestions() {
+        const selected = [];
+        const checks = bultoSugerenciasWrapper.querySelectorAll('.sug-check:checked');
+
+        checks.forEach((check) => {
+            const id = check.dataset.id;
+            const base = bultoSuggestionsIndex[id];
+            if (!base) {
+                return;
+            }
+
+            const input = bultoSugerenciasWrapper.querySelector(`.sug-bultos[data-id="${id}"]`);
+            const requested = parseInt(input ? input.value : base.bultos_sugeridos, 10);
+            const normalized = Number.isFinite(requested)
+                ? Math.max(1, Math.min(base.bultos_sugeridos, requested))
+                : base.bultos_sugeridos;
+
+            selected.push({
+                pedido_id: base.pedido_id,
+                pedido_detalle_id: base.pedido_detalle_id,
+                factura_numero: base.factura_numero,
+                vendedor_codigo: base.vendedor_codigo,
+                vendedor_nombre: base.vendedor_nombre,
+                producto_codigo: base.producto_codigo,
+                producto_descripcion: base.producto_descripcion,
+                unidad: base.unidad,
+                unidades_por_bulto: base.unidades_por_bulto,
+                cantidad_por_bulto: base.cantidad_por_bulto,
+                cantidad_disponible: base.cantidad_disponible,
+                bultos: normalized,
+                peso_gramos: base.peso_gramos,
+            });
+        });
+
+        return selected;
+    }
+
+    function sanitizeSuggestionInputs() {
+        const inputs = bultoSugerenciasWrapper.querySelectorAll('.sug-bultos');
+        inputs.forEach((input) => {
+            const max = parseInt(input.max || '1', 10);
+            const min = parseInt(input.min || '1', 10);
+            let value = parseInt(input.value || String(min), 10);
+
+            if (!Number.isFinite(value)) {
+                value = min;
+            }
+
+            if (value < min) {
+                value = min;
+            }
+
+            if (value > max) {
+                value = max;
+            }
+
+            input.value = String(value);
+        });
+    }
+
+    function renderBultoSuggestions() {
+        bultoSuggestions = collectBultoSuggestions();
+        bultoSuggestionsIndex = {};
+        bultoSuggestions.forEach((s) => {
+            bultoSuggestionsIndex[s.id] = s;
+        });
+
+        if (!bultoSuggestions.length) {
+            bultoSugerenciasWrapper.classList.add('d-none');
+            bultoSugerenciasText.innerHTML = '';
+            return;
+        }
+
+        const totalBultos = bultoSuggestions.reduce((sum, s) => sum + s.bultos_sugeridos, 0);
+        const withSobrante = bultoSuggestions.filter((s) => s.sobrante > 0).length;
+        const rows = bultoSuggestions.map((s) => {
+            const sobranteText = s.sobrante > 0
+                ? `${formatNum(s.sobrante)} queda(n) para carga manual`
+                : 'sin sobrante';
+
+            return `
+                <tr>
+                    <td class="text-center"><input type="checkbox" class="sug-check" data-id="${s.id}" checked></td>
+                    <td>${escapeHtml(s.producto_codigo)}</td>
+                    <td>${escapeHtml(s.producto_descripcion)}</td>
+                    <td class="text-right">${formatNum(s.cantidad_disponible)}</td>
+                    <td class="text-right">${formatNum(s.unidades_por_bulto)}</td>
+                    <td style="min-width: 120px;">
+                        <input type="number" class="form-control form-control-sm sug-bultos" data-id="${s.id}" min="1" max="${s.bultos_sugeridos}" value="${s.bultos_sugeridos}">
+                    </td>
+                    <td class="text-right">${formatNum(s.sobrante)}</td>
+                    <td><small>${sobranteText}</small></td>
+                </tr>
+            `;
+        });
+
+        bultoSugerenciasText.innerHTML = `
+            <div class="mb-2">
+                Se detectaron <strong>${bultoSuggestions.length}</strong> sugerencia(s) por configuracion de unidades por bulto.
+                <strong>Total sugerido:</strong> ${totalBultos} caja(s).
+                ${withSobrante > 0 ? `En ${withSobrante} producto(s) quedará sobrante para carga manual.` : ''}
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-bordered mb-1 bg-white">
+                    <thead>
+                        <tr>
+                            <th class="text-center">Usar</th>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th class="text-right">Disponible</th>
+                            <th class="text-right">Unid/bulto</th>
+                            <th>Bultos a crear</th>
+                            <th class="text-right">Sobrante</th>
+                            <th>Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.join('')}
+                    </tbody>
+                </table>
+            </div>
+            <small class="text-muted">Puedes desmarcar productos para aceptar solo algunas sugerencias.</small>
+        `;
+        bultoSugerenciasWrapper.classList.remove('d-none');
+        sanitizeSuggestionInputs();
     }
 
     function setFeedback(message, level = 'info') {
@@ -308,6 +504,7 @@
 
         pedidosContenedor.innerHTML = html;
         recalculateSuggestedPesoKg();
+        renderBultoSuggestions();
     }
 
     function recalculateSuggestedPesoKg() {
@@ -463,9 +660,79 @@
             drawPedidos();
             inferVendedorName();
             recalculateSuggestedPesoKg();
+            renderBultoSuggestions();
         } catch (e) {
             setFeedback('No se pudieron cargar los datos del cliente o sus pedidos aprobados.', 'danger');
             pedidosContenedor.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar los pedidos del cliente.</div>';
+            bultoSugerenciasWrapper.classList.add('d-none');
+        }
+    }
+
+    async function autoCrearBultosSugeridos() {
+        if (!bultoSuggestions.length) {
+            alert('No hay sugerencias de bultos para crear automaticamente.');
+            return;
+        }
+
+        sanitizeSuggestionInputs();
+        const selectedSuggestions = getSelectedBultoSuggestions();
+        if (!selectedSuggestions.length) {
+            alert('Debe seleccionar al menos una sugerencia para crear bultos.');
+            return;
+        }
+
+        const total = selectedSuggestions.reduce((sum, s) => sum + s.bultos, 0);
+        const confirmMsg = `Se crearán ${total} caja(s) automaticamente según las sugerencias seleccionadas. ¿Desea continuar?`;
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
+        const tokenInput = form.querySelector('input[name="_token"]');
+        const payload = {
+            _token: tokenInput ? tokenInput.value : '',
+            bulto_codigo: (bultoCodigo.value || '').trim(),
+            cliente_rif: clienteRif.value || '',
+            cliente_codcli: clienteCodcli.value || '',
+            cliente_nombre: clienteNombre.value || '',
+            telefono: telefono.value || '',
+            direccion_fiscal: direccionFiscal.value || '',
+            direccion_entrega: direccionEntrega.value || '',
+            ciudad: ciudad.value || '',
+            estado: estado.value || '',
+            vendedor_nombre: vendedorNombre.value || '',
+            chofer_nombre: (document.getElementById('chofer_nombre')?.value || ''),
+            chofer_user_id: (form.querySelector('input[name="chofer_user_id"]')?.value || null),
+            estatus: (form.querySelector('select[name="estatus"]')?.value || 'ARMADA'),
+            observaciones: (form.querySelector('input[name="observaciones"]')?.value || ''),
+            sugerencias: selectedSuggestions,
+        };
+
+        try {
+            btnAutoBultos.disabled = true;
+            btnAutoBultos.textContent = 'Creando...';
+
+            const response = await fetch(`{{ route('admin.logistica.auto_bultos_sugeridos') }}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': payload._token,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.message || 'No se pudieron crear los bultos sugeridos.');
+            }
+
+            alert(result.message || 'Bultos sugeridos creados correctamente.');
+            window.location.href = `{{ route('admin.logistica.index') }}`;
+        } catch (error) {
+            alert(error.message || 'No se pudieron crear los bultos sugeridos.');
+        } finally {
+            btnAutoBultos.disabled = false;
+            btnAutoBultos.textContent = 'Crear bultos sugeridos';
         }
     }
 
@@ -486,6 +753,7 @@
         }
         pedidosData = [];
         drawPedidos();
+        renderBultoSuggestions();
 
         if (clienteRif.value) {
             loadPedidos(clienteRif.value);
@@ -534,6 +802,14 @@
         bultoCodigo.dataset.auto = '0';
     });
 
+    btnAutoBultos.addEventListener('click', autoCrearBultosSugeridos);
+
+    bultoSugerenciasWrapper.addEventListener('input', function(e) {
+        if (e.target.classList.contains('sug-bultos')) {
+            sanitizeSuggestionInputs();
+        }
+    });
+
     form.addEventListener('submit', function(e) {
         const count = buildHiddenItems();
         if (count < 1) {
@@ -554,10 +830,12 @@
         } else {
             drawPedidos();
             recalculateSuggestedPesoKg();
+            renderBultoSuggestions();
         }
     } else {
         drawPedidos();
         recalculateSuggestedPesoKg();
+        renderBultoSuggestions();
         setFeedback('Seleccione un cliente para cargar su información y pedidos aprobados.', 'info');
     }
 

@@ -37,7 +37,12 @@
                     <label>Total bulto</label>
                     <input type="number" class="form-control" name="bulto_total" value="{{ old('bulto_total', $caja->bulto_total) }}" min="1" placeholder="3">
                 </div>
-                <div class="col-md-5">
+                <div class="col-md-2">
+                    <label>Peso caja (kg)</label>
+                    <input type="number" class="form-control" name="peso_kg" id="peso_kg" value="{{ old('peso_kg', $caja->peso_kg) }}" min="0" step="0.001" placeholder="0.000">
+                    <small class="text-muted" id="peso_kg_hint">Peso sugerido por items seleccionados.</small>
+                </div>
+                <div class="col-md-3">
                     <label>Cliente</label>
                     <select id="cliente_rif_select" class="form-control select2bs4" required>
                         <option value="">Seleccione cliente...</option>
@@ -76,14 +81,17 @@
                 <div class="col-md-4">
                     <label>Dirección entrega</label>
                     <input type="text" class="form-control" name="direccion_entrega" id="direccion_entrega" value="{{ old('direccion_entrega', $caja->direccion_entrega) }}" required>
+                    <small class="text-muted d-none" id="direccion_hint"></small>
                 </div>
                 <div class="col-md-2">
                     <label>Ciudad</label>
                     <input type="text" class="form-control" name="ciudad" id="ciudad" value="{{ old('ciudad', $caja->ciudad) }}">
+                    <small class="text-muted d-none" id="ciudad_hint"></small>
                 </div>
                 <div class="col-md-2">
                     <label>Estado</label>
                     <input type="text" class="form-control" name="estado" id="estado" value="{{ old('estado', $caja->estado) }}">
+                    <small class="text-muted d-none" id="estado_hint"></small>
                 </div>
             </div>
 
@@ -147,6 +155,11 @@
     const estado = document.getElementById('estado');
     const vendedorNombre = document.getElementById('vendedor_nombre');
     const bultoCodigo = document.getElementById('bulto_codigo');
+    const pesoKgInput = document.getElementById('peso_kg');
+    const pesoKgHint = document.getElementById('peso_kg_hint');
+    const ciudadHint = document.getElementById('ciudad_hint');
+    const estadoHint = document.getElementById('estado_hint');
+    const direccionHint = document.getElementById('direccion_hint');
     const clienteFeedback = document.getElementById('cliente-feedback');
     const hiddenItems = document.getElementById('items-hidden');
     const form = document.getElementById('logistica-form');
@@ -163,6 +176,13 @@
     const selectedItems = JSON.parse(document.getElementById('selected-items-json').textContent || '{}');
     let pedidosData = JSON.parse(document.getElementById('pedidos-iniciales-json').textContent || '[]');
     const cajaId = JSON.parse(document.getElementById('caja-id-json').textContent || 'null');
+    let suggestedPesoKg = null;
+    let userEditedPesoKg = Boolean((pesoKgInput.value || '').trim());
+
+    function parseNum(value) {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
 
     function setClienteFromOption(option, overrideFields = true) {
         if (!option) {
@@ -184,6 +204,25 @@
 
     function formatNum(value) {
         return Number(value || 0).toFixed(2);
+    }
+
+    function formatNum3(value) {
+        return Number(value || 0).toFixed(3);
+    }
+
+    function updateSuggestionHint(element, message) {
+        if (!element) {
+            return;
+        }
+
+        if (!message) {
+            element.textContent = '';
+            element.classList.add('d-none');
+            return;
+        }
+
+        element.textContent = message;
+        element.classList.remove('d-none');
     }
 
     function setFeedback(message, level = 'info') {
@@ -255,6 +294,7 @@
                                 data-codigo="${item.producto_codigo || ''}"
                                 data-descripcion="${(item.producto_descripcion || '').replace(/"/g, '&quot;')}"
                                 data-unidad="${item.unidad || ''}"
+                                data-peso-gramos="${item.peso_gramos || 0}"
                                 data-vendedor-codigo="${pedido.vendedor_codigo || ''}"
                                 data-vendedor-nombre="${(pedido.vendedor_nombre || '').replace(/"/g, '&quot;')}"
                             >
@@ -267,6 +307,48 @@
         });
 
         pedidosContenedor.innerHTML = html;
+        recalculateSuggestedPesoKg();
+    }
+
+    function recalculateSuggestedPesoKg() {
+        let totalGramos = 0;
+        const checks = pedidosContenedor.querySelectorAll('.item-check:checked');
+
+        checks.forEach(check => {
+            const detalleId = check.dataset.detalle;
+            const row = pedidosContenedor.querySelector(`input.item-cantidad[data-detalle-id="${detalleId}"]`);
+            if (!row) {
+                return;
+            }
+
+            const qty = parseNum(row.value);
+            const max = parseNum(row.max);
+            const pesoGramos = parseNum(row.dataset.pesoGramos);
+
+            if (!(qty > 0) || qty > max || !(pesoGramos > 0)) {
+                return;
+            }
+
+            totalGramos += (qty * pesoGramos);
+        });
+
+        suggestedPesoKg = totalGramos > 0 ? (totalGramos / 1000) : null;
+
+        if (!userEditedPesoKg && suggestedPesoKg !== null) {
+            pesoKgInput.value = formatNum3(suggestedPesoKg);
+        }
+
+        if (suggestedPesoKg !== null) {
+            const hint = userEditedPesoKg
+                ? `Sugerido por items: ${formatNum3(suggestedPesoKg)} kg (editable).`
+                : `Sugerido por items: ${formatNum3(suggestedPesoKg)} kg.`;
+            pesoKgHint.textContent = hint;
+        } else {
+            pesoKgHint.textContent = 'Peso sugerido por items seleccionados.';
+            if (!userEditedPesoKg) {
+                pesoKgInput.value = '';
+            }
+        }
     }
 
     function buildHiddenItems() {
@@ -296,6 +378,7 @@
                 producto_codigo: row.dataset.codigo,
                 producto_descripcion: row.dataset.descripcion,
                 unidad: row.dataset.unidad,
+                peso_gramos: row.dataset.pesoGramos || 0,
                 cantidad: qty,
                 vendedor_codigo: row.dataset.vendedorCodigo,
                 vendedor_nombre: row.dataset.vendedorNombre,
@@ -348,8 +431,38 @@
                 estado.value = estado.value || data.cliente.estado || '';
             }
 
+            if (data.ultima_caja) {
+                const sugestCiudad = data.ultima_caja.ciudad || '';
+                const sugestEstado = data.ultima_caja.estado || '';
+                const sugestDireccion = data.ultima_caja.direccion_entrega || '';
+
+                updateSuggestionHint(ciudadHint, sugestCiudad ? `Sugerencia por ultima caja: ${sugestCiudad}` : '');
+                updateSuggestionHint(estadoHint, sugestEstado ? `Sugerencia por ultima caja: ${sugestEstado}` : '');
+                updateSuggestionHint(direccionHint, sugestDireccion ? 'Sugerencia de direccion de entrega disponible para este cliente.' : '');
+
+                if (!ciudad.value && sugestCiudad) {
+                    ciudad.value = sugestCiudad;
+                }
+                if (!estado.value && sugestEstado) {
+                    estado.value = sugestEstado;
+                }
+                if (!direccionEntrega.value && sugestDireccion) {
+                    direccionEntrega.value = sugestDireccion;
+                }
+            } else {
+                updateSuggestionHint(ciudadHint, '');
+                updateSuggestionHint(estadoHint, '');
+                updateSuggestionHint(direccionHint, '');
+            }
+
+            if (data.sugerido_bulto_codigo && (!bultoCodigo.value || bultoCodigo.dataset.auto === '1')) {
+                bultoCodigo.value = data.sugerido_bulto_codigo;
+                bultoCodigo.dataset.auto = '1';
+            }
+
             drawPedidos();
             inferVendedorName();
+            recalculateSuggestedPesoKg();
         } catch (e) {
             setFeedback('No se pudieron cargar los datos del cliente o sus pedidos aprobados.', 'danger');
             pedidosContenedor.innerHTML = '<div class="p-3 text-danger">No se pudieron cargar los pedidos del cliente.</div>';
@@ -369,10 +482,7 @@
 
         setClienteFromOption(option, true);
         if (bultoCodigo && !bultoCodigo.value) {
-            const rifRaw = (option.dataset.codcli || option.value || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-            const today = new Date();
-            const stamp = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
-            bultoCodigo.value = `LOT-${rifRaw || 'CLIENTE'}-${stamp}`;
+            bultoCodigo.dataset.auto = '1';
         }
         pedidosData = [];
         drawPedidos();
@@ -395,7 +505,33 @@
             if (value > max) {
                 e.target.value = max;
             }
+
+            recalculateSuggestedPesoKg();
         }
+    });
+
+    pedidosContenedor.addEventListener('change', function(e) {
+        if (e.target.classList.contains('item-check')) {
+            recalculateSuggestedPesoKg();
+        }
+    });
+
+    pesoKgInput.addEventListener('input', function() {
+        const current = (pesoKgInput.value || '').trim();
+        if (current === '') {
+            userEditedPesoKg = false;
+            recalculateSuggestedPesoKg();
+            return;
+        }
+
+        userEditedPesoKg = true;
+        if (suggestedPesoKg !== null) {
+            pesoKgHint.textContent = `Sugerido por items: ${formatNum3(suggestedPesoKg)} kg (editable).`;
+        }
+    });
+
+    bultoCodigo.addEventListener('input', function() {
+        bultoCodigo.dataset.auto = '0';
     });
 
     form.addEventListener('submit', function(e) {
@@ -417,9 +553,11 @@
             loadPedidos(clienteSelect.value);
         } else {
             drawPedidos();
+            recalculateSuggestedPesoKg();
         }
     } else {
         drawPedidos();
+        recalculateSuggestedPesoKg();
         setFeedback('Seleccione un cliente para cargar su información y pedidos aprobados.', 'info');
     }
 

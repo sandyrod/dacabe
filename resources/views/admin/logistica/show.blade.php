@@ -74,6 +74,9 @@
                     <div class="col-md-4"><strong>Chofer:</strong> {{ $caja->chofer_nombre ?: '-' }}</div>
                     <div class="col-md-4"><strong>Fecha entrega:</strong> {{ optional($caja->fecha_entrega)->format('d/m/Y H:i') ?: '-' }}</div>
                 </div>
+                <div class="row mt-2">
+                    <div class="col-md-4"><strong>Peso caja:</strong> {{ $caja->peso_kg !== null ? number_format((float) $caja->peso_kg, 3, ',', '.') . ' kg' : '-' }}</div>
+                </div>
                 @if($caja->observaciones)
                     <div class="row mt-2">
                         <div class="col-12"><strong>Observaciones:</strong> {{ $caja->observaciones }}</div>

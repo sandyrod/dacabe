@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use Auth;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,7 +13,7 @@ class InvenInformacion extends Model
     protected $connection = 'company';
     protected $table = 'inven_informacion';
 
-    protected $fillable = ['codigo', 'detalle', 'observaciones', 'stock_minimo', 'descuento', 'comision'];
+    protected $fillable = ['codigo', 'detalle', 'observaciones', 'stock_minimo', 'descuento', 'comision', 'peso_gramos', 'requiere_etiqueta'];
 
     public function saveDetails($codigo, $data)
     {
@@ -27,6 +27,8 @@ class InvenInformacion extends Model
         $model->stock_minimo = $data->stock_minimo;
         $model->descuento = $data->descuento;
         $model->comision = $data->comision;
+        $model->peso_gramos = $data->peso_gramos ?? null;
+        $model->requiere_etiqueta = $data->requiere_etiqueta ?? 1;
         $model->save();
     }
 

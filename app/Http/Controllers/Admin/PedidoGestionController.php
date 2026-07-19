@@ -411,6 +411,40 @@ class PedidoGestionController extends Controller
     }
 
     /**
+     * Marcar manualmente un pedido como PAGADO
+     */
+    public function marcarPagado(Request $request)
+    {
+        $pedido = Pedido::find($request->order_id);
+        if (!$pedido) {
+            return response()->json(['type' => 'error', 'message' => 'Pedido no encontrado'], 404);
+        }
+
+        if ($pedido->estatus === 'PAGADO') {
+            return response()->json(['type' => 'error', 'message' => 'El pedido ya se encuentra marcado como PAGADO'], 400);
+        }
+
+        $nota = '(REPORTADO COMO PAGADO POR USUARIO ' . auth()->user()->name . ')';
+
+        $pedido->estatus = 'PAGADO';
+        $pedido->saldo_base = 0;
+        $pedido->saldo_iva_bs = 0;
+        $pedido->saldo_ajustes = 0;
+        $pedido->observations = trim(($pedido->observations ? $pedido->observations . ' ' : '') . $nota);
+        $pedido->save();
+
+        Log::info('Pedido marcado manualmente como PAGADO', [
+            'pedido_id' => $pedido->id,
+            'usuario' => auth()->user()->name,
+        ]);
+
+        return response()->json([
+            'type' => 'success',
+            'message' => 'Pedido #' . $pedido->id . ' marcado como PAGADO correctamente',
+        ]);
+    }
+
+    /**
      * Actualizar días de crédito de un pedido
      */
     public function updateDiasCredito(Request $request)

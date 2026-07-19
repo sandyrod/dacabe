@@ -416,6 +416,7 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
     Route::post('anular-pedido', 'Admin\PedidoGestionController@anularPedido')->name('admin.pedidos.anular');
     Route::post('pedidos/{pedidoId}/factura-pdf', 'Admin\PedidoGestionController@subirFacturaPdf')->name('admin.pedidos.factura_pdf');
     Route::post('anular-pedido-sin-reserva', 'Admin\PedidoGestionController@anularPedidoSinReserva')->name('admin.pedidos.anular.sinreserva');
+    Route::post('marcar-pagado-pedido', 'Admin\PedidoGestionController@marcarPagado')->name('admin.pedidos.marcarPagado');
 
     // Ajustes de pedido (cargos / notas de crédito)
     Route::get('pedidos/{pedidoId}/ajustes', 'Admin\PedidoGestionController@getAjustes')->name('admin.pedidos.ajustes.index');

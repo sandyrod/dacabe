@@ -426,6 +426,9 @@
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-warning m-1 anular" data-iddata="{{ $pedido->id }}" title="Anular Pedido">
                                     <i class="fas fa-ban"></i>
                                 </a>
+                                <a href="javascript:void(0)" class="btn btn-sm btn-outline-success m-1 marcar-pagado" data-iddata="{{ $pedido->id }}" title="Marcar como Pagado">
+                                    <i class="fas fa-money-check-alt"></i>
+                                </a>
                                 @endif
                                 @if(in_array($pedido->estatus, ['APROBADO', 'PENDIENTE', 'EN REVISION']))
                                 <a href="javascript:void(0)" class="btn btn-sm btn-outline-purple m-1 btn-ajustes"
@@ -789,6 +792,61 @@
                     console.log('Usuario canceló la anulación inicial');
                 } else {
                     console.log('First Swal dismissed for other reason:', result.dismiss);
+                }
+            });
+        });
+
+        // Marcar Pedido como Pagado
+        $(document).on('click', '.marcar-pagado', function() {
+            if ($(this).hasClass('disabled')) return;
+            let id = $(this).data('iddata');
+
+            Swal.fire({
+                title: '¿Marcar Pedido como Pagado?',
+                html: `
+                    <div class="text-left">
+                        <p><strong>¿Está seguro que desea marcar este pedido como PAGADO?</strong></p>
+                        <ul class="text-left" style="margin-top: 10px;">
+                            <li>Se cambiará el estatus a <span class="badge badge-success">PAGADO</span></li>
+                            <li>Se colocarán en 0 los saldos pendientes (base, IVA y ajustes)</li>
+                            <li>Se dejará constancia en las observaciones del pedido</li>
+                        </ul>
+                    </div>
+                `,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Sí, marcar como pagado',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#28a745',
+                cancelButtonColor: '#6c757d',
+                showLoaderOnConfirm: true,
+                preConfirm: () => {
+                    return $.ajax({
+                        url: BASE_URL + '/admin/marcar-pagado-pedido',
+                        type: 'POST',
+                        data: {
+                            _token: TOKEN,
+                            order_id: id
+                        }
+                    }).catch(error => {
+                        Swal.showValidationMessage(`Error: ${error.responseJSON ? error.responseJSON.message : 'Error desconocido'}`);
+                    });
+                }
+            }).then((result) => {
+                if (result.isConfirmed || result.value.type == 'success') {
+                    let response = result.value;
+                    if (response.type === 'success') {
+                        Swal.fire({
+                            title: '¡Pedido Actualizado!',
+                            html: response.message,
+                            icon: 'success',
+                            confirmButtonColor: '#28a745'
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        Swal.fire('Error', response.message, 'error');
+                    }
                 }
             });
         });

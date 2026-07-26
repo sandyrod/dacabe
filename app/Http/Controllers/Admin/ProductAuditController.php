@@ -10,6 +10,7 @@ use App\Models\PedidoDetalle;
 use App\Models\ArtDepos;
 use App\Models\Inven;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 class ProductAuditController extends Controller
 {
@@ -226,11 +227,23 @@ class ProductAuditController extends Controller
             ->where('ad.CODIGO', $codigo)
             ->get();
 
+        // Historial real de movimientos de RESERVA/EUNIDAD (incluye sincronizaciones VFP)
+        $movimientosInventarioDisponible = Schema::connection('company')->hasTable('artdepos_movimientos');
+        $movimientosInventario = $movimientosInventarioDisponible
+            ? DB::connection('company')
+                ->table('artdepos_movimientos')
+                ->where('codigo', $codigo)
+                ->orderByDesc('created_at')
+                ->paginate(30, ['*'], 'inventario_page')
+            : null;
+
         return view('admin.productos.detalle_auditoria', compact(
             'producto',
             'movimientos',
             'stats',
-            'stockActual'
+            'stockActual',
+            'movimientosInventario',
+            'movimientosInventarioDisponible'
         ));
     }
 

@@ -266,6 +266,89 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Historial de Movimientos de Inventario (RESERVA/EUNIDAD) -->
+                        <div class="card border-0 shadow-sm mt-4">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-warehouse mr-2"></i>Historial de Movimientos de Inventario
+                                </h5>
+                            </div>
+                            <div class="card-body p-0">
+                                @if(!$movimientosInventarioDisponible)
+                                    <div class="alert alert-warning m-3 mb-0">
+                                        La tabla <code>artdepos_movimientos</code> aún no existe. Ejecuta
+                                        <code>database/sql/artdepos_movimientos.sql</code> manualmente en la base de
+                                        datos <code>company</code> para habilitar este historial.
+                                    </div>
+                                @else
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-striped mb-0">
+                                            <thead class="bg-light text-dark">
+                                                <tr>
+                                                    <th class="text-center">Fecha</th>
+                                                    <th class="text-center">Depósito</th>
+                                                    <th class="text-center">Origen</th>
+                                                    <th class="text-center">Pedido #</th>
+                                                    <th class="text-center">EUNIDAD (antes → después)</th>
+                                                    <th class="text-center">RESERVA (antes → después)</th>
+                                                    <th>Nota</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @forelse($movimientosInventario as $mov)
+                                                    @php
+                                                        $origenLabels = [
+                                                            'PEDIDO_APROBADO' => ['Pedido Aprobado', 'success'],
+                                                            'PEDIDO_RECHAZADO' => ['Pedido Rechazado', 'danger'],
+                                                            'PEDIDO_ANULADO' => ['Pedido Anulado', 'danger'],
+                                                            'PEDIDO_EDITOR_AJUSTE' => ['Edición Admin', 'info'],
+                                                            'RESERVA_CARRITO_AGREGAR' => ['Reserva Agregada', 'primary'],
+                                                            'RESERVA_CARRITO_MODIFICAR' => ['Reserva Modificada', 'primary'],
+                                                            'RESERVA_CARRITO_EDITAR' => ['Reserva Editada', 'primary'],
+                                                            'RESERVA_CARRITO_ELIMINAR' => ['Reserva Eliminada', 'secondary'],
+                                                            'RESERVA_CARRITO_ABANDONADO' => ['Carrito Abandonado', 'secondary'],
+                                                        ];
+                                                        [$origenLabel, $origenBadge] = $mov->origen && isset($origenLabels[$mov->origen])
+                                                            ? $origenLabels[$mov->origen]
+                                                            : ($mov->origen ? [$mov->origen, 'secondary'] : ['Sincronización VFP', 'warning']);
+                                                    @endphp
+                                                    <tr>
+                                                        <td class="text-center small">
+                                                            {{ \Carbon\Carbon::parse($mov->created_at)->format('d/m/Y H:i') }}
+                                                        </td>
+                                                        <td class="text-center small">{{ $mov->cdepos ?? 'N/A' }}</td>
+                                                        <td class="text-center">
+                                                            <span class="badge badge-{{ $origenBadge }} small">{{ $origenLabel }}</span>
+                                                        </td>
+                                                        <td class="text-center font-weight-bold text-primary">
+                                                            {{ $mov->pedido_id ? '#' . $mov->pedido_id : '-' }}
+                                                        </td>
+                                                        <td class="text-center small">
+                                                            {{ number_format($mov->eunidad_anterior, 0, ',', '.') }} → {{ number_format($mov->eunidad_nuevo, 0, ',', '.') }}
+                                                        </td>
+                                                        <td class="text-center small">
+                                                            {{ number_format($mov->reserva_anterior, 0, ',', '.') }} → {{ number_format($mov->reserva_nuevo, 0, ',', '.') }}
+                                                        </td>
+                                                        <td class="small">{{ $mov->nota }}</td>
+                                                    </tr>
+                                                @empty
+                                                    <tr>
+                                                        <td colspan="7" class="text-center py-5">
+                                                            <i class="fas fa-inbox fa-4x text-muted mb-3" style="opacity: 0.3;"></i>
+                                                            <p class="text-muted font-weight-bold">Sin movimientos de inventario registrados para este producto.</p>
+                                                        </td>
+                                                    </tr>
+                                                @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="p-3">
+                                        {{ $movimientosInventario->links() }}
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -122,6 +122,17 @@ class PedidoGestionController extends Controller
     /**
      * Anular un pedido aprobado
      */
+    /**
+     * Anular un pedido aprobado.
+     *
+     * La reserva de este pedido ya fue liberada al aprobarlo (ver
+     * PedidosController::updateEstatusOrder), así que aquí no se toca
+     * RESERVA ni EUNIDAD — volver a descontar RESERVA robaría reserva a
+     * otros pedidos pendientes del mismo producto. La reversión física del
+     * stock (EUNIDAD) es responsabilidad del proceso de devolución/nota de
+     * crédito en el sistema externo (FoxPro); esta acción sólo deja
+     * constancia del evento en el historial de auditoría.
+     */
     public function anularPedido(Request $request)
     {
         try {
@@ -148,123 +159,39 @@ class PedidoGestionController extends Controller
                 ], 400);
             }
 
-            // Obtener los detalles del pedido
             $detalles = DB::connection('company')
                 ->table('pedido_detalle')
                 ->where('pedido_id', $request->order_id)
                 ->get();
 
-            $productosInvalidos = [];
-            $productosActualizados = [];
-
-            // Validar y actualizar la reserva para cada producto
-            foreach ($detalles as $detalle) {
-                // Buscar el producto en ARTDEPOS
-                $artdepos = DB::connection('company')
-                    ->table('ARTDEPOS')
-                    ->where('CODIGO', $detalle->codigo_inven)
-                    ->first();
-
-                if (!$artdepos) {
-                    $productosInvalidos[] = [
-                        'codigo' => $detalle->codigo_inven,
-                        'motivo' => 'Producto no encontrado en ARTDEPOS'
-                    ];
-                    continue;
-                }
-
-                // Validar si hay suficiente reserva
-                if ($artdepos->RESERVA < $detalle->cantidad) {
-                    $productosInvalidos[] = [
-                        'codigo' => $detalle->codigo_inven,
-                        'motivo' => 'Reserva insuficiente. Disponible: ' . $artdepos->RESERVA . ', Requerido: ' . $detalle->cantidad
-                    ];
-                    continue;
-                }
-
-                // Descontar de la reserva
-                DB::connection('company')
-                    ->table('ARTDEPOS')
-                    ->where('CODIGO', $detalle->codigo_inven)
-                    ->decrement('RESERVA', $detalle->cantidad);
-
-                $productosActualizados[] = [
-                    'codigo' => $detalle->codigo_inven,
-                    'cantidad_anulada' => $detalle->cantidad,
-                    'reserva_anterior' => $artdepos->RESERVA,
-                    'reserva_nueva' => $artdepos->RESERVA - $detalle->cantidad
-                ];
-            }
-
-            // Si hay productos inválidos, verificar si son solo de reserva insuficiente
-            if (!empty($productosInvalidos)) {
-                // Verificar si todos los errores son de reserva insuficiente
-                $todosReservaInsuficiente = true;
-                $productosConReservaInsuficiente = [];
-
-                foreach ($productosInvalidos as $producto) {
-                    if (strpos($producto['motivo'], 'Reserva insuficiente') !== false) {
-                        $productosConReservaInsuficiente[] = $producto;
-                    } else {
-                        $todosReservaInsuficiente = false;
-                        break;
-                    }
-                }
-
-                // Si todos son de reserva insuficiente, permitir opción de continuar
-                if ($todosReservaInsuficiente) {
-                    DB::connection('company')->rollBack();
-
-                    $mensajeError = 'Los siguientes productos tienen reserva insuficiente:<br><br>';
-                    foreach ($productosConReservaInsuficiente as $producto) {
-                        $mensajeError .= '<strong>' . $producto['codigo'] . ':</strong> ' . $producto['motivo'] . '<br>';
-                    }
-                    $mensajeError .= '<br>¿Desea continuar y anular el pedido sin modificar las reservas?';
-
-                    return response()->json([
-                        'type' => 'warning',
-                        'message' => $mensajeError,
-                        'productos_invalidos' => $productosConReservaInsuficiente,
-                        'permitir_continuar' => true,
-                        'pedido_id' => $request->order_id
-                    ], 200);
-                } else {
-                    // Si hay otros errores (productos no encontrados), no permitir continuar
-                    DB::connection('company')->rollBack();
-
-                    $mensajeError = 'No se puede anular el pedido por los siguientes productos:<br><br>';
-                    foreach ($productosInvalidos as $producto) {
-                        $mensajeError .= '<strong>' . $producto['codigo'] . ':</strong> ' . $producto['motivo'] . '<br>';
-                    }
-
-                    return response()->json([
-                        'type' => 'error',
-                        'message' => $mensajeError,
-                        'productos_invalidos' => $productosInvalidos
-                    ], 400);
-                }
-            }
-
-            // Cambiar el estatus del pedido a RECHAZADO
             DB::connection('company')
                 ->table('pedidos')
                 ->where('id', $request->order_id)
                 ->update(['estatus' => 'RECHAZADO']);
+
+            foreach ($detalles as $detalle) {
+                ArtDepos::logManual(
+                    $detalle->codigo_inven,
+                    $pedido->cdepos,
+                    'PEDIDO_ANULADO',
+                    (int) $request->order_id,
+                    'Anulado por ' . auth()->user()->name . '. Reserva y stock no modificados.'
+                );
+            }
 
             DB::connection('company')->commit();
 
             Log::info('Pedido anulado exitosamente', [
                 'pedido_id' => $request->order_id,
                 'usuario' => auth()->user()->name,
-                'productos_actualizados' => $productosActualizados
+                'productos' => $detalles->pluck('codigo_inven'),
             ]);
 
             return response()->json([
                 'type' => 'success',
-                'message' => 'Pedido #' . $request->order_id . ' anulado exitosamente. Se descontó la reserva de ' . count($productosActualizados) . ' productos.',
+                'message' => 'Pedido #' . $request->order_id . ' anulado exitosamente. La reserva y el stock no fueron modificados.',
                 'data' => [
                     'pedido_id' => $request->order_id,
-                    'productos_actualizados' => $productosActualizados,
                     'nuevo_estatus' => 'RECHAZADO'
                 ]
             ]);
@@ -348,66 +275,6 @@ class PedidoGestionController extends Controller
         }
         $ajuste->delete();
         return response()->json(['success' => true]);
-    }
-
-    /**
-     * Anular un pedido aprobado sin modificar reservas
-     */
-    public function anularPedidoSinReserva(Request $request)
-    {
-        try {
-            $pedido = DB::connection('company')
-                ->table('pedidos')
-                ->where('id', $request->order_id)
-                ->first();
-
-            if (!$pedido) {
-                return response()->json([
-                    'type' => 'error',
-                    'message' => 'Pedido no encontrado'
-                ], 404);
-            }
-
-            if ($pedido->estatus !== 'APROBADO') {
-                return response()->json([
-                    'type' => 'error',
-                    'message' => 'Solo se pueden anular pedidos con estatus APROBADO'
-                ], 400);
-            }
-
-            // Cambiar el estatus del pedido a RECHAZADO sin modificar reservas
-            DB::connection('company')
-                ->table('pedidos')
-                ->where('id', $request->order_id)
-                ->update(['estatus' => 'RECHAZADO']);
-
-            Log::info('Pedido anulado sin modificar reservas', [
-                'pedido_id' => $request->order_id,
-                'usuario' => auth()->user()->name,
-                'motivo' => 'Reserva insuficiente en productos'
-            ]);
-
-            return response()->json([
-                'type' => 'success',
-                'message' => 'Pedido #' . $request->order_id . ' anulado exitosamente. Las reservas no fueron modificadas.',
-                'data' => [
-                    'pedido_id' => $request->order_id,
-                    'nuevo_estatus' => 'RECHAZADO',
-                    'reservas_modificadas' => false
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Error al anular pedido sin reserva: ' . $e->getMessage(), [
-                'pedido_id' => $request->order_id,
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'type' => 'error',
-                'message' => 'Error al anular el pedido: ' . $e->getMessage()
-            ], 500);
-        }
     }
 
     /**

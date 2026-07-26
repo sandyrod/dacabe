@@ -653,7 +653,7 @@
         $(document).on('click', '.anular', function() {
             if ($(this).hasClass('disabled')) return;
             let id = $(this).data('iddata');
-            
+
             Swal.fire({
                 title: '¿Anular Pedido?',
                 html: `
@@ -661,7 +661,7 @@
                         <p><strong>¿Está seguro que desea anular este pedido?</strong></p>
                         <ul class="text-left" style="margin-top: 10px;">
                             <li>Se cambiará el estatus a <span class="badge badge-danger">RECHAZADO</span></li>
-                            <li>Se descontará la reserva de los productos en ARTDEPOS</li>
+                            <li>La reserva ya fue liberada al aprobar el pedido, así que no se modifica de nuevo</li>
                             <li>Esta acción no se puede deshacer</li>
                         </ul>
                     </div>
@@ -691,107 +691,25 @@
                     });
                 }
             }).then((result) => {
-                console.log('First Swal result:', result);
-                console.log('result.isConfirmed:', result.isConfirmed);
-                console.log('result.dismiss:', result.dismiss);
-                console.log('result.value:', result.value);
-                
-                // Si el usuario confirmó o si hay un valor (para manejar warnings)
-                if (result.isConfirmed || (result.value && !result.dismiss)) {
-                    let response = result.value;
-                    console.log('Response from first AJAX:', response);
-                    
-                    if (response.type === 'success') {
-                        console.log('Handling success case');
-                        Swal.fire({
-                            title: '¡Pedido Anulado!',
-                            html: response.message,
-                            icon: 'success',
-                            confirmButtonColor: '#28a745'
-                        }).then(() => {
-                            window.location.reload();
-                        });
-                    } else if (response.type === 'warning' && response.permitir_continuar) {
-                        console.log('Handling warning case - showing second Swal');
-                        // Caso de reserva insuficiente - mostrar opción de continuar
-                        Swal.fire({
-                            title: 'Reserva Insuficiente',
-                            html: response.message,
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonText: 'Sí, anular sin modificar reservas',
-                            cancelButtonText: 'Cancelar',
-                            confirmButtonColor: '#ffc107',
-                            cancelButtonColor: '#6c757d',
-                            showLoaderOnConfirm: true,
-                            preConfirm: () => {
-                                console.log('Making second AJAX call for:', response.pedido_id);
-                                return $.ajax({
-                                    url: BASE_URL + '/admin/anular-pedido-sin-reserva',
-                                    type: 'POST',
-                                    data: {
-                                        _token: TOKEN,
-                                        order_id: response.pedido_id
-                                    }
-                                }).catch(error => {
-                                    console.error('Anulation without reservation error:', error);
-                                    if (error.responseJSON && error.responseJSON.message) {
-                                        Swal.showValidationMessage(error.responseJSON.message);
-                                    } else {
-                                        Swal.showValidationMessage('Error al anular el pedido');
-                                    }
-                                });
-                            }
-                        }).then((result2) => {
-                            console.log('Second Swal result:', result2);
-                            if (result2.isConfirmed) {
-                                let response2 = result2.value;
-                                console.log('Response from second AJAX:', response2);
-                                if (response2.type === 'success') {
-                                    console.log('Second AJAX success - showing success message and reloading');
-                                    Swal.fire({
-                                        title: '¡Pedido Anulado!',
-                                        html: response2.message,
-                                        icon: 'success',
-                                        confirmButtonColor: '#28a745'
-                                    }).then(() => {
-                                        console.log('About to reload page');
-                                        window.location.reload();
-                                    });
-                                } else if (response2.type === 'error') {
-                                    console.log('Second AJAX error:', response2);
-                                    Swal.fire({
-                                        title: 'Error',
-                                        html: response2.message,
-                                        icon: 'error',
-                                        confirmButtonColor: '#dc3545'
-                                    });
-                                } else {
-                                    console.log('Unknown second response type:', response2.type);
-                                }
-                            } else if (result2.dismiss === Swal.DismissReason.cancel) {
-                                // Usuario canceló, no hacer nada
-                                console.log('Usuario canceló la anulación sin reserva');
-                            } else {
-                                console.log('Second Swal dismissed for other reason:', result2.dismiss);
-                            }
-                        });
-                    } else if (response.type === 'error') {
-                        console.log('Handling error case');
-                        Swal.fire({
-                            title: 'Error',
-                            html: response.message,
-                            icon: 'error',
-                            confirmButtonColor: '#dc3545'
-                        });
-                    } else {
-                        console.log('Unknown response type:', response.type);
-                    }
-                } else if (result.dismiss === Swal.DismissReason.cancel) {
-                    // Usuario canceló la anulación inicial
-                    console.log('Usuario canceló la anulación inicial');
-                } else {
-                    console.log('First Swal dismissed for other reason:', result.dismiss);
+                if (!result.isConfirmed) return;
+
+                let response = result.value;
+                if (response.type === 'success') {
+                    Swal.fire({
+                        title: '¡Pedido Anulado!',
+                        html: response.message,
+                        icon: 'success',
+                        confirmButtonColor: '#28a745'
+                    }).then(() => {
+                        window.location.reload();
+                    });
+                } else if (response.type === 'error') {
+                    Swal.fire({
+                        title: 'Error',
+                        html: response.message,
+                        icon: 'error',
+                        confirmButtonColor: '#dc3545'
+                    });
                 }
             });
         });

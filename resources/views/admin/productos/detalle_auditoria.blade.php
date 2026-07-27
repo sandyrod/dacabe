@@ -261,8 +261,8 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <div class="p-3">
-                                    {{ $movimientos->links() }}
+                                <div class="p-3 auditoria-pagination-wrap">
+                                    {{ $movimientos->links('pagination::bootstrap-4') }}
                                 </div>
                             </div>
                         </div>
@@ -343,8 +343,8 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <div class="p-3">
-                                        {{ $movimientosInventario->links() }}
+                                    <div class="p-3 auditoria-pagination-wrap">
+                                        {{ $movimientosInventario->links('pagination::bootstrap-4') }}
                                     </div>
                                 @endif
                             </div>
@@ -397,6 +397,30 @@
 
         .card-header {
             border-bottom: 2px solid rgba(0,0,0,0.125);
+        }
+
+        .auditoria-pagination-wrap nav {
+            display: flex;
+            justify-content: center;
+        }
+
+        .auditoria-pagination-wrap .pagination {
+            margin-bottom: 0;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .auditoria-pagination-wrap .page-item .page-link {
+            min-width: 34px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.82rem;
+            line-height: 1.2;
+            text-align: center;
+            border-radius: 0.2rem;
+        }
+
+        .auditoria-pagination-wrap .page-item.active .page-link {
+            font-weight: 600;
         }
     </style>
 @endsection

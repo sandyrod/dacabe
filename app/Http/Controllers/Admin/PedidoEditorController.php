@@ -433,7 +433,7 @@ class PedidoEditorController extends Controller
         } else {
             ArtDepos::where('CODIGO', $codigo)
                 ->where('CDEPOS', $pedido->cdepos)
-                ->decrement('RESERVA', abs($delta));
+                ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) abs($delta) . ', 0)')]);
         }
 
         return true;

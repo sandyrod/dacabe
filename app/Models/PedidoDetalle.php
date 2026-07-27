@@ -330,7 +330,8 @@ class PedidoDetalle extends Model
             if ($artdepos) {
                 ArtDepos::tagMovimiento($mode == 'delete' ? 'RESERVA_CARRITO_ELIMINAR' : 'RESERVA_CARRITO_AGREGAR', $pedido->id);
                 if ($mode == 'delete') {
-                    (new ArtDepos)->where('CODIGO', $detail->codigo_inven)->where('CDEPOS', $cdepos)->decrement('RESERVA', $detail->cantidad);
+                    (new ArtDepos)->where('CODIGO', $detail->codigo_inven)->where('CDEPOS', $cdepos)
+                        ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) $detail->cantidad . ', 0)')]);
                 } else {
                     (new ArtDepos)->where('CODIGO', $detail->codigo_inven)->where('CDEPOS', $cdepos)->increment('RESERVA', $detail->cantidad);
                 }

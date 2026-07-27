@@ -125,7 +125,8 @@ class PedidosController extends Controller
                         if ($delta > 0) {
                             (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->increment('RESERVA', $delta);
                         } elseif ($delta < 0) {
-                            (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->decrement('RESERVA', abs($delta));
+                            (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)
+                                ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) abs($delta) . ', 0)')]);
                         }
                     }
                 }
@@ -204,6 +205,7 @@ class PedidosController extends Controller
             ], 200);
         }
         $detalle = (new PedidoDetalle)->searchProduct($pedido->id, $inven->CODIGO);
+        $cantidadAnterior = $detalle ? (float) $detalle->cantidad : 0;
         if (!$detalle) {
             $todayTasa = Tasa::where('fecha', now()->format('Y-m-d'))->first();
             $tasa = $todayTasa ? $todayTasa->valor : 0;
@@ -227,9 +229,15 @@ class PedidosController extends Controller
             $cdepos = $pedido->cdepos;
             $artdepos = (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->first();
             if ($artdepos) {
+                $delta = $request->cantidad - $cantidadAnterior;
                 ArtDepos::tagMovimiento('RESERVA_CARRITO_AGREGAR', $pedido->id);
-                (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->increment('RESERVA', $request->cantidad);
-                $disp = $artdepos->EUNIDAD - ($artdepos->RESERVA + $request->cantidad);
+                if ($delta > 0) {
+                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->increment('RESERVA', $delta);
+                } elseif ($delta < 0) {
+                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)
+                        ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) abs($delta) . ', 0)')]);
+                }
+                $disp = $artdepos->EUNIDAD - ($artdepos->RESERVA + $delta);
             }
         }
 
@@ -270,7 +278,7 @@ class PedidosController extends Controller
                 $artdepos = (new ArtDepos)->where('CODIGO', $item->codigo_inven)->where('CDEPOS', $cdepos)->first();
                 if ($artdepos && ($request->estatus == 'APROBADO' || $request->estatus == 'RECHAZADO')) {
                     ArtDepos::tagMovimiento('PEDIDO_' . $request->estatus, $pedido->id);
-                    $updates = ['RESERVA' => DB::raw('RESERVA - ' . (float) $item->cantidad)];
+                    $updates = ['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) $item->cantidad . ', 0)')];
                     if ($request->estatus == 'APROBADO') {
                         $updates['EUNIDAD'] = DB::raw('EUNIDAD - ' . (float) $item->cantidad);
                     }
@@ -544,7 +552,8 @@ class PedidosController extends Controller
                 if ($delta > 0) {
                     (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->increment('RESERVA', $delta);
                 } elseif ($delta < 0) {
-                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->decrement('RESERVA', abs($delta));
+                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)
+                        ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) abs($delta) . ', 0)')]);
                 }
             }
 

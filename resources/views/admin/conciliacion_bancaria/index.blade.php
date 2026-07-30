@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('titulo', config('app.name', 'Laravel') . ' - Conciliación Bancaria')
-@section('titulo_header', 'Conciliación Bancaria')
+@section('titulo', config('app.name', 'Laravel') . ' - Auditoría de Pagos')
+@section('titulo_header', 'Auditoría de Pagos')
 @section('subtitulo_header', 'Control gerencial de ingresos por banco y forma de pago')
 
 @section('content')
@@ -67,7 +67,7 @@
             <strong>Filtros de Conciliación</strong>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ route('admin.conciliacion_bancaria.index') }}">
+            <form method="GET" action="{{ route('admin.auditoria_pagos.index') }}">
                 <div class="form-row">
                     <div class="form-group col-md-2">
                         <label>Desde</label>
@@ -89,12 +89,12 @@
                         </select>
                     </div>
                     <div class="form-group col-md-2">
-                        <label>Banco Origen</label>
+                        <label>Banco / Destino</label>
                         <select name="banco_codigo" class="form-control">
                             <option value="">Todos</option>
-                            @foreach($bancos as $b)
-                                <option value="{{ $b->CODIGO }}" {{ request('banco_codigo') == $b->CODIGO ? 'selected' : '' }}>
-                                    {{ $b->NOMBRE }}
+                            @foreach($filtrosBancoDestino as $item)
+                                <option value="{{ $item['value'] }}" {{ request('banco_codigo') == $item['value'] ? 'selected' : '' }}>
+                                    {{ $item['label'] }}
                                 </option>
                             @endforeach
                         </select>
@@ -156,7 +156,7 @@
                 </div>
 
                 <div class="d-flex justify-content-end">
-                    <a href="{{ route('admin.conciliacion_bancaria.index') }}" class="btn btn-outline-secondary mr-2">Limpiar</a>
+                    <a href="{{ route('admin.auditoria_pagos.index') }}" class="btn btn-outline-secondary mr-2">Limpiar</a>
                     <button class="btn btn-primary">Aplicar Filtros</button>
                 </div>
             </form>
@@ -241,7 +241,7 @@
                                 <td class="text-right">{{ number_format($p->monto_usd, 2, ',', '.') }}</td>
                                 <td class="text-right">{{ number_format($p->monto_bs, 2, ',', '.') }}</td>
                                 <td style="min-width:300px;">
-                                    <form method="POST" action="{{ route('admin.conciliacion_bancaria.reclasificar', $p->id) }}">
+                                    <form method="POST" action="{{ route('admin.auditoria_pagos.reclasificar', $p->id) }}">
                                         @csrf
                                         <div class="form-row">
                                             <div class="col-12 mb-1">

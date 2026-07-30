@@ -933,6 +933,10 @@
                                             class="list-group-item list-group-item-action report-highlight">
                                             <i class="fas fa-random"></i> Conciliación Bancaria
                                         </a>
+                                        <a href="{{ url('admin/auditoria-pagos') }}"
+                                            class="list-group-item list-group-item-action report-highlight">
+                                            <i class="fas fa-search-dollar"></i> Auditoría de Pagos
+                                        </a>
                                         <a href="{{ url('admin/cuentas-por-cobrar') }}"
                                             class="list-group-item list-group-item-action report-highlight">
                                             <i class="fas fa-balance-scale"></i> Cuentas por Cobrar

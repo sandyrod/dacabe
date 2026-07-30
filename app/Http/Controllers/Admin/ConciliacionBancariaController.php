@@ -69,6 +69,7 @@ class ConciliacionBancariaController extends Controller
         $tiposPago = OrderTpago::orderBy('DPAGO')->get();
         $destinos = PagoDestino::orderBy('nombre')->get();
         $bancos = OrderBanco::orderBy('NOMBRE')->get();
+        $filtrosBancoDestino = $this->buildBancoDestinoFilterOptions($bancos, $destinos);
 
         return view('admin.conciliacion_bancaria.index', [
             'pagos' => $pagos,
@@ -78,6 +79,7 @@ class ConciliacionBancariaController extends Controller
             'tiposPago' => $tiposPago,
             'destinos' => $destinos,
             'bancos' => $bancos,
+            'filtrosBancoDestino' => $filtrosBancoDestino,
             'tablaMovimientosDisponible' => $tablaMovimientosDisponible,
         ]);
     }
@@ -208,7 +210,22 @@ class ConciliacionBancariaController extends Controller
         }
 
         if ($request->filled('banco_codigo')) {
-            $query->where('pag.banco_codigo', $request->input('banco_codigo'));
+            $selection = self::parseBancoDestinoSelection($request->input('banco_codigo'));
+
+            if ($selection['type'] === 'destino') {
+                $query->where('pag.pago_destino_id', (int) $selection['value']);
+            } else {
+                $selectedBanco = trim((string) $selection['value']);
+                $normalizedBanco = self::normalizeFilterValue($selectedBanco);
+
+                $query->where(function ($q) use ($selectedBanco, $normalizedBanco) {
+                    $q->where('pag.banco_codigo', $selectedBanco)
+                        ->orWhereRaw('TRIM(COALESCE(CONVERT(bo.NOMBRE USING utf8mb4), "")) = ?', [$selectedBanco])
+                        ->orWhereRaw('TRIM(COALESCE(CONVERT(pd.nombre USING utf8mb4), "")) = ?', [$selectedBanco])
+                        ->orWhereRaw("REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(bo.NOMBRE USING utf8mb4), ""))), ' ', ''), '$', '') = ?", [$normalizedBanco])
+                        ->orWhereRaw("REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(pd.nombre USING utf8mb4), ""))), ' ', ''), '$', '') = ?", [$normalizedBanco]);
+                });
+            }
         }
 
         if ($request->filled('estatus')) {
@@ -260,6 +277,67 @@ class ConciliacionBancariaController extends Controller
         }
 
         return $query;
+    }
+
+    public static function normalizeFilterValue($value)
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $normalized = trim((string) $value);
+        $normalized = mb_strtolower($normalized, 'UTF-8');
+        $normalized = str_replace(['$', ' ', '-', '_', '.', ',', '/', '\\'], '', $normalized);
+        $normalized = preg_replace('/[^a-z0-9]+/u', '', $normalized);
+
+        return $normalized;
+    }
+
+    public static function parseBancoDestinoSelection($value)
+    {
+        $raw = trim((string) $value);
+
+        if ($raw === '') {
+            return ['type' => 'none', 'value' => null];
+        }
+
+        if (preg_match('/^destino:(\d+)$/', $raw, $matches)) {
+            return ['type' => 'destino', 'value' => (int) $matches[1]];
+        }
+
+        if (preg_match('/^banco:(.+)$/', $raw, $matches)) {
+            return ['type' => 'banco', 'value' => trim($matches[1])];
+        }
+
+        return ['type' => 'banco', 'value' => $raw];
+    }
+
+    private function buildBancoDestinoFilterOptions($bancos, $destinos)
+    {
+        $items = collect();
+
+        foreach ($bancos as $banco) {
+            $items->push([
+                'value' => 'banco:' . (string) $banco->CODIGO,
+                'label' => (string) $banco->NOMBRE,
+                'tipo' => 'banco',
+            ]);
+        }
+
+        foreach ($destinos as $destino) {
+            $items->push([
+                'value' => 'destino:' . (string) $destino->id,
+                'label' => (string) $destino->nombre,
+                'tipo' => 'destino',
+            ]);
+        }
+
+        return $items
+            ->sortBy(function ($item) {
+                return mb_strtolower($item['label'], 'UTF-8');
+            })
+            ->values()
+            ->all();
     }
 
     private function buildDetallePagosSubquery()

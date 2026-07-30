@@ -392,8 +392,18 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'role:admin|admin_pe
 
     Route::resource('pagos', 'Admin\PagoController')->only(['index']);
     Route::get('pagos/aprobar', ['as' => 'pagos.aprobar', 'uses' => 'Admin\PagoController@aprobar']);
-    Route::get('conciliacion-bancaria', 'Admin\ConciliacionBancariaController@index')->name('admin.conciliacion_bancaria.index');
-    Route::post('conciliacion-bancaria/{pago}/reclasificar', 'Admin\ConciliacionBancariaController@reclasificar')->name('admin.conciliacion_bancaria.reclasificar');
+    Route::get('conciliacion-bancaria', 'Admin\ConciliacionLibroBancoController@index')->name('admin.conciliacion_bancaria.index');
+    Route::post('conciliacion-bancaria/saldo-inicial', 'Admin\ConciliacionLibroBancoController@saveSaldoInicial')->name('admin.conciliacion_bancaria.saldo_inicial');
+    Route::post('conciliacion-bancaria/entradas', 'Admin\ConciliacionLibroBancoController@storeEntrada')->name('admin.conciliacion_bancaria.entradas.store');
+    Route::post('conciliacion-bancaria/entradas/{entrada}', 'Admin\ConciliacionLibroBancoController@updateEntrada')->name('admin.conciliacion_bancaria.entradas.update');
+    Route::post('conciliacion-bancaria/entradas/{entrada}/delete', 'Admin\ConciliacionLibroBancoController@destroyEntrada')->name('admin.conciliacion_bancaria.entradas.destroy');
+    Route::post('conciliacion-bancaria/conceptos', 'Admin\ConciliacionLibroBancoController@storeConcepto')->name('admin.conciliacion_bancaria.conceptos.store');
+    Route::get('conciliacion-bancaria/export', 'Admin\ConciliacionLibroBancoController@export')->name('admin.conciliacion_bancaria.export');
+
+    Route::get('auditoria-pagos', 'Admin\ConciliacionBancariaController@index')->name('admin.auditoria_pagos.index');
+    Route::post('auditoria-pagos/{pago}/reclasificar', 'Admin\ConciliacionBancariaController@reclasificar')->name('admin.auditoria_pagos.reclasificar');
+    Route::get('conciliacion-bancaria-anterior', 'Admin\ConciliacionBancariaController@index')->name('admin.conciliacion_bancaria_legacy.index');
+    Route::post('conciliacion-bancaria-anterior/{pago}/reclasificar', 'Admin\ConciliacionBancariaController@reclasificar')->name('admin.conciliacion_bancaria_legacy.reclasificar');
     Route::get('cuentas-por-cobrar', ['as' => 'admin.cuentas_por_cobrar.index', 'uses' => 'Admin\CuentasPorCobrarController@index']);
     Route::get('pagos/export', ['as' => 'pagos.export', 'uses' => 'Admin\PagoController@export']);
     Route::get('pagos/trazabilidad/{pedido_id}', ['as' => 'pagos.trazabilidad', 'uses' => 'Admin\PagoController@trazabilidad']);

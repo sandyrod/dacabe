@@ -26,7 +26,7 @@
     @endif
 
     @if(!$tablaMovimientosDisponible)
-        <div class="alert alert-warning">
+        <div class="alert alert-warning d-none">
             El histórico Debe/Haber por reclasificación requiere la tabla <strong>conciliacion_bancaria_movimientos</strong>.
             Ejecuta el SQL manual suministrado para habilitar trazabilidad completa.
         </div>

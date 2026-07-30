@@ -222,8 +222,8 @@ class ConciliacionBancariaController extends Controller
                     $q->where('pag.banco_codigo', $selectedBanco)
                         ->orWhereRaw('TRIM(COALESCE(CONVERT(bo.NOMBRE USING utf8mb4), "")) = ?', [$selectedBanco])
                         ->orWhereRaw('TRIM(COALESCE(CONVERT(pd.nombre USING utf8mb4), "")) = ?', [$selectedBanco])
-                        ->orWhereRaw("REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(bo.NOMBRE USING utf8mb4), ""))), ' ', ''), '$', '') = ?", [$normalizedBanco])
-                        ->orWhereRaw("REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(pd.nombre USING utf8mb4), ""))), ' ', ''), '$', '') = ?", [$normalizedBanco]);
+                        ->orWhereRaw('REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(bo.NOMBRE USING utf8mb4), ""))), " ", ""), "$", "") = ?', [$normalizedBanco])
+                        ->orWhereRaw('REPLACE(REPLACE(LOWER(TRIM(COALESCE(CONVERT(pd.nombre USING utf8mb4), ""))), " ", ""), "$", "") = ?', [$normalizedBanco]);
                 });
             }
         }

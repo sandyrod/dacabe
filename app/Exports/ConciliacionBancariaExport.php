@@ -48,7 +48,16 @@ class ConciliacionBancariaExport implements FromCollection, WithHeadings, Should
             })
             ->selectRaw('pag.fecha as fecha')
             ->selectRaw('CONCAT("PAGO DE FACT Nro. ", COALESCE(pf.factura, "S/F"), " ", COALESCE(ped.descripcion, "SIN CLIENTE")) as descripcion')
-            ->selectRaw('COALESCE(pp.monto * COALESCE(pag.rate, 0), 0) as monto')
+            ->selectRaw('CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN COALESCE((COALESCE(pp.monto, 0) * COALESCE(pag.rate, 0)) + COALESCE(pp.iva, 0) + (COALESCE(pp.ajustes_monto, 0) * COALESCE(pag.rate, 0)), 0)
+                ELSE COALESCE(pp.monto, 0)
+            END as monto')
+            ->selectRaw('CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN "Bs. "
+                ELSE "$ "
+            END as monto_prefijo')
             ->orderBy('pag.fecha')
             ->orderBy('pag.id')
             ->get();
@@ -58,7 +67,7 @@ class ConciliacionBancariaExport implements FromCollection, WithHeadings, Should
                 'fecha' => $item->fecha,
                 'descripcion' => $item->descripcion,
                 'entra' => '',
-                'sale' => number_format((float) $item->monto, 2, ',', '.'),
+                'sale' => (string) ($item->monto_prefijo ?? '') . number_format((float) $item->monto, 2, ',', '.'),
             ]);
         }
 

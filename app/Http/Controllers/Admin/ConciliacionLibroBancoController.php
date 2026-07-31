@@ -81,7 +81,16 @@ class ConciliacionLibroBancoController extends Controller
             })
             ->selectRaw('pag.fecha as fecha')
             ->selectRaw('CONCAT("PAGO DE FACT Nro. ", COALESCE(pf.factura, "S/F"), " ", COALESCE(ped.descripcion, "SIN CLIENTE")) as descripcion')
-            ->selectRaw('COALESCE(pp.monto * COALESCE(pag.rate, 0), 0) as monto')
+            ->selectRaw('CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN COALESCE((COALESCE(pp.monto, 0) * COALESCE(pag.rate, 0)) + COALESCE(pp.iva, 0) + (COALESCE(pp.ajustes_monto, 0) * COALESCE(pag.rate, 0)), 0)
+                ELSE COALESCE(pp.monto, 0)
+            END as monto')
+            ->selectRaw('CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN "Bs. "
+                ELSE "$ "
+            END as monto_prefijo')
             ->orderBy('pag.fecha')
             ->orderBy('pag.id')
             ->get();
@@ -101,15 +110,64 @@ class ConciliacionLibroBancoController extends Controller
             $salidasManuales = collect();
         }
 
-        $totalEntradas = (float) $entradas->sum('monto');
-        $totalPagos = (float) $salidas->sum('monto');
-        $totalSalidasManuales = (float) $salidasManuales->sum('monto');
+        $normalizarMoneda = function ($value): string {
+            $txt = mb_strtolower(trim((string) $value), 'UTF-8');
+            $txt = str_replace(['í', 'á'], ['i', 'a'], $txt);
+            if (in_array($txt, ['bolivares', 'bs'], true)) {
+                return 'bs';
+            }
+            return 'usd';
+        };
+
+        $totalPagosBs = (float) $salidas
+            ->filter(function ($row) {
+                return trim((string) ($row->monto_prefijo ?? '')) === 'Bs.' || trim((string) ($row->monto_prefijo ?? '')) === 'Bs. ';
+            })
+            ->sum('monto');
+
+        $totalPagosUsd = (float) $salidas
+            ->filter(function ($row) {
+                return trim((string) ($row->monto_prefijo ?? '')) === '$' || trim((string) ($row->monto_prefijo ?? '')) === '$ ';
+            })
+            ->sum('monto');
+
+        $totalEntradasBs = (float) $entradas
+            ->filter(function ($row) use ($normalizarMoneda) {
+                return $normalizarMoneda($row->moneda ?? 'bs') === 'bs';
+            })
+            ->sum('monto');
+
+        $totalEntradasUsd = (float) $entradas
+            ->filter(function ($row) use ($normalizarMoneda) {
+                return $normalizarMoneda($row->moneda ?? 'bs') === 'usd';
+            })
+            ->sum('monto');
+
+        $totalSalidasManualesBs = (float) $salidasManuales
+            ->filter(function ($row) use ($normalizarMoneda) {
+                return $normalizarMoneda($row->moneda ?? 'bs') === 'bs';
+            })
+            ->sum('monto');
+
+        $totalSalidasManualesUsd = (float) $salidasManuales
+            ->filter(function ($row) use ($normalizarMoneda) {
+                return $normalizarMoneda($row->moneda ?? 'bs') === 'usd';
+            })
+            ->sum('monto');
+
+        $totalCargosBs = $totalPagosBs + $totalEntradasBs;
+        $totalCargosUsd = $totalPagosUsd + $totalEntradasUsd;
+        $totalAbonosBs = $totalSalidasManualesBs;
+        $totalAbonosUsd = $totalSalidasManualesUsd;
 
         $totales = [
             'saldo_inicial' => (float) ($periodo->saldo_inicial ?? 0),
-            'total_cargos' => $totalPagos + $totalEntradas,
-            'total_abonos' => $totalSalidasManuales,
-            'saldo_final' => (float) ($periodo->saldo_inicial ?? 0) + $totalPagos + $totalEntradas - $totalSalidasManuales,
+            'total_cargos_bs' => $totalCargosBs,
+            'total_cargos_usd' => $totalCargosUsd,
+            'total_abonos_bs' => $totalAbonosBs,
+            'total_abonos_usd' => $totalAbonosUsd,
+            'saldo_final_bs' => (float) ($periodo->saldo_inicial ?? 0) + $totalCargosBs - $totalAbonosBs,
+            'saldo_final_usd' => $totalCargosUsd - $totalAbonosUsd,
         ];
 
         return view('admin.conciliacion_libro_banco.index', [
@@ -153,6 +211,7 @@ class ConciliacionLibroBancoController extends Controller
             'monto' => 'required|numeric|min:0.01',
             'concepto_id' => 'nullable|integer|min:1',
             'tipo_movimiento' => 'required|in:entrada,salida',
+            'moneda' => 'required|in:bs,usd',
         ]);
 
         $tipoMovimiento = $request->input('tipo_movimiento') === 'salida' ? 'salida' : 'entrada';
@@ -172,6 +231,10 @@ class ConciliacionLibroBancoController extends Controller
             $entryData['tipo_movimiento'] = $tipoMovimiento;
         }
 
+        if ($this->hasMonedaColumn()) {
+            $entryData['moneda'] = $request->input('moneda', 'bs') === 'usd' ? 'usd' : 'bs';
+        }
+
         DB::connection('company')->table('conciliacion_bancaria_entradas')->insert($entryData);
 
         return back()->with('success', $tipoMovimiento === 'salida' ? 'Salida agregada correctamente.' : 'Entrada agregada correctamente.');
@@ -184,18 +247,25 @@ class ConciliacionLibroBancoController extends Controller
             'descripcion' => 'required|string|max:255',
             'monto' => 'required|numeric|min:0.01',
             'concepto_id' => 'nullable|integer|min:1',
+            'moneda' => 'required|in:bs,usd',
         ]);
+
+        $updateData = [
+            'fecha' => $request->input('fecha'),
+            'descripcion' => trim((string) $request->input('descripcion')),
+            'monto' => (float) $request->input('monto'),
+            'concepto_id' => $request->filled('concepto_id') ? (int) $request->input('concepto_id') : null,
+            'updated_at' => now(),
+        ];
+
+        if ($this->hasMonedaColumn()) {
+            $updateData['moneda'] = $request->input('moneda', 'bs') === 'usd' ? 'usd' : 'bs';
+        }
 
         DB::connection('company')
             ->table('conciliacion_bancaria_entradas')
             ->where('id', $entradaId)
-            ->update([
-                'fecha' => $request->input('fecha'),
-                'descripcion' => trim((string) $request->input('descripcion')),
-                'monto' => (float) $request->input('monto'),
-                'concepto_id' => $request->filled('concepto_id') ? (int) $request->input('concepto_id') : null,
-                'updated_at' => now(),
-            ]);
+            ->update($updateData);
 
         return back()->with('success', 'Entrada actualizada correctamente.');
     }
@@ -240,6 +310,15 @@ class ConciliacionLibroBancoController extends Controller
     {
         try {
             return Schema::connection('company')->hasColumn('conciliacion_bancaria_entradas', 'tipo_movimiento');
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function hasMonedaColumn(): bool
+    {
+        try {
+            return Schema::connection('company')->hasColumn('conciliacion_bancaria_entradas', 'moneda');
         } catch (\Throwable $e) {
             return false;
         }

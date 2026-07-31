@@ -52,6 +52,16 @@
     $fmt = function ($value) {
         return number_format((float) $value, 2, ',', '.');
     };
+    $fmtTotalMoneda = function ($bs, $usd) use ($fmt) {
+        $bs = (float) $bs;
+        $usd = (float) $usd;
+
+        if (abs($usd) > 0.00001 && abs($bs) <= 0.00001) {
+            return '$ ' . $fmt($usd);
+        }
+
+        return 'Bs. ' . $fmt($bs);
+    };
 @endphp
 <div class="container-fluid">
     @if(session('success'))
@@ -158,6 +168,13 @@
                         <label>Monto</label>
                         <input type="number" step="0.01" min="0.01" name="monto" class="form-control" required>
                     </div>
+                    <div class="form-group col-md-1">
+                        <label>Moneda</label>
+                        <select name="moneda" class="form-control" required>
+                            <option value="bs">Bs.</option>
+                            <option value="usd">$</option>
+                        </select>
+                    </div>
                     <div class="form-group col-md-2">
                         <label>Concepto Frecuente</label>
                         <select id="concepto_selector" class="form-control">
@@ -209,6 +226,7 @@
                 'fecha' => $s->fecha,
                 'descripcion' => $s->descripcion,
                 'monto' => (float) $s->monto,
+                'monto_prefijo' => $s->monto_prefijo ?? '',
             ]);
         }
         foreach($entradas as $e) {
@@ -217,9 +235,11 @@
                 'fecha' => $e->fecha,
                 'descripcion' => $e->descripcion,
                 'monto' => (float) $e->monto,
+                'monto_prefijo' => (isset($e->moneda) && strtolower((string)$e->moneda) === 'usd') ? '$ ' : 'Bs. ',
                 'entrada_id' => $e->id,
                 'concepto_id' => $e->concepto_id,
                 'tipo_movimiento' => 'entrada',
+                'moneda' => isset($e->moneda) ? strtolower((string)$e->moneda) : 'bs',
             ]);
         }
         foreach($salidas_manuales as $s) {
@@ -228,9 +248,11 @@
                 'fecha' => $s->fecha,
                 'descripcion' => $s->descripcion,
                 'monto' => (float) $s->monto,
+                'monto_prefijo' => (isset($s->moneda) && strtolower((string)$s->moneda) === 'usd') ? '$ ' : 'Bs. ',
                 'entrada_id' => $s->id,
                 'concepto_id' => $s->concepto_id,
                 'tipo_movimiento' => 'salida',
+                'moneda' => isset($s->moneda) ? strtolower((string)$s->moneda) : 'bs',
             ]);
         }
         $movimientos = $movimientos->sortBy('fecha')->values();
@@ -271,6 +293,12 @@
                                                     <div class="col-md-2 mb-1"><input type="date" name="fecha" class="form-control form-control-sm" value="{{ $row->fecha }}" required></div>
                                                     <div class="col-md-5 mb-1"><input type="text" name="descripcion" class="form-control form-control-sm" value="{{ $row->descripcion }}" required></div>
                                                     <div class="col-md-2 mb-1"><input type="number" step="0.01" min="0.01" name="monto" class="form-control form-control-sm" value="{{ $row->monto }}" required></div>
+                                                    <div class="col-md-1 mb-1">
+                                                        <select name="moneda" class="form-control form-control-sm" required>
+                                                            <option value="bs" {{ ($row->moneda ?? 'bs') === 'bs' ? 'selected' : '' }}>Bs.</option>
+                                                            <option value="usd" {{ ($row->moneda ?? 'bs') === 'usd' ? 'selected' : '' }}>$</option>
+                                                        </select>
+                                                    </div>
                                                     <div class="col-md-2 mb-1">
                                                         <select name="concepto_id" class="form-control form-control-sm">
                                                             <option value="">Sin concepto</option>
@@ -279,14 +307,14 @@
                                                             @endforeach
                                                         </select>
                                                     </div>
-                                                    <div class="col-md-1 mb-1"><button class="btn btn-sm btn-primary btn-block">OK</button></div>
+                                                    <div class="col-md-2 mb-1"><button class="btn btn-sm btn-primary btn-block">OK</button></div>
                                                 </div>
                                             </form>
                                         </div>
                                     @endif
                                 </td>
-                                <td class="{{ $row->tipo === 'entrada' ? 'cb-entra' : '' }}">{{ $row->tipo === 'entrada' ? $fmt($row->monto) : '' }}</td>
-                                <td class="{{ $row->tipo === 'salida' ? 'cb-sale' : '' }}">{{ $row->tipo === 'salida' ? $fmt($row->monto) : '' }}</td>
+                                <td class="{{ $row->tipo === 'entrada' ? 'cb-entra' : '' }}">{{ $row->tipo === 'entrada' ? (($row->monto_prefijo ?? '') . $fmt($row->monto)) : '' }}</td>
+                                <td class="{{ $row->tipo === 'salida' ? 'cb-sale' : '' }}">{{ $row->tipo === 'salida' ? (($row->monto_prefijo ?? '') . $fmt($row->monto)) : '' }}</td>
                             </tr>
                         @empty
                             <tr>
@@ -302,19 +330,19 @@
     <table class="table table-bordered table-sm cb-total-table">
         <tr>
             <th>SALDO INICIAL</th>
-            <td class="text-right">{{ $fmt($totales['saldo_inicial']) }}</td>
+            <td class="text-right">Bs. {{ $fmt($totales['saldo_inicial']) }}</td>
         </tr>
         <tr>
             <th>TOTAL CARGOS</th>
-            <td class="text-right">{{ $fmt($totales['total_cargos']) }}</td>
+            <td class="text-right">{{ $fmtTotalMoneda($totales['total_cargos_bs'], $totales['total_cargos_usd']) }}</td>
         </tr>
         <tr>
             <th>TOTAL ABONOS</th>
-            <td class="text-right text-success">{{ $fmt($totales['total_abonos']) }}</td>
+            <td class="text-right text-success">{{ $fmtTotalMoneda($totales['total_abonos_bs'], $totales['total_abonos_usd']) }}</td>
         </tr>
         <tr>
             <th>SALDO SEGÚN LIBRO BANCOS</th>
-            <td class="text-right font-weight-bold">{{ $fmt($totales['saldo_final']) }}</td>
+            <td class="text-right font-weight-bold">{{ $fmtTotalMoneda($totales['saldo_final_bs'], $totales['saldo_final_usd']) }}</td>
         </tr>
     </table>
 </div>

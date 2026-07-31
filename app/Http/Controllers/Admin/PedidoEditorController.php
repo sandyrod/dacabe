@@ -292,38 +292,41 @@ class PedidoEditorController extends Controller
             ->where('codigo_inven', $codigo)
             ->first();
 
-        if ($detalle) {
-            $detalle->cantidad = (int) $detalle->cantidad + $cantidad;
-            $detalle->precio = $precio;
-            $detalle->precio_dolar = $precio;
-            $detalle->iva = $iva;
-            $detalle->pago = $pago;
-            $detalle->save();
+        $reservaOk = DB::connection('company')->transaction(function () use ($detalle, $pedidoModel, $codigo, $cantidad, $precio, $iva, $pago, $producto) {
+            if ($detalle) {
+                $detalle->cantidad = (int) $detalle->cantidad + $cantidad;
+                $detalle->precio = $precio;
+                $detalle->precio_dolar = $precio;
+                $detalle->iva = $iva;
+                $detalle->pago = $pago;
+                $detalle->save();
+            } else {
+                $tasa = $pedidoModel->tasa ?? 0;
+                (new PedidoDetalle)->createNew(
+                    $pedidoModel->id,
+                    $cantidad,
+                    round($precio, 4),
+                    round((float) ($producto->ACTUALDL ?? $precio), 4),
+                    $tasa,
+                    $codigo,
+                    (string) $producto->DESCR,
+                    (string) $producto->DUNIMEDD,
+                    $pago,
+                    $iva
+                );
+            }
 
-            $this->ajustarReserva($pedidoModel, $codigo, $cantidad);
+            $reservaOk = $this->ajustarReserva($pedidoModel, $codigo, $cantidad);
             (new Pedido)->updateTotals($pedidoModel->id);
-        } else {
-            $tasa = $pedidoModel->tasa ?? 0;
-            (new PedidoDetalle)->createNew(
-                $pedidoModel->id,
-                $cantidad,
-                round($precio, 4),
-                round((float) ($producto->ACTUALDL ?? $precio), 4),
-                $tasa,
-                $codigo,
-                (string) $producto->DESCR,
-                (string) $producto->DUNIMEDD,
-                $pago,
-                $iva
-            );
 
-            $this->ajustarReserva($pedidoModel, $codigo, $cantidad);
-        }
+            return $reservaOk;
+        });
 
         return response()->json([
             'type' => 'success',
             'totales' => $this->buildTotales($pedidoModel->id),
             'detalle' => PedidoDetalle::where('pedido_id', $pedidoModel->id)->orderBy('id')->get(),
+            'reserva_advertencia' => $reservaOk ? null : "No se encontró el producto {$codigo} en ARTDEPOS para el depósito del pedido; la reserva no pudo ajustarse.",
         ]);
     }
 
@@ -343,23 +346,29 @@ class PedidoEditorController extends Controller
         $cantidadAnterior = (int) $detalle->cantidad;
         $delta = $cantidadNueva - $cantidadAnterior;
 
-        $detalle->cantidad = $cantidadNueva;
-        $detalle->precio = (float) $data['precio_dolar'];
-        $detalle->precio_dolar = (float) $data['precio_dolar'];
-        $detalle->iva = (int) $data['iva'];
-        $detalle->pago = $data['pago'] ?? $detalle->pago;
-        $detalle->save();
+        $reservaOk = DB::connection('company')->transaction(function () use ($detalle, $pedidoModel, $data, $delta) {
+            $detalle->cantidad = (int) $data['cantidad'];
+            $detalle->precio = (float) $data['precio_dolar'];
+            $detalle->precio_dolar = (float) $data['precio_dolar'];
+            $detalle->iva = (int) $data['iva'];
+            $detalle->pago = $data['pago'] ?? $detalle->pago;
+            $detalle->save();
 
-        if (abs($delta) > 0.00001) {
-            $this->ajustarReserva($pedidoModel, (string) $detalle->codigo_inven, $delta);
-        }
+            $reservaOk = true;
+            if (abs($delta) > 0.00001) {
+                $reservaOk = $this->ajustarReserva($pedidoModel, (string) $detalle->codigo_inven, $delta);
+            }
 
-        (new Pedido)->updateTotals($pedidoModel->id);
+            (new Pedido)->updateTotals($pedidoModel->id);
+
+            return $reservaOk;
+        });
 
         return response()->json([
             'type' => 'success',
             'totales' => $this->buildTotales($pedidoModel->id),
             'item' => $detalle,
+            'reserva_advertencia' => $reservaOk ? null : "No se encontró el producto {$detalle->codigo_inven} en ARTDEPOS para el depósito del pedido; la reserva no pudo ajustarse.",
         ]);
     }
 
@@ -367,15 +376,22 @@ class PedidoEditorController extends Controller
     {
         $pedidoModel = Pedido::findOrFail($pedido);
         $detalle = PedidoDetalle::where('pedido_id', $pedidoModel->id)->where('id', $item)->firstOrFail();
+        $codigoInven = (string) $detalle->codigo_inven;
+        $cantidad = (float) $detalle->cantidad;
 
-        $this->ajustarReserva($pedidoModel, (string) $detalle->codigo_inven, -1 * (float) $detalle->cantidad);
-        $detalle->delete();
+        $reservaOk = DB::connection('company')->transaction(function () use ($detalle, $pedidoModel, $codigoInven, $cantidad) {
+            $reservaOk = $this->ajustarReserva($pedidoModel, $codigoInven, -1 * $cantidad);
+            $detalle->delete();
 
-        (new Pedido)->updateTotals($pedidoModel->id);
+            (new Pedido)->updateTotals($pedidoModel->id);
+
+            return $reservaOk;
+        });
 
         return response()->json([
             'type' => 'success',
             'totales' => $this->buildTotales($pedidoModel->id),
+            'reserva_advertencia' => $reservaOk ? null : "No se encontró el producto {$codigoInven} en ARTDEPOS para el depósito del pedido; la reserva no pudo ajustarse.",
         ]);
     }
 
@@ -394,10 +410,10 @@ class PedidoEditorController extends Controller
         ];
     }
 
-    private function ajustarReserva(Pedido $pedido, string $codigo, float $delta): void
+    private function ajustarReserva(Pedido $pedido, string $codigo, float $delta): bool
     {
         if (abs($delta) < 0.00001) {
-            return;
+            return true;
         }
 
         $artDepos = ArtDepos::where('CODIGO', $codigo)
@@ -405,17 +421,22 @@ class PedidoEditorController extends Controller
             ->first();
 
         if (! $artDepos) {
-            return;
+            return false;
         }
 
-        $nuevaReserva = ((float) $artDepos->RESERVA) + $delta;
-        if ($nuevaReserva < 0) {
-            $nuevaReserva = 0;
+        ArtDepos::tagMovimiento('PEDIDO_EDITOR_AJUSTE', $pedido->id);
+
+        if ($delta > 0) {
+            ArtDepos::where('CODIGO', $codigo)
+                ->where('CDEPOS', $pedido->cdepos)
+                ->increment('RESERVA', $delta);
+        } else {
+            ArtDepos::where('CODIGO', $codigo)
+                ->where('CDEPOS', $pedido->cdepos)
+                ->update(['RESERVA' => DB::raw('GREATEST(RESERVA - ' . (float) abs($delta) . ', 0)')]);
         }
 
-        ArtDepos::where('CODIGO', $codigo)
-            ->where('CDEPOS', $pedido->cdepos)
-            ->update(['RESERVA' => $nuevaReserva]);
+        return true;
     }
 
     private function resolveVendedorPedido(Pedido $pedido): ?Vendedor

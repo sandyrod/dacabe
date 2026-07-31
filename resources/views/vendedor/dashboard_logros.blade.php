@@ -6,6 +6,19 @@
 
 @php
     $periodosJson = json_encode($periodos->values(), JSON_UNESCAPED_UNICODE);
+
+    $anillos = [
+        'clientes' => [
+            'pct' => $resumen['clientes_activados_pct'],
+        ],
+        'meta' => [
+            'pct' => $metaVentasRing['disponible'] ? $metaVentasRing['pct'] : null,
+        ],
+        'pedidos' => [
+            'pct' => $resumen['pedidos_aprobacion_pct'],
+        ],
+    ];
+    $anillosJson = json_encode($anillos, JSON_UNESCAPED_UNICODE);
 @endphp
 
 @section('styles')
@@ -158,6 +171,61 @@
         border-radius: inherit;
         background: linear-gradient(90deg, #1f8a70, #1d4f7a);
     }
+
+    .vd-ring-card .card-body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .vd-ring-subtitle {
+        font-size: .78rem;
+        color: var(--vd-muted);
+        text-align: center;
+        margin-bottom: .75rem;
+    }
+
+    .vd-ring-wrap {
+        position: relative;
+        width: 168px;
+        height: 168px;
+        margin: 0 auto;
+    }
+
+    .vd-ring-value {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.55rem;
+        font-weight: 900;
+        color: var(--vd-ink);
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .vd-ring-legend {
+        display: flex;
+        justify-content: center;
+        gap: 1.25rem;
+        flex-wrap: wrap;
+        font-size: .82rem;
+        color: var(--vd-muted);
+        margin-top: 1rem;
+    }
+
+    .vd-ring-legend .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        margin-right: .35rem;
+    }
+
+    .vd-ring-legend strong {
+        color: var(--vd-ink);
+        margin-left: .25rem;
+    }
 </style>
 @endsection
 
@@ -238,6 +306,87 @@
                 <div class="label">Cobertura de Pedidos</div>
                 <div class="value">{{ number_format($resumen['cobertura_pedidos_pct'], 2, ',', '.') }}%</div>
                 <div class="sub">Cobertura monto: {{ number_format($resumen['cobertura_monto_pct'], 2, ',', '.') }}%</div>
+            </div>
+        </div>
+    </div>
+
+    @php
+        $ringColor = function ($pct) {
+            if (is_null($pct)) {
+                return '#94a3b8';
+            }
+            if ($pct >= 100) {
+                return '#16a34a';
+            }
+            if ($pct >= 70) {
+                return '#d97706';
+            }
+            return '#dc2626';
+        };
+        $ringTrack = '#e6eef6';
+    @endphp
+
+    <div class="row mb-4">
+        <div class="col-12 mb-2">
+            <h5 class="font-weight-bold mb-1" style="color:#15324c;">Indicadores de Cumplimiento</h5>
+            <div style="font-size:.85rem;color:#60758a;">Un vistazo rapido a la activacion de clientes, el avance de la meta y la calidad de tus pedidos.</div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card vd-card h-100 vd-ring-card">
+                <div class="card-header"><i class="fas fa-user-check mr-2"></i>Activacion de Clientes</div>
+                <div class="card-body">
+                    <div class="vd-ring-subtitle">Clientes con pedidos vs. cartera asignada en el periodo</div>
+                    <div class="vd-ring-wrap">
+                        <canvas id="ringClientes" width="168" height="168"></canvas>
+                        <div class="vd-ring-value" id="ringClientesValue" style="color: {{ $ringColor($resumen['clientes_activados_pct']) }};">
+                            {{ is_null($resumen['clientes_activados_pct']) ? 'N/D' : number_format($resumen['clientes_activados_pct'], 2, ',', '.') . '%' }}
+                        </div>
+                    </div>
+                    <div class="vd-ring-legend">
+                        <div><span class="dot" style="background: {{ $ringColor($resumen['clientes_activados_pct']) }};"></span>Activos<strong>{{ number_format($resumen['clientes_activos']) }}</strong></div>
+                        <div><span class="dot" style="background: {{ $ringTrack }};"></span>Inactivos<strong>{{ number_format($resumen['clientes_inactivos']) }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card vd-card h-100 vd-ring-card">
+                <div class="card-header"><i class="fas fa-bullseye mr-2"></i>Cumplimiento de Meta</div>
+                <div class="card-body">
+                    <div class="vd-ring-subtitle">Ventas alcanzadas vs. meta propuesta para {{ $filtros['periodo_objetivo'] }}</div>
+                    <div class="vd-ring-wrap">
+                        <canvas id="ringMeta" width="168" height="168"></canvas>
+                        <div class="vd-ring-value" id="ringMetaValue" style="color: {{ $ringColor($metaVentasRing['disponible'] ? $metaVentasRing['pct'] : null) }};">
+                            {{ $metaVentasRing['disponible'] ? number_format($metaVentasRing['pct'], 2, ',', '.') . '%' : 'Sin meta' }}
+                        </div>
+                    </div>
+                    <div class="vd-ring-legend">
+                        @if($metaVentasRing['disponible'])
+                            <div><span class="dot" style="background: {{ $ringColor($metaVentasRing['pct']) }};"></span>Alcanzado<strong>${{ number_format($metaVentasRing['ventas_alcanzadas'], 2, ',', '.') }}</strong></div>
+                            <div><span class="dot" style="background: {{ $ringTrack }};"></span>Meta<strong>${{ number_format($metaVentasRing['meta_ventas'], 2, ',', '.') }}</strong></div>
+                        @else
+                            <div>No hay meta de ventas configurada para este periodo.</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card vd-card h-100 vd-ring-card">
+                <div class="card-header"><i class="fas fa-check-double mr-2"></i>Aprobacion de Pedidos</div>
+                <div class="card-body">
+                    <div class="vd-ring-subtitle">Pedidos aprobados vs. rechazados en el periodo</div>
+                    <div class="vd-ring-wrap">
+                        <canvas id="ringPedidos" width="168" height="168"></canvas>
+                        <div class="vd-ring-value" id="ringPedidosValue" style="color: {{ $ringColor($resumen['pedidos_aprobacion_pct']) }};">
+                            {{ is_null($resumen['pedidos_aprobacion_pct']) ? 'N/D' : number_format($resumen['pedidos_aprobacion_pct'], 2, ',', '.') . '%' }}
+                        </div>
+                    </div>
+                    <div class="vd-ring-legend">
+                        <div><span class="dot" style="background: {{ $ringColor($resumen['pedidos_aprobacion_pct']) }};"></span>Aprobados<strong>{{ number_format($resumen['pedidos_aprobados']) }}</strong></div>
+                        <div><span class="dot" style="background: {{ $ringTrack }};"></span>Rechazados<strong>{{ number_format($resumen['pedidos_rechazados']) }}</strong></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -355,7 +504,7 @@
     </div>
 </div>
 
-<div id="vd-data" class="d-none" data-periodos='{{ $periodosJson }}'></div>
+<div id="vd-data" class="d-none" data-periodos='{{ $periodosJson }}' data-anillos='{{ $anillosJson }}'></div>
 @endsection
 
 @section('scripts')
@@ -397,6 +546,55 @@
         document.querySelectorAll('.vd-progress > span[data-width]').forEach(function (bar) {
             bar.style.width = bar.dataset.width + '%';
         });
+    })();
+
+    (function renderRings() {
+        var node = document.getElementById('vd-data');
+        if (!node) return;
+
+        var anillos = JSON.parse(node.dataset.anillos || '{}');
+        var trackColor = '#e6eef6';
+
+        function ringColor(pct) {
+            if (pct === null || typeof pct === 'undefined') return '#94a3b8';
+            if (pct >= 100) return '#16a34a';
+            if (pct >= 70) return '#d97706';
+            return '#dc2626';
+        }
+
+        function drawRing(canvasId, pct) {
+            var canvas = document.getElementById(canvasId);
+            if (!canvas || typeof Chart === 'undefined') return;
+
+            var hasValue = (pct !== null && typeof pct !== 'undefined');
+            var capped = hasValue ? Math.max(0, Math.min(100, pct)) : 0;
+            var color = ringColor(hasValue ? pct : null);
+
+            new Chart(canvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: hasValue ? [capped, 100 - capped] : [0, 100],
+                        backgroundColor: [color, trackColor],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutoutPercentage: 78,
+                    rotation: -0.5 * Math.PI,
+                    circumference: Math.PI * 2,
+                    tooltips: { enabled: false },
+                    legend: { display: false },
+                    animation: { animateRotate: true }
+                }
+            });
+        }
+
+        drawRing('ringClientes', anillos.clientes ? anillos.clientes.pct : null);
+        drawRing('ringMeta', anillos.meta ? anillos.meta.pct : null);
+        drawRing('ringPedidos', anillos.pedidos ? anillos.pedidos.pct : null);
     })();
 </script>
 @endsection

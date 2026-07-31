@@ -96,6 +96,39 @@ class ArtDepos extends Model
     }
 
     /**
+     * Etiqueta el próximo UPDATE a ARTDEPOS en esta conexión para que el
+     * trigger de auditoría (artdepos_movimientos) registre su origen. Debe
+     * llamarse justo antes de cada mutación de RESERVA/EUNIDAD.
+     */
+    public static function tagMovimiento(string $origen, ?int $pedidoId = null): void
+    {
+        DB::connection('company')->statement('SET @app_origin = ?, @app_pedido_id = ?', [$origen, $pedidoId]);
+    }
+
+    /**
+     * Deja un registro de auditoría en artdepos_movimientos sin modificar
+     * ARTDEPOS (p.ej. anular un pedido cuya reserva ya fue liberada al
+     * aprobarlo, donde no corresponde tocar RESERVA ni EUNIDAD).
+     */
+    public static function logManual(string $codigo, ?string $cdepos, string $origen, ?int $pedidoId, string $nota): void
+    {
+        $actual = self::where('CODIGO', $codigo)->where('CDEPOS', $cdepos)->first();
+
+        DB::connection('company')->table('artdepos_movimientos')->insert([
+            'codigo' => $codigo,
+            'cdepos' => $cdepos,
+            'eunidad_anterior' => $actual->EUNIDAD ?? null,
+            'eunidad_nuevo' => $actual->EUNIDAD ?? null,
+            'reserva_anterior' => $actual->RESERVA ?? null,
+            'reserva_nuevo' => $actual->RESERVA ?? null,
+            'origen' => $origen,
+            'pedido_id' => $pedidoId,
+            'nota' => $nota,
+            'created_at' => now(),
+        ]);
+    }
+
+    /**
      * Obtener historial de sincronización
      */
     public static function getHistorialSincronizacion($codigo = null, $dias = 30)

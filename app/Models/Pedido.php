@@ -174,8 +174,8 @@ class Pedido extends Model
                 $cdepos = $pedido->cdepos;
                 $artdepos = (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->first();
                 if ($artdepos) {
-                    $qty = $artdepos->RESERVA - $detalle->cantidad;
-                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->update(['RESERVA' => $qty]);
+                    ArtDepos::tagMovimiento('RESERVA_CARRITO_ABANDONADO', $pedido->id);
+                    (new ArtDepos)->where('CODIGO', $detalle->codigo_inven)->where('CDEPOS', $cdepos)->decrement('RESERVA', $detalle->cantidad);
                 }
             }
         }

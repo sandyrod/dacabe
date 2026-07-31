@@ -33,6 +33,7 @@ class DashboardLogrosController extends Controller
             'comisionesResumen' => $data['comisionesResumen'],
             'metaActual' => $data['metaActual'],
             'metaTableDisponible' => $data['metaTableDisponible'],
+            'metaVentasRing' => $data['metaVentasRing'],
         ]);
     }
 
@@ -122,6 +123,7 @@ class DashboardLogrosController extends Controller
             ->selectRaw('COALESCE(tp.ventas_usd, 0) as ventas_usd')
             ->selectRaw('COALESCE(pp.pagos_aprobados_usd, 0) as pagos_aprobados_usd')
             ->selectRaw('CASE WHEN UPPER(COALESCE(p.estatus, "")) = "APROBADO" THEN 1 ELSE 0 END as es_aprobado')
+            ->selectRaw('CASE WHEN UPPER(COALESCE(p.estatus, "")) = "RECHAZADO" THEN 1 ELSE 0 END as es_rechazado')
             ->selectRaw('CASE WHEN COALESCE(pp.tiene_pago_aprobado, 0) > 0 THEN 1 ELSE 0 END as es_pagado')
             ->orderBy('periodo_key')
             ->get();
@@ -152,6 +154,7 @@ class DashboardLogrosController extends Controller
         $resumen = [
             'pedidos_total' => (int) $pedidoDetalle->count(),
             'pedidos_aprobados' => (int) $pedidoDetalle->sum('es_aprobado'),
+            'pedidos_rechazados' => (int) $pedidoDetalle->sum('es_rechazado'),
             'pedidos_pagados' => (int) $pedidoDetalle->sum('es_pagado'),
             'ventas_usd' => (float) $pedidoDetalle->sum('ventas_usd'),
             'pagos_aprobados_usd' => (float) $pedidoDetalle->sum('pagos_aprobados_usd'),
@@ -162,6 +165,38 @@ class DashboardLogrosController extends Controller
         $resumen['cobertura_monto_pct'] = $resumen['ventas_usd'] > 0
             ? round(($resumen['pagos_aprobados_usd'] / $resumen['ventas_usd']) * 100, 2)
             : 0;
+
+        $pedidosDecididos = $resumen['pedidos_aprobados'] + $resumen['pedidos_rechazados'];
+        $resumen['pedidos_aprobacion_pct'] = $pedidosDecididos > 0
+            ? round(($resumen['pedidos_aprobados'] / $pedidosDecididos) * 100, 2)
+            : null;
+
+        $resumen['clientes_asignados'] = DB::connection('company')
+            ->table('cliente_vendedor')
+            ->whereRaw('LOWER(TRIM(email_vendedor)) = ?', [strtolower(trim($email))])
+            ->distinct()
+            ->count('rif');
+
+        $resumen['clientes_activos'] = DB::connection('company')
+            ->table('pedidos as p')
+            ->where(function ($query) use ($userId, $sellerCode) {
+                $query->where('p.user_id', $userId);
+
+                if ($sellerCode !== '') {
+                    $query->orWhereRaw('UPPER(TRIM(COALESCE(p.seller_code, ""))) = ?', [$sellerCode]);
+                }
+            })
+            ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '>=', $filtros['fecha_desde'])
+            ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '<=', $filtros['fecha_hasta'])
+            ->whereRaw('UPPER(COALESCE(p.estatus, "")) NOT IN ("CARGANDO", "ANULADO", "CANCELADO")')
+            ->whereRaw('TRIM(COALESCE(p.rif, "")) <> ""')
+            ->distinct()
+            ->count('p.rif');
+
+        $resumen['clientes_inactivos'] = max(0, $resumen['clientes_asignados'] - $resumen['clientes_activos']);
+        $resumen['clientes_activados_pct'] = $resumen['clientes_asignados'] > 0
+            ? round(($resumen['clientes_activos'] / $resumen['clientes_asignados']) * 100, 2)
+            : null;
 
         $pagosResumen = DB::connection('company')
             ->table('pagos')
@@ -244,6 +279,13 @@ class DashboardLogrosController extends Controller
                 : null;
         }
 
+        $metaVentasRing = [
+            'disponible' => (bool) ($metaActual && (float) $metaActual->meta_ventas_usd > 0),
+            'pct' => $metaActual->logro_ventas_pct ?? null,
+            'ventas_alcanzadas' => (float) optional($periodoObjetivoData)->ventas_usd,
+            'meta_ventas' => (float) optional($metaActual)->meta_ventas_usd,
+        ];
+
         return [
             'resumen' => $resumen,
             'periodos' => $periodos,
@@ -251,6 +293,7 @@ class DashboardLogrosController extends Controller
             'comisionesResumen' => $comisionesResumen,
             'metaActual' => $metaActual,
             'metaTableDisponible' => $metaTableDisponible,
+            'metaVentasRing' => $metaVentasRing,
         ];
     }
 

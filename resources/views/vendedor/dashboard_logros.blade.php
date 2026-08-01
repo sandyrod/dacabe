@@ -15,7 +15,7 @@
             'pct' => $metaVentasRing['disponible'] ? $metaVentasRing['pct'] : null,
         ],
         'pedidos' => [
-            'pct' => $resumen['pedidos_aprobacion_pct'],
+            'pct' => $aprobacionPeriodo['pct'],
         ],
     ];
     $anillosJson = json_encode($anillos, JSON_UNESCAPED_UNICODE);
@@ -353,7 +353,7 @@
             <div class="card vd-card h-100 vd-ring-card">
                 <div class="card-header"><i class="fas fa-bullseye mr-2"></i>Cumplimiento de Meta</div>
                 <div class="card-body">
-                    <div class="vd-ring-subtitle">Ventas alcanzadas vs. meta propuesta para {{ $filtros['periodo_objetivo'] }}</div>
+                    <div class="vd-ring-subtitle">Ventas alcanzadas vs. meta propuesta para {{ $metaVentasRing['periodo_key'] ?: $filtros['periodo_objetivo'] }}</div>
                     <div class="vd-ring-wrap">
                         <canvas id="ringMeta" width="168" height="168"></canvas>
                         <div class="vd-ring-value" id="ringMetaValue" style="color: {{ $ringColor($metaVentasRing['disponible'] ? $metaVentasRing['pct'] : null) }};">
@@ -375,16 +375,16 @@
             <div class="card vd-card h-100 vd-ring-card">
                 <div class="card-header"><i class="fas fa-check-double mr-2"></i>Aprobacion de Pedidos</div>
                 <div class="card-body">
-                    <div class="vd-ring-subtitle">Pedidos aprobados vs. rechazados en el periodo</div>
+                    <div class="vd-ring-subtitle">Pedidos aprobados vs. rechazados en {{ $aprobacionPeriodo['periodo_key'] }}</div>
                     <div class="vd-ring-wrap">
                         <canvas id="ringPedidos" width="168" height="168"></canvas>
-                        <div class="vd-ring-value" id="ringPedidosValue" style="color: {{ $ringColor($resumen['pedidos_aprobacion_pct']) }};">
-                            {{ is_null($resumen['pedidos_aprobacion_pct']) ? 'N/D' : number_format($resumen['pedidos_aprobacion_pct'], 2, ',', '.') . '%' }}
+                        <div class="vd-ring-value" id="ringPedidosValue" style="color: {{ $ringColor($aprobacionPeriodo['pct']) }};">
+                            {{ is_null($aprobacionPeriodo['pct']) ? 'N/D' : number_format($aprobacionPeriodo['pct'], 2, ',', '.') . '%' }}
                         </div>
                     </div>
                     <div class="vd-ring-legend">
-                        <div><span class="dot" style="background: {{ $ringColor($resumen['pedidos_aprobacion_pct']) }};"></span>Aprobados<strong>{{ number_format($resumen['pedidos_aprobados']) }}</strong></div>
-                        <div><span class="dot" style="background: {{ $ringTrack }};"></span>Rechazados<strong>{{ number_format($resumen['pedidos_rechazados']) }}</strong></div>
+                        <div><span class="dot" style="background: {{ $ringColor($aprobacionPeriodo['pct']) }};"></span>Aprobados<strong>{{ number_format($aprobacionPeriodo['aprobados']) }}</strong></div>
+                        <div><span class="dot" style="background: {{ $ringTrack }};"></span>Rechazados<strong>{{ number_format($aprobacionPeriodo['rechazados']) }}</strong></div>
                     </div>
                 </div>
             </div>
@@ -412,7 +412,7 @@
                     @elseif(!$metaActual)
                         <div class="alert alert-info mb-0">No tienes metas cargadas para {{ $filtros['periodo_objetivo'] }}.</div>
                     @else
-                        <div class="mb-2"><strong>Periodo:</strong> {{ $filtros['periodo_objetivo'] }}</div>
+                        <div class="mb-2"><strong>Periodo:</strong> {{ $metaActual->periodo_key ?? $filtros['periodo_objetivo'] }}</div>
                         <div class="mb-2">Meta ventas: <strong>${{ number_format((float) $metaActual->meta_ventas_usd, 2, ',', '.') }}</strong></div>
                         <div class="mb-2">Meta aprobados: <strong>{{ number_format((int) $metaActual->meta_pedidos_aprobados) }}</strong></div>
                         <div class="mb-2">Meta pagados: <strong>{{ number_format((int) $metaActual->meta_pedidos_pagados) }}</strong></div>

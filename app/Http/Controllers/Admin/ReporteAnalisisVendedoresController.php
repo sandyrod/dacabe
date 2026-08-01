@@ -32,6 +32,7 @@ class ReporteAnalisisVendedoresController extends Controller
             'pedidoDetalle' => $data['pedidoDetalle'],
             'metas' => $data['metas'],
             'metaTableDisponible' => $data['metaTableDisponible'],
+            'indicadoresCumplimiento' => $data['indicadoresCumplimiento'],
         ]);
     }
 
@@ -114,7 +115,7 @@ class ReporteAnalisisVendedoresController extends Controller
                 : 'mes',
             'fecha_desde' => $request->filled('fecha_desde')
                 ? Carbon::parse($request->fecha_desde)->format('Y-m-d')
-                : now()->subMonths(11)->startOfMonth()->format('Y-m-d'),
+                : now()->startOfMonth()->format('Y-m-d'),
             'fecha_hasta' => $request->filled('fecha_hasta')
                 ? Carbon::parse($request->fecha_hasta)->format('Y-m-d')
                 : now()->format('Y-m-d'),
@@ -224,6 +225,7 @@ class ReporteAnalisisVendedoresController extends Controller
             ->selectRaw('p.id as pedido_id')
             ->selectRaw('p.fecha')
             ->selectRaw('p.estatus')
+            ->selectRaw('p.rif')
             ->selectRaw($periodoExpr . ' as periodo_key')
             ->selectRaw('COALESCE(v.id, 0) as vendedor_id')
             ->selectRaw('COALESCE(NULLIF(TRIM(CONCAT(COALESCE(pu.name, ""), " ", COALESCE(pu.last_name, ""))), ""), NULLIF(TRIM(CONCAT(COALESCE(u.name, ""), " ", COALESCE(u.last_name, ""))), ""), v.codigo, v.email, "Sin vendedor") as vendedor_nombre')
@@ -231,6 +233,7 @@ class ReporteAnalisisVendedoresController extends Controller
             ->selectRaw('COALESCE(tp.ventas_usd, 0) as ventas_usd')
             ->selectRaw('COALESCE(pp.pagos_aprobados_usd, 0) as pagos_aprobados_usd')
             ->selectRaw('CASE WHEN UPPER(COALESCE(p.estatus, "")) = "APROBADO" THEN 1 ELSE 0 END as es_aprobado')
+            ->selectRaw('CASE WHEN UPPER(COALESCE(p.estatus, "")) = "RECHAZADO" THEN 1 ELSE 0 END as es_rechazado')
             ->selectRaw('CASE WHEN COALESCE(pp.tiene_pago_aprobado, 0) > 0 THEN 1 ELSE 0 END as es_pagado')
             ->orderBy('periodo_key')
             ->orderBy('vendedor_nombre')
@@ -243,6 +246,7 @@ class ReporteAnalisisVendedoresController extends Controller
             ->map(function ($items, $periodoKey) use ($filtros) {
                 $ventasUsd = (float) $items->sum('ventas_usd');
                 $pedidosAprobados = (int) $items->sum('es_aprobado');
+                $pedidosRechazados = (int) $items->sum('es_rechazado');
                 $pedidosPagados = (int) $items->sum('es_pagado');
                 $pagosUsd = (float) $items->sum('pagos_aprobados_usd');
                 $coberturaPedidos = $this->calcularCoberturaPedidos($pedidosAprobados, $pedidosPagados);
@@ -252,6 +256,7 @@ class ReporteAnalisisVendedoresController extends Controller
                     'etiqueta' => $this->formatPeriodLabel($periodoKey, $filtros['periodo']),
                     'pedidos_total' => (int) $items->count(),
                     'pedidos_aprobados' => $pedidosAprobados,
+                    'pedidos_rechazados' => $pedidosRechazados,
                     'pedidos_pagados' => $pedidosPagados,
                     'ventas_usd' => $ventasUsd,
                     'pagos_aprobados_usd' => $pagosUsd,
@@ -344,6 +349,7 @@ class ReporteAnalisisVendedoresController extends Controller
         $resumenGlobal = [
             'pedidos_total' => (int) $pedidoDetalle->count(),
             'pedidos_aprobados' => (int) $pedidoDetalle->sum('es_aprobado'),
+            'pedidos_rechazados' => (int) $pedidoDetalle->sum('es_rechazado'),
             'pedidos_pagados' => (int) $pedidoDetalle->sum('es_pagado'),
             'ventas_usd' => (float) $pedidoDetalle->sum('ventas_usd'),
             'pagos_aprobados_usd' => (float) $pedidoDetalle->sum('pagos_aprobados_usd'),
@@ -403,10 +409,126 @@ class ReporteAnalisisVendedoresController extends Controller
             })
             ->values();
 
+        $vendedorSeleccionado = null;
+        if ((int) $filtros['vendedor_id'] > 0) {
+            $vendedorSeleccionado = DB::connection('company')
+                ->table('vendedores')
+                ->select('id', 'email')
+                ->where('id', (int) $filtros['vendedor_id'])
+                ->first();
+        }
+
+        $clientesAsignadosQuery = DB::connection('company')->table('cliente_vendedor');
+        if ($vendedorSeleccionado && trim((string) $vendedorSeleccionado->email) !== '') {
+            $clientesAsignadosQuery->whereRaw('LOWER(TRIM(COALESCE(email_vendedor, ""))) = ?', [strtolower(trim((string) $vendedorSeleccionado->email))]);
+        }
+
+        $clientesAsignadosRif = $clientesAsignadosQuery
+            ->whereRaw('TRIM(COALESCE(rif, "")) <> ""')
+            ->distinct()
+            ->pluck('rif')
+            ->map(function ($rif) {
+                return trim((string) $rif);
+            })
+            ->filter(function ($rif) {
+                return $rif !== '';
+            })
+            ->unique()
+            ->values();
+
+        $clientesAsignados = (int) $clientesAsignadosRif->count();
+        $clientesActivos = 0;
+
+        if ($clientesAsignados > 0) {
+            $clientesPedidosQuery = DB::connection('company')
+                ->table('pedidos as p')
+                ->leftJoin($mysqlDb . '.users as pu', 'pu.id', '=', 'p.user_id')
+                ->leftJoin('vendedores as v', function ($join) {
+                    $join->whereRaw('LOWER(TRIM(COALESCE(v.codigo, ""))) = LOWER(TRIM(COALESCE(p.seller_code, "")))')
+                        ->orWhereRaw('LOWER(TRIM(COALESCE(v.email, ""))) = LOWER(TRIM(COALESCE(pu.email, "")))');
+                })
+                ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '>=', $filtros['fecha_desde'])
+                ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '<=', $filtros['fecha_hasta'])
+                ->whereRaw('UPPER(COALESCE(p.estatus, "")) NOT IN ("CARGANDO", "ANULADO", "CANCELADO")')
+                ->whereRaw('TRIM(COALESCE(p.rif, "")) <> ""')
+                ->whereIn('p.rif', $clientesAsignadosRif->all());
+
+            if ((int) $filtros['vendedor_id'] > 0) {
+                $clientesPedidosQuery->where('v.id', (int) $filtros['vendedor_id']);
+            }
+
+            $clientesActivos = (int) $clientesPedidosQuery
+                ->distinct()
+                ->count('p.rif');
+        }
+
+        $clientesInactivos = max(0, $clientesAsignados - $clientesActivos);
+        $clientesActivadosPct = $clientesAsignados > 0
+            ? round(($clientesActivos / $clientesAsignados) * 100, 2)
+            : null;
+
+        $pedidosDecididos = $resumenGlobal['pedidos_aprobados'] + $resumenGlobal['pedidos_rechazados'];
+        $pedidosAprobacionPct = $pedidosDecididos > 0
+            ? round(($resumenGlobal['pedidos_aprobados'] / $pedidosDecididos) * 100, 2)
+            : null;
+
+        $metaVentasObjetivo = 0.0;
+        $metaVentasOrigen = 'sugerida';
+        if ((int) $filtros['vendedor_id'] > 0) {
+            $metaManualSeleccionada = $metasManualMap->get((int) $filtros['vendedor_id']);
+            $metaVentasObjetivo = (float) optional($metaManualSeleccionada)->meta_ventas_usd;
+            $metaVentasOrigen = 'manual';
+        } else {
+            $metaManualConsolidada = (float) $metasManualMap->sum(function ($meta) {
+                return (float) $meta->meta_ventas_usd;
+            });
+
+            if ($metaManualConsolidada > 0) {
+                $metaVentasObjetivo = $metaManualConsolidada;
+                $metaVentasOrigen = 'manual';
+            } else {
+                $metaVentasObjetivo = (float) $metas['ventas_usd'];
+            }
+        }
+
+        $metaVentasPct = $metaVentasObjetivo > 0
+            ? round((((float) optional($periodos->firstWhere('periodo_key', strtoupper($filtros['meta_periodo_objetivo'])))->ventas_usd) / $metaVentasObjetivo) * 100, 2)
+            : null;
+
+        $periodoObjetivoData = $periodos->firstWhere('periodo_key', strtoupper($filtros['meta_periodo_objetivo']));
+        $aprobadosPeriodoObjetivo = (int) optional($periodoObjetivoData)->pedidos_aprobados;
+        $rechazadosPeriodoObjetivo = (int) optional($periodoObjetivoData)->pedidos_rechazados;
+        $pedidosDecididosPeriodoObjetivo = $aprobadosPeriodoObjetivo + $rechazadosPeriodoObjetivo;
+        $pedidosAprobacionPctPeriodoObjetivo = $pedidosDecididosPeriodoObjetivo > 0
+            ? round(($aprobadosPeriodoObjetivo / $pedidosDecididosPeriodoObjetivo) * 100, 2)
+            : null;
+
+        $indicadoresCumplimiento = [
+            'clientes' => [
+                'pct' => $clientesActivadosPct,
+                'activos' => $clientesActivos,
+                'inactivos' => $clientesInactivos,
+            ],
+            'meta' => [
+                'pct' => $metaVentasPct,
+                'ventas_alcanzadas' => (float) optional($periodoObjetivoData)->ventas_usd,
+                'meta_ventas' => $metaVentasObjetivo,
+                'origen' => $metaVentasOrigen,
+                'periodo_key' => strtoupper($filtros['meta_periodo_objetivo']),
+            ],
+            'pedidos' => [
+                'pct' => $pedidosAprobacionPctPeriodoObjetivo,
+                'aprobados' => $aprobadosPeriodoObjetivo,
+                'rechazados' => $rechazadosPeriodoObjetivo,
+                'periodo_key' => strtoupper($filtros['meta_periodo_objetivo']),
+            ],
+        ];
+
         return [
             'resumen' => [
                 'pedidos_total' => $resumenGlobal['pedidos_total'],
                 'pedidos_aprobados' => $resumenGlobal['pedidos_aprobados'],
+                'pedidos_rechazados' => $resumenGlobal['pedidos_rechazados'],
                 'pedidos_pagados' => $resumenGlobal['pedidos_pagados'],
                 'ventas_usd' => $resumenGlobal['ventas_usd'],
                 'pagos_aprobados_usd' => $resumenGlobal['pagos_aprobados_usd'],
@@ -425,6 +547,11 @@ class ReporteAnalisisVendedoresController extends Controller
                 'promedio_periodo_ventas' => $promedioVentas,
                 'promedio_periodo_pedidos' => $promedioPedidos,
                 'promedio_periodo_cobertura' => $promedioCobertura,
+                'clientes_asignados' => $clientesAsignados,
+                'clientes_activos' => $clientesActivos,
+                'clientes_inactivos' => $clientesInactivos,
+                'clientes_activados_pct' => $clientesActivadosPct,
+                'pedidos_aprobacion_pct' => $pedidosAprobacionPct,
             ],
             'periodos' => $periodos,
             'rankingVendedores' => $rankingVendedores,
@@ -432,6 +559,7 @@ class ReporteAnalisisVendedoresController extends Controller
             'pedidoDetalle' => $pedidoDetalle,
             'metas' => $metas,
             'metaTableDisponible' => $metaTableDisponible,
+            'indicadoresCumplimiento' => $indicadoresCumplimiento,
         ];
     }
 
@@ -442,21 +570,16 @@ class ReporteAnalisisVendedoresController extends Controller
             return $periodoObjetivo;
         }
 
-        return $this->nextPeriodKeyFromDate($periodoTipo, $fechaHasta);
+        return $this->currentPeriodKeyFromDate($periodoTipo);
     }
 
-    private function nextPeriodKeyFromDate(string $periodoTipo, string $fechaHasta): string
+    private function currentPeriodKeyFromDate(string $periodoTipo): string
     {
-        $fecha = Carbon::parse($fechaHasta)->startOfDay();
+        $fecha = now()->startOfDay();
 
         if ($periodoTipo === 'trimestre') {
             $year = (int) $fecha->format('Y');
             $quarter = (int) ceil(((int) $fecha->format('n')) / 3);
-            $quarter++;
-            if ($quarter > 4) {
-                $quarter = 1;
-                $year++;
-            }
 
             return $year . '-T' . $quarter;
         }
@@ -464,20 +587,15 @@ class ReporteAnalisisVendedoresController extends Controller
         if ($periodoTipo === 'semestre') {
             $year = (int) $fecha->format('Y');
             $semestre = ((int) $fecha->format('n')) <= 6 ? 1 : 2;
-            $semestre++;
-            if ($semestre > 2) {
-                $semestre = 1;
-                $year++;
-            }
 
             return $year . '-S' . $semestre;
         }
 
         if ($periodoTipo === 'anual') {
-            return (string) (((int) $fecha->format('Y')) + 1);
+            return (string) ((int) $fecha->format('Y'));
         }
 
-        return $fecha->copy()->startOfMonth()->addMonth()->format('Y-m');
+        return $fecha->copy()->startOfMonth()->format('Y-m');
     }
 
     private function isPeriodoKeyValido(string $periodoKey, string $periodoTipo): bool

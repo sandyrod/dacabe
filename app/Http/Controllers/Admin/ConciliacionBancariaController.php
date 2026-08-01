@@ -348,8 +348,16 @@ class ConciliacionBancariaController extends Controller
             ->leftJoin('pedidos_facturas as pf', 'pf.pedido_id', '=', 'ped.id')
             ->leftJoin('pagos as pag2', 'pag2.id', '=', 'pp.pago_id')
             ->selectRaw('pp.pago_id')
-            ->selectRaw('COALESCE(SUM(pp.monto), 0) as monto_usd')
-            ->selectRaw('COALESCE(SUM(pp.monto * COALESCE(pag2.rate, 0)), 0) as monto_bs')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag2.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN 0
+                ELSE COALESCE(pp.monto, 0)
+            END), 0) as monto_usd')
+            ->selectRaw('COALESCE(SUM(CASE
+                WHEN LOWER(REPLACE(REPLACE(TRIM(COALESCE(CONVERT(pag2.moneda_pago USING utf8mb4), "")), "í", "i"), "á", "a")) IN ("bolivares", "bs")
+                    THEN COALESCE((COALESCE(pp.monto, 0) * COALESCE(pag2.rate, 0)) + COALESCE(pp.iva, 0) + (COALESCE(pp.ajustes_monto, 0) * COALESCE(pag2.rate, 0)), 0)
+                ELSE 0
+            END), 0) as monto_bs')
             ->selectRaw('GROUP_CONCAT(DISTINCT pp.pedido_id ORDER BY pp.pedido_id ASC SEPARATOR ", ") as pedidos')
             ->selectRaw('GROUP_CONCAT(DISTINCT pf.factura ORDER BY pf.factura ASC SEPARATOR ", ") as facturas')
             ->selectRaw('GROUP_CONCAT(DISTINCT ped.descripcion ORDER BY ped.descripcion ASC SEPARATOR " | ") as clientes')

@@ -34,6 +34,7 @@ class DashboardLogrosController extends Controller
             'metaActual' => $data['metaActual'],
             'metaTableDisponible' => $data['metaTableDisponible'],
             'metaVentasRing' => $data['metaVentasRing'],
+            'aprobacionPeriodo' => $data['aprobacionPeriodo'],
         ]);
     }
 
@@ -45,7 +46,7 @@ class DashboardLogrosController extends Controller
 
         $fechaDesde = $request->filled('fecha_desde')
             ? Carbon::parse($request->fecha_desde)->format('Y-m-d')
-            : now()->subMonths(11)->startOfMonth()->format('Y-m-d');
+            : now()->startOfMonth()->format('Y-m-d');
 
         $fechaHasta = $request->filled('fecha_hasta')
             ? Carbon::parse($request->fecha_hasta)->format('Y-m-d')
@@ -82,7 +83,10 @@ class DashboardLogrosController extends Controller
     private function buildData(int $userId, string $email, $vendedor, array $filtros): array
     {
         $periodoExpr = $this->periodExpression($filtros['periodo']);
+        $mysqlDb = config('database.connections.mysql.database');
         $sellerCode = strtoupper(trim((string) optional($vendedor)->codigo));
+        $sellerEmail = strtolower(trim((string) optional($vendedor)->email));
+        $emailVendedorFiltro = $sellerEmail !== '' ? $sellerEmail : strtolower(trim($email));
 
         $totalesPorPedido = DB::connection('company')
             ->table('pedido_detalle as pd')
@@ -107,11 +111,16 @@ class DashboardLogrosController extends Controller
             ->leftJoinSub($pagosPorPedido, 'pp', function ($join) {
                 $join->on('pp.pedido_id', '=', 'p.id');
             })
-            ->where(function ($query) use ($userId, $sellerCode) {
+            ->leftJoin($mysqlDb . '.users as pu', 'pu.id', '=', 'p.user_id')
+            ->where(function ($query) use ($userId, $sellerCode, $sellerEmail) {
                 $query->where('p.user_id', $userId);
 
                 if ($sellerCode !== '') {
                     $query->orWhereRaw('UPPER(TRIM(COALESCE(p.seller_code, ""))) = ?', [$sellerCode]);
+                }
+
+                if ($sellerEmail !== '') {
+                    $query->orWhereRaw('LOWER(TRIM(COALESCE(pu.email, ""))) = ?', [$sellerEmail]);
                 }
             })
             ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '>=', $filtros['fecha_desde'])
@@ -173,17 +182,22 @@ class DashboardLogrosController extends Controller
 
         $resumen['clientes_asignados'] = DB::connection('company')
             ->table('cliente_vendedor')
-            ->whereRaw('LOWER(TRIM(email_vendedor)) = ?', [strtolower(trim($email))])
+            ->whereRaw('LOWER(TRIM(email_vendedor)) = ?', [$emailVendedorFiltro])
             ->distinct()
             ->count('rif');
 
         $resumen['clientes_activos'] = DB::connection('company')
             ->table('pedidos as p')
-            ->where(function ($query) use ($userId, $sellerCode) {
+            ->leftJoin($mysqlDb . '.users as pu', 'pu.id', '=', 'p.user_id')
+            ->where(function ($query) use ($userId, $sellerCode, $sellerEmail) {
                 $query->where('p.user_id', $userId);
 
                 if ($sellerCode !== '') {
                     $query->orWhereRaw('UPPER(TRIM(COALESCE(p.seller_code, ""))) = ?', [$sellerCode]);
+                }
+
+                if ($sellerEmail !== '') {
+                    $query->orWhereRaw('LOWER(TRIM(COALESCE(pu.email, ""))) = ?', [$sellerEmail]);
                 }
             })
             ->whereDate(DB::raw('COALESCE(p.fecha, p.created_at)'), '>=', $filtros['fecha_desde'])
@@ -260,8 +274,24 @@ class DashboardLogrosController extends Controller
         }
 
         $periodoObjetivoData = $periodos->firstWhere('periodo_key', $filtros['periodo_objetivo']);
-        if (!$periodoObjetivoData) {
-            $periodoObjetivoData = $periodos->last();
+        $aprobadosPeriodoObjetivo = (int) optional($periodoObjetivoData)->pedidos_aprobados;
+        $rechazadosPeriodoObjetivo = (int) optional($periodoObjetivoData)->pedidos_rechazados;
+        $pedidosDecididosPeriodoObjetivo = $aprobadosPeriodoObjetivo + $rechazadosPeriodoObjetivo;
+
+        $aprobacionPeriodo = [
+            'aprobados' => $aprobadosPeriodoObjetivo,
+            'rechazados' => $rechazadosPeriodoObjetivo,
+            'pct' => $pedidosDecididosPeriodoObjetivo > 0
+                ? round(($aprobadosPeriodoObjetivo / $pedidosDecididosPeriodoObjetivo) * 100, 2)
+                : null,
+            'periodo_key' => $filtros['periodo_objetivo'],
+        ];
+
+        if ($metaActual) {
+            $metaActual->logro_ventas_pct = null;
+            $metaActual->logro_aprobados_pct = null;
+            $metaActual->logro_pagados_pct = null;
+            $metaActual->logro_cobertura_pct = null;
         }
 
         if ($metaActual && $periodoObjetivoData) {
@@ -284,6 +314,7 @@ class DashboardLogrosController extends Controller
             'pct' => $metaActual->logro_ventas_pct ?? null,
             'ventas_alcanzadas' => (float) optional($periodoObjetivoData)->ventas_usd,
             'meta_ventas' => (float) optional($metaActual)->meta_ventas_usd,
+            'periodo_key' => $filtros['periodo_objetivo'],
         ];
 
         return [
@@ -294,6 +325,7 @@ class DashboardLogrosController extends Controller
             'metaActual' => $metaActual,
             'metaTableDisponible' => $metaTableDisponible,
             'metaVentasRing' => $metaVentasRing,
+            'aprobacionPeriodo' => $aprobacionPeriodo,
         ];
     }
 
@@ -343,6 +375,41 @@ class DashboardLogrosController extends Controller
         }
 
         return $date->format('Y-m');
+    }
+
+    private function nextPeriodKeyFromDate(string $periodo, string $fecha): string
+    {
+        $date = Carbon::parse($fecha)->startOfDay();
+
+        if ($periodo === 'trimestre') {
+            $year = (int) $date->format('Y');
+            $quarter = (int) ceil(((int) $date->format('n')) / 3);
+            $quarter++;
+            if ($quarter > 4) {
+                $quarter = 1;
+                $year++;
+            }
+
+            return $year . '-T' . $quarter;
+        }
+
+        if ($periodo === 'semestre') {
+            $year = (int) $date->format('Y');
+            $semestre = ((int) $date->format('n')) <= 6 ? 1 : 2;
+            $semestre++;
+            if ($semestre > 2) {
+                $semestre = 1;
+                $year++;
+            }
+
+            return $year . '-S' . $semestre;
+        }
+
+        if ($periodo === 'anual') {
+            return (string) (((int) $date->format('Y')) + 1);
+        }
+
+        return $date->copy()->startOfMonth()->addMonth()->format('Y-m');
     }
 
     private function formatPeriodLabel(string $periodoKey, string $periodo): string

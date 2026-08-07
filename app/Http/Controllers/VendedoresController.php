@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 use App\Http\Requests\VendedorRequest;
 use App\Models\{Vendedor, Zona, Deposito};
@@ -82,11 +85,89 @@ class VendedoresController extends Controller
 
         $vendedor = (new Vendedor)->getData($code);        
         $route = $this->permission.'.index';
+        $metaPeriodoActual = Carbon::now()->format('Y-m');
+        $metaTableDisponible = Schema::connection('company')->hasTable('metas_vendedores_periodo');
+        $metaMensual = null;
+        $metasMensuales = collect();
+
+        if ($metaTableDisponible) {
+            $metasMensuales = DB::connection('company')
+                ->table('metas_vendedores_periodo')
+                ->where('vendedor_id', $vendedor->id)
+                ->where('periodo_tipo', 'mes')
+                ->orderByDesc('periodo_key')
+                ->get()
+                ->keyBy('periodo_key');
+
+            $metaMensual = DB::connection('company')
+                ->table('metas_vendedores_periodo')
+                ->where('vendedor_id', $vendedor->id)
+                ->where('periodo_tipo', 'mes')
+                ->where('periodo_key', strtoupper($metaPeriodoActual))
+                ->first();
+        }
 
         $zonas = (new Zona)->getData();
         $depositos = (new Deposito)->getData();
 
-        return view($this->module.'.edit', compact(['vendedor', 'route', 'zonas', 'depositos']));
+        return view($this->module.'.edit', compact(['vendedor', 'route', 'zonas', 'depositos', 'metaTableDisponible', 'metaMensual', 'metaPeriodoActual', 'metasMensuales']));
+    }
+
+    public function guardarMetaMensual(Request $request)
+    {
+        if ( ! hasPermission($this->permission) ) {
+            abort(403);
+        }
+
+        if (! Schema::connection('company')->hasTable('metas_vendedores_periodo')) {
+            return back()->withErrors(['No existe la tabla de metas manuales. Ejecuta el SQL de creacion y vuelve a intentar.']);
+        }
+
+        $validated = $request->validate([
+            'vendedor_id' => ['required', 'integer', 'min:1', 'exists:company.vendedores,id'],
+            'periodo_key' => ['required', 'date_format:Y-m'],
+            'meta_ventas_usd' => ['nullable', 'numeric', 'min:0'],
+            'meta_pedidos_aprobados' => ['nullable', 'integer', 'min:0'],
+            'meta_pedidos_pagados' => ['nullable', 'integer', 'min:0'],
+            'meta_logro_pedidos_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
+        ]);
+
+        $todosNulos = is_null($validated['meta_ventas_usd'])
+            && is_null($validated['meta_pedidos_aprobados'])
+            && is_null($validated['meta_pedidos_pagados'])
+            && is_null($validated['meta_logro_pedidos_pct']);
+
+        if ($todosNulos) {
+            return back()->withErrors(['Debes indicar al menos una meta para guardar.']);
+        }
+
+        $filtro = [
+            'vendedor_id' => (int) $validated['vendedor_id'],
+            'periodo_tipo' => 'mes',
+            'periodo_key' => strtoupper(trim($validated['periodo_key'])),
+        ];
+
+        $payload = [
+            'meta_ventas_usd' => is_null($validated['meta_ventas_usd']) ? null : round((float) $validated['meta_ventas_usd'], 2),
+            'meta_pedidos_aprobados' => is_null($validated['meta_pedidos_aprobados']) ? null : (int) $validated['meta_pedidos_aprobados'],
+            'meta_pedidos_pagados' => is_null($validated['meta_pedidos_pagados']) ? null : (int) $validated['meta_pedidos_pagados'],
+            'meta_logro_pedidos_pct' => is_null($validated['meta_logro_pedidos_pct']) ? null : round((float) $validated['meta_logro_pedidos_pct'], 2),
+            'actualizado_por' => (int) auth()->id(),
+            'updated_at' => now(),
+        ];
+
+        $query = DB::connection('company')->table('metas_vendedores_periodo')->where($filtro);
+        if ($query->exists()) {
+            $query->update($payload);
+        } else {
+            DB::connection('company')->table('metas_vendedores_periodo')->insert(array_merge($filtro, $payload, [
+                'created_at' => now(),
+            ]));
+        }
+
+        return redirect()
+            ->route('vendedores.edit', $validated['vendedor_id'])
+            ->with('info', 'Meta mensual guardada correctamente.');
     }
 
     public function destroy(Request $request, $code)

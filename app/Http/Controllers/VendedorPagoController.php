@@ -78,7 +78,8 @@ class VendedorPagoController extends Controller
                     ->whereIn('p.estatus', ['APROBADO', 'EN REVISION'])
                     ->where(function ($q) {
                         $q->where('p.saldo_base', '>', 0)
-                            ->orWhere('p.saldo_iva_bs', '>', 0);
+                            ->orWhere('p.saldo_iva_bs', '>', 0)
+                            ->orWhere('p.saldo_ajustes', '>', 0);
                     });
             })
             ->selectSub(function ($query) use ($user) {
@@ -89,19 +90,21 @@ class VendedorPagoController extends Controller
                     ->where('p2.estatus', 'APROBADO')
                     ->where(function ($q) {
                         $q->where('p2.saldo_base', '>', 0)
-                            ->orWhere('p2.saldo_iva_bs', '>', 0);
+                            ->orWhere('p2.saldo_iva_bs', '>', 0)
+                            ->orWhere('p2.saldo_ajustes', '>', 0);
                     });
             }, 'pedidos_pendientes')
             ->addSelect([
                 'total_pendiente' => function ($query) use ($user) {
-                    $query->select(DB::raw('ROUND(COALESCE(SUM(p3.saldo_base), 0), 2)'))
+                    $query->select(DB::raw('ROUND(COALESCE(SUM(p3.saldo_base + p3.saldo_ajustes), 0), 2)'))
                         ->from('pedidos as p3')
                         ->whereRaw('BINARY p3.rif = BINARY CLIENTE.RIF')
                         ->where('p3.user_id', $user->id)
                         ->where('p3.estatus', 'APROBADO')
                         ->where(function ($q) {
                             $q->where('p3.saldo_base', '>', 0)
-                                ->orWhere('p3.saldo_iva_bs', '>', 0);
+                                ->orWhere('p3.saldo_iva_bs', '>', 0)
+                                ->orWhere('p3.saldo_ajustes', '>', 0);
                         });
                 }
             ])
@@ -465,7 +468,7 @@ class VendedorPagoController extends Controller
         $pedidosSeleccionados = collect();
 
         if ($pedidosIds) {
-            $pedidosIds = explode(',', $pedidosIds);
+            $pedidosIds = array_map('trim', explode(',', $pedidosIds));
             
             // Procesar los ajustes si existen
             $ajustesMap = [];
@@ -1988,8 +1991,10 @@ class VendedorPagoController extends Controller
                         \Illuminate\Support\Facades\Log::info('IVA aplicado Bs: ' . $ivaAplicadoBs . ' | Base aplicada Bs: ' . $montoBaseAplicadoBs);
 
                         $montoParaAsignarBs = $ivaAplicadoBs + $montoBaseAplicadoBs;
-                        $montoPagadoUsd = (float) $tasa_cambio > 0 ? $montoBaseAplicadoBs / (float) $tasa_cambio : 0;
-                        $montoParaAsignar = $montoPagadoUsd;
+                        $montoDisponibleUsd = (float) $tasa_cambio > 0 ? $montoBaseAplicadoBs / (float) $tasa_cambio : 0;
+                        $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
+                        $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
+                        $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
 
                     } elseif ($aplicarIvaEnDivisaAhora && $saldoIvaPendientePedido > 0.01) {
                         // ── DIVISA + IVA: pagar base + IVA convertido a USD ──────────────────────
@@ -2089,7 +2094,7 @@ class VendedorPagoController extends Controller
                     // Descontar saldos al registrar el pago EN REVISION.
                     // Validar que los montos cubran completamente los saldos antes de actualizar
                     $saldoIvaRestante = max($saldoIvaPendientePedido - $ivaAplicadoBs, 0);
-                    $saldoBaseRestante = max($saldoPendientePedido - $montoPagadoUsd, 0);
+                    $saldoBaseRestante = max($saldoReal - $montoPagadoUsd, 0);
                     
                     \Illuminate\Support\Facades\Log::info('Validación actualización pedido ' . $pedido->id . ':');
                     \Illuminate\Support\Facades\Log::info('IVA aplicado: ' . $ivaAplicadoBs . ', IVA restante: ' . $saldoIvaRestante);
@@ -2110,8 +2115,10 @@ class VendedorPagoController extends Controller
                             $restantePagoBs = max($montoDisponiblePago - $ivaAplicadoBs, 0);
                             $maximoBaseEnBs = max($saldoPendientePedido, 0) * (float) $tasa_cambio;
                             $montoBaseAplicadoBs = min($restantePagoBs, $maximoBaseEnBs);
-                            $montoPagadoUsd = $montoBaseAplicadoBs / (float) $tasa_cambio;
-                            $montoParaAsignar = $montoPagadoUsd;
+                            $montoDisponibleUsd = $montoBaseAplicadoBs / (float) $tasa_cambio;
+                            $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
+                            $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
+                            $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
 
                             \Illuminate\Support\Facades\Log::info('IVA adicional aplicado: ' . $ivaAdicional . ', Nuevo IVA total: ' . $ivaAplicadoBs);
                         }
@@ -2119,8 +2126,10 @@ class VendedorPagoController extends Controller
                         // Si hay saldo base restante, ajustar el monto base aplicado
                         if ($saldoBaseRestante > 0.01 && $montoDisponiblePago > $ivaAplicadoBs + ($montoPagadoUsd * (float) $tasa_cambio)) {
                             $baseAdicional = min($saldoBaseRestante, ($montoDisponiblePago - $ivaAplicadoBs) / (float) $tasa_cambio);
-                            $montoPagadoUsd += $baseAdicional;
-                            $montoParaAsignar = $montoPagadoUsd;
+                            $montoDisponibleUsd = $montoPagadoUsd + $ajustesAsignadoDiv + $baseAdicional;
+                            $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
+                            $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
+                            $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
 
                             \Illuminate\Support\Facades\Log::info('Base adicional aplicada: ' . $baseAdicional . ', Nueva base total: ' . $montoPagadoUsd);
                         }
@@ -2129,10 +2138,10 @@ class VendedorPagoController extends Controller
                     // Actualizar el registro de pago con los montos corregidos.
                     // iva almacena: para Bolívares = Bs aplicados a saldo_iva_bs (reducido al registrar)
                     //               para Divisa+IVA = Bs de IVA a reducir al APROBAR (no inmediato)
-                    // ajustes_monto para divisa = USD de ajustes a reducir de saldo_ajustes al APROBAR.
+                    // ajustes_monto = USD de ajustes asignado a este pedido.
                     $pagoPedido->monto = round($montoPagadoUsd, 2);
                     $pagoPedido->iva   = round($ivaAplicadoBs, 2);
-                    if (!$esPagoBolivaresConIva && $ajustesAsignadoDiv > 0.001) {
+                    if ($ajustesAsignadoDiv > 0.001) {
                         $pagoPedido->ajustes_monto = round($ajustesAsignadoDiv, 2);
                     }
                     $pagoPedido->save();
@@ -2147,10 +2156,9 @@ class VendedorPagoController extends Controller
                             $updatePedido['saldo_iva_bs'] = DB::raw('GREATEST(saldo_iva_bs - ' . (float) $pagoPedido->iva . ', 0)');
                         }
                         // Reducir saldo_ajustes por el monto del ajuste (USD) incluido en el pago.
-                        $ajustesNetoDetalle = (float) ($detalle['ajustes_neto'] ?? 0);
+                        $ajustesNetoDetalle = (float) ($pagoPedido->ajustes_monto ?? 0);
                         if ($ajustesNetoDetalle > 0.01) {
                             $updatePedido['saldo_ajustes'] = DB::raw('GREATEST(saldo_ajustes - ' . round($ajustesNetoDetalle, 2) . ', 0)');
-                            $pagoPedido->ajustes_monto = round($ajustesNetoDetalle, 2);
                             $pagoPedido->save();
                         }
                         Pedido::where('id', $pedido->id)->update($updatePedido);

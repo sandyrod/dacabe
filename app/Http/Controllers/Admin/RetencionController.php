@@ -190,8 +190,10 @@ class RetencionController extends Controller
 
         $update = ['saldo_iva_bs' => 0, 'updated_at' => now()];
 
-        // Si la base también está saldada, marcar el pedido como PAGADO
-        if ((float) $pedido->saldo_base <= 0) {
+        // Si base, IVA y ajustes quedan saldados, marcar el pedido como PAGADO.
+        if ((float) $pedido->saldo_base <= 0.01 && (float) ($pedido->saldo_ajustes ?? 0) <= 0.01) {
+            $update['saldo_base'] = 0;
+            $update['saldo_ajustes'] = 0;
             $update['estatus'] = 'PAGADO';
         }
 

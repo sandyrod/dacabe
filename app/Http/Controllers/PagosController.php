@@ -107,6 +107,7 @@ class PagosController extends Controller
                     }
 
                     $pedido->estatus = $this->determinarEstatus($pedido);
+                    $this->normalizarSaldosPagados($pedido);
                     $pedido->save();
                     if ($pedido->estatus === 'PAGADO') {
                         PedidoAjuste::marcarPagados((int) $pedido->id);
@@ -153,6 +154,7 @@ class PagosController extends Controller
                     }
 
                     $pedido->estatus = $this->determinarEstatus($pedido);
+                    $this->normalizarSaldosPagados($pedido);
                     $pedido->save();
                     if ($pedido->estatus === 'PAGADO') {
                         PedidoAjuste::marcarPagados((int) $pedido->id);
@@ -289,6 +291,17 @@ class PagosController extends Controller
         return ($baseOk && $ivaOk && $ajustesOk) ? 'PAGADO' : 'APROBADO';
     }
 
+    private function normalizarSaldosPagados(Pedido $pedido): void
+    {
+        if ($pedido->estatus !== 'PAGADO') {
+            return;
+        }
+
+        $pedido->saldo_base = 0;
+        $pedido->saldo_iva_bs = 0;
+        $pedido->saldo_ajustes = 0;
+    }
+
     /**
      * Aprueba el comprobante de retención de IVA de un pago.
      * Al validar la retención, se salda el saldo_iva_bs pendiente (la retención).
@@ -329,6 +342,7 @@ class PagosController extends Controller
                 }
 
                 $pedido->estatus = $this->determinarEstatus($pedido);
+                $this->normalizarSaldosPagados($pedido);
                 $pedido->save();
 
                 if ($pedido->estatus === 'PAGADO') {

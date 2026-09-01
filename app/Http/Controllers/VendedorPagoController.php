@@ -772,8 +772,11 @@ class VendedorPagoController extends Controller
                 }
 
                 // Determinar el nuevo estado del pedido.
-                // Solo PAGADO si ambos saldos quedaron en cero; en otro caso queda APROBADO.
-                if ($deberSaldarPedidos && $pedido->saldo_base <= 0.01 && (float) $pedido->saldo_iva_bs <= 0.01) {
+                // Solo PAGADO si base, IVA y ajustes quedaron en cero; en otro caso queda APROBADO.
+                if ($deberSaldarPedidos && $pedido->saldo_base <= 0.01 && (float) $pedido->saldo_iva_bs <= 0.01 && (float) ($pedido->saldo_ajustes ?? 0) <= 0.01) {
+                    $pedido->saldo_base = 0;
+                    $pedido->saldo_iva_bs = 0;
+                    $pedido->saldo_ajustes = 0;
                     $pedido->estatus = 'PAGADO';
                     PedidoAjuste::marcarPagados((int) $pedido->id);
                 } else {

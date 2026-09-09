@@ -569,75 +569,8 @@
                                 </div>
                             @endif
 
-                            {{-- Abono parcial: solo para pago BS con 1 pedido, con IVA y sin retención --}}
-                            @php
-                                $pedidosCount = $pedidos_seleccionados ? count(array_filter(explode(',', $pedidos_seleccionados))) : 0;
-                            @endphp
-                            @if (session('pago_cliente.tipo_pago') == 'bs' && $pedidosCount === 1 && ($total_iva ?? 0) > 0 && ($total_retencion ?? 0) == 0)
-                            @php
-                                $montoAbonoAmbos = (float) ($totalConAjustes ?? $total_pagar ?? 0);
-                                $montoAbonoSoloIva = (float) (($total_iva ?? 0) - ($total_retencion ?? 0));
-                                $montoAbonoSoloBase = max((float) $montoAbonoAmbos - (float) $montoAbonoSoloIva, 0);
-                            @endphp
-                            <div class="row mb-3">
-                                <div class="col-12">
-                                    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 2px solid #16a34a; border-radius: 12px; padding: 20px 24px;">
-                                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-                                            <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); display: flex; align-items: center; justify-content: center;">
-                                                <i class="fas fa-sliders-h" style="color: white; font-size: 16px;"></i>
-                                            </div>
-                                            <h6 style="margin: 0; font-size: 16px; font-weight: 700; color: #14532d;">¿A qué aplicar el abono?</h6>
-                                        </div>
-                                        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
-                                            <label style="flex: 1; min-width: 160px; cursor: pointer;">
-                                                <input type="radio" name="abono_tipo" value="ambos" data-monto="{{ number_format($montoAbonoAmbos, 2, '.', '') }}" checked style="position: absolute; opacity: 0; z-index: -1;">
-                                                <div class="abono-card" data-value="ambos" style="border: 2px solid #16a34a; border-radius: 10px; padding: 14px 18px; background: white; transition: all 0.2s ease; display: flex; align-items: center; gap: 10px;">
-                                                    <div style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid #16a34a; background: #16a34a; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                                        <div style="width: 8px; height: 8px; border-radius: 50%; background: white;"></div>
-                                                    </div>
-                                                    <div>
-                                                        <div style="font-weight: 700; color: #14532d; font-size: 14px;">Base e IVA</div>
-                                                        <div style="font-size: 12px; color: #4ade80;">Distribuir entre ambos</div>
-                                                        <div style="font-size: 11px; color: #6b7280; font-weight: 600; margin-top: 4px;">
-                                                            Monto: Bs. {{ number_format($montoAbonoAmbos, 2, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                            <label style="flex: 1; min-width: 160px; cursor: pointer;">
-                                                <input type="radio" name="abono_tipo" value="solo_base" data-monto="{{ number_format($montoAbonoSoloBase, 2, '.', '') }}" style="position: absolute; opacity: 0; z-index: -1;">
-                                                <div class="abono-card" data-value="solo_base" style="border: 2px solid #d1d5db; border-radius: 10px; padding: 14px 18px; background: white; transition: all 0.2s ease; display: flex; align-items: center; gap: 10px;">
-                                                    <div style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; background: white; flex-shrink: 0;"></div>
-                                                    <div>
-                                                        <div style="font-weight: 700; color: #374151; font-size: 14px;">Solo base</div>
-                                                        <div style="font-size: 12px; color: #9ca3af;">No aplica al IVA</div>
-                                                        <div style="font-size: 11px; color: #6b7280; font-weight: 600; margin-top: 4px;">
-                                                            Monto: Bs. {{ number_format($montoAbonoSoloBase, 2, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                            <label style="flex: 1; min-width: 160px; cursor: pointer;">
-                                                <input type="radio" name="abono_tipo" value="solo_iva" data-monto="{{ number_format($montoAbonoSoloIva, 2, '.', '') }}" style="position: absolute; opacity: 0; z-index: -1;">
-                                                <div class="abono-card" data-value="solo_iva" style="border: 2px solid #d1d5db; border-radius: 10px; padding: 14px 18px; background: white; transition: all 0.2s ease; display: flex; align-items: center; gap: 10px;">
-                                                    <div style="width: 18px; height: 18px; border-radius: 50%; border: 2px solid #d1d5db; background: white; flex-shrink: 0;"></div>
-                                                    <div>
-                                                        <div style="font-weight: 700; color: #374151; font-size: 14px;">Solo IVA</div>
-                                                        <div style="font-size: 12px; color: #9ca3af;">No aplica a la base</div>
-                                                        <div style="font-size: 11px; color: #6b7280; font-weight: 600; margin-top: 4px;">
-                                                            Monto: Bs. {{ number_format($montoAbonoSoloIva, 2, ',', '.') }}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            @endif
-
                             <!-- Sección de IVA con retención -->
-                            @if (session('pago_cliente.tipo_pago') == 'bs' && ($total_retencion ?? 0) > 0)
+                            @if (false && session('pago_cliente.tipo_pago') == 'bs' && ($total_retencion ?? 0) > 0)
                             <div class="iva-responsive" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-radius: 20px; padding: 32px; margin-bottom: 24px; border: 3px solid #0ea5e9; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); position: relative;">
                                 <!-- Header con resumen -->
                                 <div class="iva-header-responsive" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px;">
@@ -994,7 +927,9 @@
                             </div>
 
                             <!-- Campos ocultos para el envío del formulario -->
-                            <input type="hidden" name="pagos_json" id="pagos-json">
+                            <input type="hidden" name="pedidos_seleccionados" id="pedidos-seleccionados-json"
+                                value="{{ $pedidos_seleccionados }}">
+                            <input type="hidden" name="pagos_json" id="pagos-json" value="[]">
                             <input type="hidden" name="rate_json" id="rate-json">
 
                         </form>
@@ -1561,7 +1496,13 @@
             totalPagado = pagos.reduce((total, pago) => total + parseFloat(pago.monto || 0), 0);
             const simboloMoneda = ($('#tipo-moneda').html() || '').trim() == 'Bolívares' ? 'Bs.' : '$';
             $('#total-pagado').text(totalPagado.toFixed(2) + ' ' + simboloMoneda);
+            sincronizarCamposOcultos();
             actualizarMontoPendiente();
+        }
+
+        function sincronizarCamposOcultos() {
+            $('#pagos-json').val(JSON.stringify(pagos));
+            $('#rate-json').val(JSON.stringify({{ $tasa_bcv }}));
         }
 
         // Actualizar el monto pendiente por pagar
@@ -1588,51 +1529,20 @@
             // Al habilitar el botón, agregamos el evento para enviar el formulario con los datos necesarios
             $('#btn-aplicar-cambios').off('click').on('click', function(e) {
                 e.preventDefault();
-
-                // Guardar los pagos en el campo oculto como JSON
-                $('#pagos-json').val(JSON.stringify(pagos));
-
-                // Guardar los pedidos seleccionados en un campo oculto
-                if ($('#pedidos-seleccionados-json').length === 0) {
-                    $('<input>').attr({
-                        type: 'hidden',
-                        id: 'pedidos-seleccionados-json',
-                        name: 'pedidos_seleccionados'
-                    }).appendTo('#multiplePaymentsForm');
-                }
-                $('#pedidos-seleccionados-json').val('{{ json_encode($pedidos_seleccionados) }}');
-                $('#rate-json').val(JSON.stringify({{ $tasa_bcv }}));
-
-                // Enviar el formulario
+                sincronizarCamposOcultos();
                 $('#multiplePaymentsForm').submit();
             });
 
-            // Habilitar o deshabilitar el botón de aplicar cambios
+            // Permitir registrar abonos parciales para uno o varios pedidos.
+            $('#btn-aplicar-cambios').prop('disabled', pagos.length === 0);
+
             if (montoPendiente <= 0) {
                 console.log('Habilitando botón de aplicar cambios');
                 pendienteElement.addClass('table-success');
-                $('#btn-aplicar-cambios').prop('disabled', false);
                 $('#btn-agregar-pago').prop('disabled', true);
-
-                
             } else {
                 pendienteElement.addClass('table-danger');
-                $('#btn-aplicar-cambios').prop('disabled', true);
                 $('#btn-agregar-pago').prop('disabled', false);
-            }
-            if (numeroPedidos == 1) {
-                $('#btn-aplicar-cambios').prop('disabled', false);
-                // Guardar los pagos en el campo oculto como JSON
-                $('#pagos-json').val(JSON.stringify(pagos));
-                if ($('#pedidos-seleccionados-json').length === 0) {
-                    $('<input>').attr({
-                        type: 'hidden',
-                        id: 'pedidos-seleccionados-json',
-                        name: 'pedidos_seleccionados'
-                    }).appendTo('#multiplePaymentsForm');
-                }
-                $('#pedidos-seleccionados-json').val('{{ json_encode($pedidos_seleccionados) }}');
-                $('#rate-json').val(JSON.stringify({{ $tasa_bcv }}));
             }
         }
 
@@ -1714,23 +1624,9 @@
                     cancelButtonText: 'Cancelar'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // Guardar el monto del pago que se va a eliminar
-                        const montoEliminado = parseFloat(pagos[index].monto) || 0;
-
-                        // Eliminar el pago del array
                         pagos.splice(index, 1);
-
-                        // Actualizar el total pagado
-                        if (paymentData.totalPagado >= montoEliminado) {
-                            paymentData.totalPagado -= montoEliminado;
-                        }
-
-                        // Actualizar la interfaz
                         actualizarListaPagos();
-                        actualizarResumenPago();
-
-                        // Actualizar el campo oculto del formulario
-                        actualizarPagosJson();
+                        actualizarTotalPagado();
 
                         // Mostrar mensaje de éxito
                         Swal.fire(
@@ -1876,73 +1772,6 @@
                 });
             }
 
-            // Handle payment deletion
-            document.addEventListener('click', function(e) {
-                const deleteBtn = e.target.closest('.btn-eliminar-pago');
-                if (!deleteBtn) return;
-
-                e.preventDefault();
-                const index = deleteBtn.getAttribute('data-index');
-                const tbody = document.getElementById('pagos-body');
-                if (!tbody) return;
-
-                // Clear existing rows
-                tbody.innerHTML = '';
-
-                // Rebuild the table with remaining payments
-                pagos.forEach(function(pago, idx) {
-                    if (idx.toString() === index) return; // Skip the deleted payment
-
-                    const pedidoNumero = pago.pedido_numero || 'N/A';
-                    const descripcion = pago.descripcion || '';
-                    
-                    // Determinar la moneda y el monto correcto
-                    const esBolivares = pago.moneda_pago === 'bs' || (pago.monto_bs && parseFloat(pago.monto_bs) > 0);
-                    const montoFinal = esBolivares ? (parseFloat(pago.monto_bs) || pago.monto || 0) : (pago.monto || 0);
-                    const simboloMoneda = esBolivares ? 'Bs. ' : '$';
-                    const monto = simboloMoneda + formatNumber(montoFinal);
-
-                    // Create table row
-                    const tr = document.createElement('tr');
-                    tr.setAttribute('data-index', idx);
-
-                    // Create cells
-                    [
-                        pedidoNumero,
-                        descripcion,
-                        'Ref ' + monto,
-                        '' // For delete button
-                    ].forEach((text, i) => {
-                        const td = document.createElement('td');
-                        if (i === 3) {
-                            // Add delete button to last cell
-                            const deleteBtn = document.createElement('button');
-                            deleteBtn.type = 'button';
-                            deleteBtn.className =
-                                'btn btn-sm btn-outline-danger btn-eliminar-pago';
-                            deleteBtn.setAttribute('data-index', idx);
-
-                            const icon = document.createElement('i');
-                            icon.className = 'fas fa-trash';
-
-                            deleteBtn.appendChild(icon);
-                            td.appendChild(deleteBtn);
-                        } else {
-                            td.textContent = text;
-                        }
-                        tr.appendChild(td);
-                    });
-
-                    tbody.appendChild(tr);
-                });
-
-                // Remove the payment from the array
-                pagos.splice(parseInt(index, 10), 1);
-
-                // Update the UI
-                actualizarTotales();
-            });
-
             // Evento para actualizar el monto máximo cuando se selecciona un pedido
             $('#pedido_id').on('change', function() {
                 const selectedOption = $(this).find('option:selected');
@@ -1978,30 +1807,10 @@
                 }
             });
 
-            // Evento para eliminar un pago
-            $(document).on('click', '.btn-eliminar-pago', function() {
-                const index = $(this).data('index');
-                if (index >= 0 && index < pagos.length) {
-                    Swal.fire({
-                        title: '¿Está seguro?',
-                        text: '¿Desea eliminar este pago?',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonText: 'Sí, eliminar',
-                        cancelButtonText: 'Cancelar'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            pagos.splice(index, 1);
-                            actualizarListaPagos();
-                            actualizarTotalPagado();
-                            actualizarPagosJSON();
-                        }
-                    });
-                }
-            });
-
             // Validar el formulario antes de enviar
             $('#multiplePaymentsForm').on('submit', function(e) {
+                sincronizarCamposOcultos();
+
                 if (pagos.length === 0) {
                     e.preventDefault();
                     Swal.fire('Error', 'Debe agregar al menos un pago', 'error');
@@ -2689,52 +2498,6 @@
 
                 return true;
             });
-
-            // Abono tipo: selección visual de cards
-            function inicializarAbonoTipo() {
-                function aplicarMontoDesdeAbonoTipo() {
-                    const $seleccion = $('input[name="abono_tipo"]:checked');
-                    if (!$seleccion.length) return;
-
-                    const montoSeleccionado = parseFloat($seleccion.data('monto')) || 0;
-
-                    // Actualiza el monto editable principal
-                    $('#monto_bs').val(montoSeleccionado.toFixed(2));
-
-                    // Mantiene sincronizados campos usados por el formulario
-                    $('#monto').val(montoSeleccionado.toFixed(2));
-                    if ($('#monto_bs_hidden').length) {
-                        $('#monto_bs_hidden').val(montoSeleccionado.toFixed(2));
-                    }
-                    if ($('#monto_hidden').length) {
-                        $('#monto_hidden').val(montoSeleccionado.toFixed(2));
-                    }
-                }
-
-                $('input[name="abono_tipo"]').on('change', function () {
-                    var val = $(this).val();
-                    $('.abono-card').each(function () {
-                        var isSelected = $(this).data('value') === val;
-                        if (isSelected) {
-                            $(this).css({ 'border-color': '#16a34a', 'box-shadow': '0 0 0 3px rgba(22,163,74,0.2)' });
-                            $(this).find('div:first-child').css({ 'border-color': '#16a34a', 'background': '#16a34a' });
-                        } else {
-                            $(this).css({ 'border-color': '#d1d5db', 'box-shadow': 'none' });
-                            $(this).find('div:first-child').css({ 'border-color': '#d1d5db', 'background': 'white' });
-                        }
-                    });
-
-                    aplicarMontoDesdeAbonoTipo();
-                });
-                $('.abono-card').on('click', function () {
-                    var val = $(this).data('value');
-                    $('input[name="abono_tipo"][value="' + val + '"]').prop('checked', true).trigger('change');
-                });
-
-                // Inicializa el monto con la opción por defecto al cargar la página
-                aplicarMontoDesdeAbonoTipo();
-            }
-            inicializarAbonoTipo();
 
             // Funcionalidad para opciones de IVA con retención - Diseño garantizado
             function inicializarOpcionesIVA() {

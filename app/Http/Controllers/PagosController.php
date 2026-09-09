@@ -59,7 +59,7 @@ class PagosController extends Controller
             $esDivisa = $pago->moneda_pago != 'Bolívares';
 
             // Si el pago es rechazado, devolver los saldos al estado anterior.
-            if ($request->estatus === 'RECHAZADO') {
+            if ($request->estatus === 'RECHAZADO' && $estatusAnterior !== 'RECHAZADO') {
                 $pagosPedidos = $pago->pago_pedidos()->get();
 
                 foreach ($pagosPedidos as $pagoPedido) {
@@ -106,12 +106,8 @@ class PagosController extends Controller
                         );
                     }
 
-                    $pedido->estatus = $this->determinarEstatus($pedido);
-                    $this->normalizarSaldosPagados($pedido);
+                    $pedido->estatus = 'APROBADO';
                     $pedido->save();
-                    if ($pedido->estatus === 'PAGADO') {
-                        PedidoAjuste::marcarPagados((int) $pedido->id);
-                    }
                 }
             }
 
@@ -127,7 +123,7 @@ class PagosController extends Controller
                         continue;
                     }
 
-                    if ($esDivisa) {
+                    if ($esDivisa && $estatusAnterior !== 'APROBADO') {
                         // Reducir saldo_base (incluye el descuento en divisa registrado en pagoPedido->descuento)
                         $montoReduccion = (float) ($pagoPedido->monto + $pagoPedido->descuento);
                         $pedido->saldo_base = max((float) $pedido->saldo_base - $montoReduccion, 0);
@@ -136,12 +132,6 @@ class PagosController extends Controller
                         $ajustesAplicados = (float) ($pagoPedido->ajustes_monto ?? 0);
                         if ($ajustesAplicados > 0.001) {
                             $pedido->saldo_ajustes = max((float) ($pedido->saldo_ajustes ?? 0) - $ajustesAplicados, 0);
-                        }
-
-                        // Safety net: si la base quedó en 0, cerrar cualquier remanente de ajustes también
-                        if ($pedido->saldo_base <= 0.01) {
-                            $pedido->saldo_base    = 0;
-                            $pedido->saldo_ajustes = 0;
                         }
 
                         // Aplicar IVA en divisa si fue registrado
@@ -153,60 +143,14 @@ class PagosController extends Controller
                         }
                     }
 
-                    $pedido->estatus = $this->determinarEstatus($pedido);
+                    $pedido->estatus = $this->determinarEstatus(
+                        $pedido,
+                        $this->tienePagosPendientes((int) $pedido->id, (int) $pago->id)
+                    );
                     $this->normalizarSaldosPagados($pedido);
                     $pedido->save();
                     if ($pedido->estatus === 'PAGADO') {
                         PedidoAjuste::marcarPagados((int) $pedido->id);
-                    }
-                }
-
-                // ── Liquidación forzada para pagos multi-pedido ────────────────────────────
-                // Regla de negocio: si el grupo de pago cubre más de un pedido, el monto
-                // registrado DEBE cubrir el total de todos los saldos.  Al aprobarse el
-                // último pago pendiente del grupo, se fuerzan todos los saldos a 0 para
-                // garantizar el cierre completo (incluyendo diferencias de redondeo y
-                // descuentos en divisa que no redujeron saldo_base en el momento del registro).
-                $pedidosALiquidar = collect();
-
-                if ($pago->pago_grupo_id) {
-                    // Releer el grupo completo (ya incluye el pago recién aprobado)
-                    $pagosDelGrupo = Pago::where('pago_grupo_id', $pago->pago_grupo_id)->get();
-
-                    $pedidosEnGrupo = PagoPedido::whereIn('pago_id', $pagosDelGrupo->pluck('id'))
-                        ->distinct()
-                        ->pluck('pedido_id');
-
-                    $esMultiPedido       = $pedidosEnGrupo->count() > 1;
-                    $todosPagosAprobados = $pagosDelGrupo->every(fn ($p) => $p->estatus === 'APROBADO');
-
-                    if ($esMultiPedido && $todosPagosAprobados) {
-                        $pedidosALiquidar = $pedidosEnGrupo;
-                    }
-                } else {
-                    // Pago sin grupo: si cubre varios pedidos directamente, liquidar todos
-                    $pedidosEnPago = $pagosPedidos->pluck('pedido_id')->unique();
-                    if ($pedidosEnPago->count() > 1) {
-                        $pedidosALiquidar = $pedidosEnPago;
-                    }
-                }
-
-                foreach ($pedidosALiquidar as $pedidoId) {
-                    $p = Pedido::on('company')->find($pedidoId);
-                    if (!$p) continue;
-                    $p->saldo_base    = 0;
-                    $p->saldo_ajustes = 0;
-                    // Si el pedido tiene retención de IVA pendiente, NO forzar saldo_iva_bs a 0.
-                    // El saldo_iva_bs se saldará cuando el admin valide el comprobante de retención.
-                    if ((float) $p->porc_retencion > 0 && (float) $p->saldo_iva_bs > 0.01) {
-                        $p->estatus = $this->determinarEstatus($p);
-                    } else {
-                        $p->saldo_iva_bs = 0;
-                        $p->estatus      = 'PAGADO';
-                    }
-                    $p->save();
-                    if ($p->estatus === 'PAGADO') {
-                        PedidoAjuste::marcarPagados((int) $pedidoId);
                     }
                 }
             }
@@ -282,13 +226,29 @@ class PagosController extends Controller
      * Determina el estatus correcto de un pedido según sus saldos.
      * Un pedido es PAGADO solo si base, IVA y ajustes son todos cero.
      */
-    private function determinarEstatus(Pedido $pedido): string
+    private function determinarEstatus(Pedido $pedido, bool $tienePagosPendientes = false): string
     {
         $baseOk    = (float) $pedido->saldo_base <= 0.01;
         $ivaOk     = (float) $pedido->saldo_iva_bs <= 0.01;
         $ajustesOk = (float) ($pedido->saldo_ajustes ?? 0) <= 0.01;
 
-        return ($baseOk && $ivaOk && $ajustesOk) ? 'PAGADO' : 'APROBADO';
+        if ($baseOk && $ivaOk && $ajustesOk) {
+            return 'PAGADO';
+        }
+
+        return $tienePagosPendientes ? 'EN REVISION' : 'APROBADO';
+    }
+
+    private function tienePagosPendientes(int $pedidoId, ?int $pagoIdExcluir = null): bool
+    {
+        return PagoPedido::query()
+            ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
+            ->where('pagos_pedidos.pedido_id', $pedidoId)
+            ->when($pagoIdExcluir, function ($query) use ($pagoIdExcluir) {
+                $query->where('pagos.id', '!=', $pagoIdExcluir);
+            })
+            ->whereIn('pagos.estatus', ['PENDIENTE', 'EN REVISION'])
+            ->exists();
     }
 
     private function normalizarSaldosPagados(Pedido $pedido): void
@@ -341,7 +301,10 @@ class PagosController extends Controller
                     $pedido->comprobante_retencion = $rutaComprobante;
                 }
 
-                $pedido->estatus = $this->determinarEstatus($pedido);
+                $pedido->estatus = $this->determinarEstatus(
+                    $pedido,
+                    $this->tienePagosPendientes((int) $pedido->id, (int) $pago->id)
+                );
                 $this->normalizarSaldosPagados($pedido);
                 $pedido->save();
 

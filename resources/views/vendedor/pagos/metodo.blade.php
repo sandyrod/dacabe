@@ -766,9 +766,14 @@
                             <form action="{{ route('vendedores.pagos.index') }}" method="POST" id="form-pago" novalidate>
                                 @csrf
                                 @php
-                                    $basePagarDivisa = (float) ($totalPagarDivisa - $totalDescuento);
-                                    $totalIvaBsVista = (float) ($iva_bs ?? 0);
-                                    $soloIvaEnBs = $basePagarDivisa <= 0.01 && $totalIvaBsVista > 0.01;
+                                    $tieneSaldoIvaBs = collect($pedidosSeleccionados)->contains(function ($pedido) {
+                                        return (float) ($pedido->saldo_iva_bs ?? 0) > 0.01;
+                                    });
+                                    $sinSaldoBaseNiAjustes = collect($pedidosSeleccionados)->every(function ($pedido) {
+                                        return (float) ($pedido->saldo_base ?? 0) <= 0.01
+                                            && (float) ($pedido->saldo_ajustes ?? 0) <= 0.01;
+                                    });
+                                    $soloIvaEnBs = $tieneSaldoIvaBs && $sinSaldoBaseNiAjustes;
                                 @endphp
                                 <input type="hidden" name="rif" value="{{ $cliente->RIF }}">
                                 <input type="hidden" name="pedidos" value="{{ implode(',', $pedidosIds) }}">

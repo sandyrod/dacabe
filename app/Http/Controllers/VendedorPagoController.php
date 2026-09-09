@@ -284,17 +284,51 @@ class VendedorPagoController extends Controller
                 ->leftJoin('pedidos_facturas', 'pedidos.id', '=', 'pedidos_facturas.pedido_id')
                 ->where('pedidos.rif', $rif)
                 ->where('pedidos.user_id', $user->id)
-                ->where('pedidos.estatus', 'APROBADO')
+                ->whereIn('pedidos.estatus', ['APROBADO', 'EN REVISION'])
                 ->where(function ($query) {
                     $query->where('pedidos.saldo_base', '>', 0)
                         ->orWhere('pedidos.saldo_iva_bs', '>', 0)
                         ->orWhere('pedidos.saldo_ajustes', '>', 0);
                 })
                 ->orderBy('pedidos.fecha', 'asc')
+                ->get();
+
+            // Los pagos en bolívares reducen los saldos al registrarse. Los pagos en divisa
+            // los reducen al aprobarse, por lo que sus asignaciones EN REVISION deben
+            // descontarse para exponer únicamente el saldo todavía disponible para abonos.
+            $compromisosDivisa = PagoPedido::query()
+                ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
+                ->whereIn('pagos_pedidos.pedido_id', $pedidos->pluck('id'))
+                ->where('pagos.estatus', 'EN REVISION')
+                ->where(function ($query) {
+                    $query->where('pagos.moneda_pago', '!=', 'Bolívares')
+                        ->orWhereNull('pagos.moneda_pago');
+                })
+                ->groupBy('pagos_pedidos.pedido_id')
+                ->selectRaw('pagos_pedidos.pedido_id,
+                    COALESCE(SUM(pagos_pedidos.monto + COALESCE(pagos_pedidos.descuento, 0)), 0) as saldo_base_comprometido,
+                    COALESCE(SUM(pagos_pedidos.iva), 0) as saldo_iva_comprometido,
+                    COALESCE(SUM(pagos_pedidos.ajustes_monto), 0) as saldo_ajustes_comprometido')
                 ->get()
-                ->map(function ($pedido) {
-                    $ajustesNeto = PedidoAjuste::netoPendiente((int) $pedido->id);
-                    $pedido->ajustes_neto   = $ajustesNeto;
+                ->keyBy('pedido_id');
+
+            $pedidos = $pedidos
+                ->map(function ($pedido) use ($compromisosDivisa) {
+                    $compromiso = $compromisosDivisa->get($pedido->id);
+                    $pedido->saldo_base = max(
+                        (float) $pedido->saldo_base - (float) ($compromiso->saldo_base_comprometido ?? 0),
+                        0
+                    );
+                    $pedido->saldo_iva_bs = max(
+                        (float) $pedido->saldo_iva_bs - (float) ($compromiso->saldo_iva_comprometido ?? 0),
+                        0
+                    );
+                    $pedido->saldo_ajustes = max(
+                        (float) ($pedido->saldo_ajustes ?? 0) - (float) ($compromiso->saldo_ajustes_comprometido ?? 0),
+                        0
+                    );
+
+                    $pedido->ajustes_neto = $pedido->saldo_ajustes;
                     $pedido->ajustes_detalle = PedidoAjuste::where('pedido_id', $pedido->id)
                         ->where('pagado', false)
                         ->get(['tipo', 'concepto', 'monto'])
@@ -302,13 +336,18 @@ class VendedorPagoController extends Controller
                         ->values()
                         ->toArray();
 
-                    $pedido->saldo_pendiente    = round((float) $pedido->saldo_base + $ajustesNeto, 2);
+                    $pedido->saldo_pendiente    = round((float) $pedido->saldo_base + (float) $pedido->saldo_ajustes, 2);
                     $pedido->fecha              = Carbon::parse($pedido->fecha)->format('d/m/Y');
                     $pedido->descuento_aplicado = 0;
                     $pedido->monto_descuento    = 0;
                     $pedido->saldo_con_descuento = $pedido->saldo_pendiente;
 
                     return $pedido;
+                })
+                ->filter(function ($pedido) {
+                    return (float) $pedido->saldo_base > 0.01
+                        || (float) $pedido->saldo_iva_bs > 0.01
+                        || (float) $pedido->saldo_ajustes > 0.01;
                 })
                 ->values();
 
@@ -1675,6 +1714,21 @@ class VendedorPagoController extends Controller
             }
         }
 
+        $pedidosIds = array_values(array_unique(array_map('intval', $pedidosIds)));
+        if (empty($pedidosIds) || empty($detallePedidos) || empty($pagos)) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Debe seleccionar al menos un pedido y registrar al menos un abono válido.');
+        }
+
+        foreach ($pagos as $pago) {
+            if (!is_array($pago) || (float) ($pago['monto'] ?? 0) <= 0) {
+                return redirect()->back()
+                    ->withInput()
+                    ->with('error', 'Todos los abonos deben tener un monto mayor a cero.');
+            }
+        }
+
         $user = auth()->user();
         $pagoData = session('pago_cliente');
         $tasa_cambio = $request->input('rate_json');
@@ -1683,11 +1737,9 @@ class VendedorPagoController extends Controller
         $total_retencion = $request->input('total_retencion');
 
         // Capturar la opción de IVA seleccionada (para pagos en Bolívares)
-        $opcion_iva = $request->input('pago_iva_opcion', 'completo'); // 'retencion' o 'completo'
-
-        // Tipo de abono para pagos parciales en Bolívares (pedido único)
-        // 'ambos' = base + IVA  |  'solo_base' = solo base  |  'solo_iva' = solo IVA
-        $abono_tipo = $request->input('abono_tipo', 'ambos');
+        $opcion_iva = $moneda_pago === 'Bolívares'
+            ? 'completo'
+            : $request->input('pago_iva_opcion', 'completo');
 
         // IVA en divisa: el vendedor elige pagar saldo_iva_bs convertido a USD
         $iva_en_divisa     = $request->boolean('iva_en_divisa', false);
@@ -1712,6 +1764,15 @@ class VendedorPagoController extends Controller
             $pedidos = Pedido::whereIn('id', $pedidosIds)
                 ->with(['pedido_detalle'])
                 ->get();
+
+            if ($pedidos->count() !== count($pedidosIds)) {
+                throw new \RuntimeException('Uno o más pedidos seleccionados no existen o ya no están disponibles.');
+            }
+
+            $ordenPedidos = array_flip($pedidosIds);
+            $pedidos = $pedidos
+                ->sortBy(fn ($pedido) => $ordenPedidos[(int) $pedido->id])
+                ->values();
 
             $total = 0;
             foreach ($pagos as $pago) {
@@ -1813,30 +1874,23 @@ class VendedorPagoController extends Controller
                 // Garantiza que saldo_iva_bs tiene prioridad GLOBAL sobre saldo_base en toda la distribución.
                 $ivaReservadoPorPedido = [];
                 $ivaReservadoSufijo    = [];
-                if ($esPagoBolivaresConIva && $abono_tipo !== 'solo_base') {
-                    $presupuestoIvaDisponible = $montoDisponiblePago;
+                if ($esPagoBolivaresConIva) {
+                    $saldosIva = [];
                     foreach ($pedidos as $pedIva) {
                         $detPedIva = collect($detallePedidos)->firstWhere('pedido_id', $pedIva->id);
-                        if (!$detPedIva) { $ivaReservadoPorPedido[$pedIva->id] = 0; continue; }
+                        if (!$detPedIva) {
+                            $saldosIva[$pedIva->id] = 0;
+                            continue;
+                        }
                         $pedActIva = Pedido::select('id', 'saldo_iva_bs')->find($pedIva->id);
                         $saldoIvaPedIva = $pedActIva ? (float) ($pedActIva->saldo_iva_bs ?? 0) : 0;
-                        if ($saldoIvaPedIva <= 0.01) { $ivaReservadoPorPedido[$pedIva->id] = 0; continue; }
-                        $retencionIvaPed = (float) ($detPedIva['retencion'] ?? 0);
-                        $ivaNetIva = ($opcion_iva === 'retencion')
-                            ? max($saldoIvaPedIva - $retencionIvaPed, 0)
-                            : $saldoIvaPedIva;
-                        $ivaParaEste = min($ivaNetIva, $presupuestoIvaDisponible);
-                        $ivaReservadoPorPedido[$pedIva->id] = $ivaParaEste;
-                        $presupuestoIvaDisponible -= $ivaParaEste;
-                        if ($presupuestoIvaDisponible <= 0.01) break;
+                        $saldosIva[$pedIva->id] = $saldoIvaPedIva;
                     }
-                    // Sufijo: suma de IVA reservado para los pedidos POSTERIORES a cada uno.
-                    // Permite limitar la base de cada pedido sin consumir el cupo del siguiente IVA.
-                    $sufijoIva = 0;
-                    foreach (array_reverse($pedidos->all()) as $pedSuf) {
-                        $ivaReservadoSufijo[$pedSuf->id] = $sufijoIva;
-                        $sufijoIva += $ivaReservadoPorPedido[$pedSuf->id] ?? 0;
-                    }
+
+                    [$ivaReservadoPorPedido, $ivaReservadoSufijo] = $this->reservarIvaPrioritario(
+                        $saldosIva,
+                        $montoDisponiblePago
+                    );
                 }
 
                 // Distribuir este pago entre los pedidos que aún tienen saldo pendiente
@@ -1950,53 +2004,31 @@ class VendedorPagoController extends Controller
                     $ivaAplicadoBs = 0;
 
                     if ($esPagoBolivaresConIva) {
-                        \Illuminate\Support\Facades\Log::info('Opción IVA: ' . $opcion_iva . ' | Abono tipo: ' . $abono_tipo);
+                        \Illuminate\Support\Facades\Log::info('Opción IVA: ' . $opcion_iva);
                         \Illuminate\Support\Facades\Log::info('Saldo IVA pendiente: ' . $saldoIvaPendientePedido . ' | Monto disponible: ' . $montoDisponiblePago);
 
                         // ── PASO 1: Calcular cuánto IVA se aplica ────────────────────────────────
-                        if ($abono_tipo === 'solo_base') {
-                            $ivaAplicadoBs = 0;
-                        } elseif ($abono_tipo === 'solo_iva') {
-                            if ($opcion_iva === 'retencion') {
-                                $retencionPedido = (float) ($detalle['retencion'] ?? 0);
-                                $ivaNetoBs = max($saldoIvaPendientePedido - $retencionPedido, 0);
-                                $ivaAplicadoBs = min($ivaNetoBs, $montoDisponiblePago);
-                            } else {
-                                $ivaAplicadoBs = min($saldoIvaPendientePedido, $montoDisponiblePago);
-                            }
-                        } elseif ($opcion_iva === 'retencion') {
-                            $retencionPedido = (float) ($detalle['retencion'] ?? 0);
-                            $ivaNetoBs = max($saldoIvaPendientePedido - $retencionPedido, 0);
-                            // Usar IVA pre-reservado para garantizar prioridad global del IVA sobre la base
-                            $ivaAplicadoBs = isset($ivaReservadoPorPedido[$pedido->id])
-                                ? min($ivaReservadoPorPedido[$pedido->id], $montoDisponiblePago)
-                                : min($ivaNetoBs, $montoDisponiblePago);
-                            \Illuminate\Support\Facades\Log::info('IVA neto (retención Bs.' . $retencionPedido . '): ' . $ivaAplicadoBs);
-                        } else {
-                            // Usar IVA pre-reservado para garantizar prioridad global del IVA sobre la base
-                            $ivaAplicadoBs = isset($ivaReservadoPorPedido[$pedido->id])
-                                ? min($ivaReservadoPorPedido[$pedido->id], $montoDisponiblePago)
-                                : min($saldoIvaPendientePedido, $montoDisponiblePago);
-                            \Illuminate\Support\Facades\Log::info('IVA completo a pagar: ' . $ivaAplicadoBs);
-                        }
+                        $ivaAplicadoBs = isset($ivaReservadoPorPedido[$pedido->id])
+                            ? min($ivaReservadoPorPedido[$pedido->id], $montoDisponiblePago)
+                            : min($saldoIvaPendientePedido, $montoDisponiblePago);
+                        \Illuminate\Support\Facades\Log::info('IVA completo a pagar: ' . $ivaAplicadoBs);
 
                         // ── PASO 2: Con el resto, pagar la base (reservando IVA de pedidos siguientes) ─
-                        if ($abono_tipo === 'solo_iva') {
-                            $montoBaseAplicadoBs = 0;
-                        } else {
-                            // Dejar espacio para el IVA de pedidos posteriores antes de asignar base
-                            $ivaParaPedidosSiguientes = $ivaReservadoSufijo[$pedido->id] ?? 0;
-                            $restantePagoBs = max($montoDisponiblePago - $ivaAplicadoBs - $ivaParaPedidosSiguientes, 0);
-                            $maximoBaseEnBs = max($saldoPendientePedido, 0) * (float) $tasa_cambio;
-                            $montoBaseAplicadoBs = min($restantePagoBs, $maximoBaseEnBs);
-                        }
+                        // Dejar espacio para el IVA de pedidos posteriores antes de asignar base.
+                        $ivaParaPedidosSiguientes = $ivaReservadoSufijo[$pedido->id] ?? 0;
+                        $restantePagoBs = max($montoDisponiblePago - $ivaAplicadoBs - $ivaParaPedidosSiguientes, 0);
+                        $maximoBaseEnBs = max($saldoPendientePedido, 0) * (float) $tasa_cambio;
+                        $montoBaseAplicadoBs = min($restantePagoBs, $maximoBaseEnBs);
 
                         \Illuminate\Support\Facades\Log::info('IVA aplicado Bs: ' . $ivaAplicadoBs . ' | Base aplicada Bs: ' . $montoBaseAplicadoBs);
 
                         $montoParaAsignarBs = $ivaAplicadoBs + $montoBaseAplicadoBs;
                         $montoDisponibleUsd = (float) $tasa_cambio > 0 ? $montoBaseAplicadoBs / (float) $tasa_cambio : 0;
-                        $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
-                        $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
+                        [$montoPagadoUsd, $ajustesAsignadoDiv] = $this->distribuirBaseYAjustes(
+                            $saldoReal,
+                            $saldoRealAjustes,
+                            $montoDisponibleUsd
+                        );
                         $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
 
                     } elseif ($aplicarIvaEnDivisaAhora && $saldoIvaPendientePedido > 0.01) {
@@ -2102,41 +2134,6 @@ class VendedorPagoController extends Controller
                     \Illuminate\Support\Facades\Log::info('Validación actualización pedido ' . $pedido->id . ':');
                     \Illuminate\Support\Facades\Log::info('IVA aplicado: ' . $ivaAplicadoBs . ', IVA restante: ' . $saldoIvaRestante);
                     \Illuminate\Support\Facades\Log::info('Base aplicada: ' . $montoPagadoUsd . ', Base restante: ' . $saldoBaseRestante);
-                    
-                    // Los bloques de corrección de IVA/base solo aplican a pagos en Bolívares.
-                    // Para pagos en Divisa, montoDisponiblePago está en USD mientras que
-                    // ivaAplicadoBs está en Bs, mezclarlos corrompería montoPagadoUsd.
-                    if ($esPagoBolivaresConIva) {
-                        // Si hay saldo IVA restante Y no es retención intencional, intentar cubrirlo
-                        // IMPORTANTE: cuando opcion_iva === 'retencion', el saldoIvaRestante es el monto
-                        // de retención que se deja intencionalmente pendiente en saldo_iva_bs.
-                        if ($opcion_iva !== 'retencion' && $saldoIvaRestante > 0.01 && $montoDisponiblePago > $ivaAplicadoBs) {
-                            $ivaAdicional = min($saldoIvaRestante, $montoDisponiblePago - $ivaAplicadoBs);
-
-                            // Actualizar el IVA aplicado para cubrir el resto
-                            $ivaAplicadoBs += $ivaAdicional;
-                            $restantePagoBs = max($montoDisponiblePago - $ivaAplicadoBs, 0);
-                            $maximoBaseEnBs = max($saldoPendientePedido, 0) * (float) $tasa_cambio;
-                            $montoBaseAplicadoBs = min($restantePagoBs, $maximoBaseEnBs);
-                            $montoDisponibleUsd = $montoBaseAplicadoBs / (float) $tasa_cambio;
-                            $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
-                            $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
-                            $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
-
-                            \Illuminate\Support\Facades\Log::info('IVA adicional aplicado: ' . $ivaAdicional . ', Nuevo IVA total: ' . $ivaAplicadoBs);
-                        }
-
-                        // Si hay saldo base restante, ajustar el monto base aplicado
-                        if ($saldoBaseRestante > 0.01 && $montoDisponiblePago > $ivaAplicadoBs + ($montoPagadoUsd * (float) $tasa_cambio)) {
-                            $baseAdicional = min($saldoBaseRestante, ($montoDisponiblePago - $ivaAplicadoBs) / (float) $tasa_cambio);
-                            $montoDisponibleUsd = $montoPagadoUsd + $ajustesAsignadoDiv + $baseAdicional;
-                            $montoPagadoUsd = min($saldoReal, $montoDisponibleUsd);
-                            $ajustesAsignadoDiv = min($saldoRealAjustes, max($montoDisponibleUsd - $montoPagadoUsd, 0));
-                            $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
-
-                            \Illuminate\Support\Facades\Log::info('Base adicional aplicada: ' . $baseAdicional . ', Nueva base total: ' . $montoPagadoUsd);
-                        }
-                    }
                     
                     // Actualizar el registro de pago con los montos corregidos.
                     // iva almacena: para Bolívares = Bs aplicados a saldo_iva_bs (reducido al registrar)
@@ -2264,6 +2261,41 @@ class VendedorPagoController extends Controller
                 ->with('error', 'Ocurrió un error al procesar el pago: ' . $e->getMessage())
                 ->withInput();
         }
+    }
+
+    private function reservarIvaPrioritario(array $saldosIva, float $montoDisponibleBs): array
+    {
+        $reservadoPorPedido = [];
+        $presupuestoDisponible = max($montoDisponibleBs, 0);
+
+        foreach ($saldosIva as $pedidoId => $saldoIva) {
+            $reservado = min(max((float) $saldoIva, 0), $presupuestoDisponible);
+            $reservadoPorPedido[$pedidoId] = $reservado;
+            $presupuestoDisponible -= $reservado;
+        }
+
+        $reservadoPosterior = [];
+        $acumulado = 0;
+        foreach (array_reverse($reservadoPorPedido, true) as $pedidoId => $reservado) {
+            $reservadoPosterior[$pedidoId] = $acumulado;
+            $acumulado += $reservado;
+        }
+
+        return [$reservadoPorPedido, $reservadoPosterior];
+    }
+
+    private function distribuirBaseYAjustes(
+        float $saldoBase,
+        float $saldoAjustes,
+        float $montoDisponibleUsd
+    ): array {
+        $montoBase = min(max($saldoBase, 0), max($montoDisponibleUsd, 0));
+        $montoAjustes = min(
+            max($saldoAjustes, 0),
+            max($montoDisponibleUsd - $montoBase, 0)
+        );
+
+        return [$montoBase, $montoAjustes];
     }
 
     /**

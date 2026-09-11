@@ -291,6 +291,12 @@ class PagosController extends Controller
 
                 // La retención en pagos_pedidos representa el monto Bs pendiente de comprobante
                 $retencionBs = (float) ($pagoPedido->retencion ?? 0);
+                if ($retencionBs <= 0.001 && (float) ($pedido->porc_retencion ?? 0) > 0) {
+                    $retencionBs = round(
+                        (float) ($pedido->iva_bs ?? 0) * ((float) $pedido->porc_retencion / 100),
+                        2
+                    );
+                }
                 if ($retencionBs <= 0.001) continue;
 
                 // Saldar el saldo_iva_bs con la retención validada

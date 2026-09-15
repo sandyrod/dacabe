@@ -17,7 +17,12 @@ class PagoGrupo extends Model
         'moneda_pago',
         'fecha_pago',
         'user_id',
-        'seller_id'
+        'seller_id',
+        'distribucion_saldos'
+    ];
+
+    protected $casts = [
+        'distribucion_saldos' => 'array'
     ];
      
     public function getData($id = null)

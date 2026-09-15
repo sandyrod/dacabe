@@ -45,6 +45,11 @@ class Pago extends Model
         return $this->hasMany(PagoPedido::class)->with('pedido');
     }
 
+    public function pago_grupo()
+    {
+        return $this->belongsTo(PagoGrupo::class, 'pago_grupo_id', 'id');
+    }
+
     public function tipo_pago()
     {
         return $this->belongsTo(OrderTpago::class, 'tpago_id', 'CPAGO');

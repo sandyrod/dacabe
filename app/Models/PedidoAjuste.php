@@ -32,9 +32,13 @@ class PedidoAjuste extends Model
     /**
      * Net effect on the total to pay (positive = increases debt, negative = reduces debt).
      */
-    public function getNetoAttribute(): float
+    public function getNetoAttribute($value): float
     {
-        return $this->tipo === 'cargo' ? $this->monto : -$this->monto;
+        if ($value !== null && $this->tipo === null) {
+            return (float) $value;
+        }
+
+        return $this->tipo === 'cargo' ? (float) $this->monto : -(float) $this->monto;
     }
 
     /**
@@ -42,12 +46,11 @@ class PedidoAjuste extends Model
      */
     public static function netoPendiente(int $pedidoId): float
     {
-        $row = self::where('pedido_id', $pedidoId)
+        $neto = self::where('pedido_id', $pedidoId)
             ->where('pagado', false)
-            ->selectRaw("SUM(CASE WHEN tipo='cargo' THEN monto ELSE -monto END) as neto")
-            ->first();
+            ->value(DB::raw("SUM(CASE WHEN tipo='cargo' THEN monto ELSE -monto END)"));
 
-        return round((float) ($row->neto ?? 0), 2);
+        return round((float) ($neto ?? 0), 2);
     }
 
     /**

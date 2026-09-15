@@ -95,6 +95,11 @@ class Pedido extends Model
         return $this->hasOne(PedidoFactura::class, 'pedido_id', 'id');
     }
 
+    public function pedidos_facturas()
+    {
+        return $this->hasOne(PedidoFactura::class, 'pedido_id', 'id');
+    }
+
     public function deposito()
     {
         return $this->belongsTo(Deposito::class, 'cdepos', 'CDEPOS');

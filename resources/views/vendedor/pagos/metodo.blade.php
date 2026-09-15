@@ -482,6 +482,7 @@
                                                 @php $totalDescuento = 0; @endphp
                                                 @php $pedidosIds = collect($pedidosSeleccionados)->pluck('id')->toArray(); @endphp
 
+                                                @php $totalSaldoBase = 0; @endphp
                                                 @php $totalPagarDivisa = 0; @endphp
                                                 @php $totalPagar = 0; @endphp
                                                 @php $totalPagarBs = 0; @endphp
@@ -495,6 +496,7 @@
                                                 @php
                                                 $basePedido = (float) ($pedido->base ?? $pedido->total ?? 0);
                                                 $saldoBasePedido = (float) ($pedido->saldo_base ?? 0);
+                                                $totalSaldoBase += $saldoBasePedido;
                                                 $aplicaDescuentoDivisa = abs($basePedido - $saldoBasePedido) <= 0.01;
 
                                                 // Obtener ajustes netos del pedido
@@ -635,6 +637,8 @@
                                             </tbody>
                                             <tfoot class="position-sticky bottom-0 bg-white"
                                                 style="box-shadow: 0 -2px 10px rgba(0,0,0,0.05);">
+                                                <input type="hidden" id="total_saldo_base_puro"
+                                                    value="{{ $totalSaldoBase }}">
                                                 <input type="hidden" id="total_porc_retencion"
                                                     name="total_porc_retencion" value="{{ $porc_retencion }}">
                                                 <input type="hidden" id="total_retencion" name="total_retencion"
@@ -790,6 +794,7 @@
                                 <input type="hidden" name="total_ajustes_netos" id="total_ajustes_netos" value="{{ $totalAjustesNetos }}">
                                 <input type="hidden" name="base_real" value="{{ $totalPagarDivisa - $totalDescuento }}">
                                 <input type="hidden" name="monto_total_bs" id="monto-total-bs" value="">
+                                <input type="hidden" name="total_bolivares" id="total_bolivares_input" value="">
 
                                 <!-- Moneda de Pago -->
                                 <div class="mb-4">
@@ -1173,14 +1178,14 @@
                                                                 </div>
                                                             </div>
                                                             <div class="row mt-2">
-                                                                <!-- Segunda fila: TOTAL (más llamativo, monto en Bs. alineado a la derecha y resaltado) -->
+                                                                <!-- Segunda fila: TOTAL CUADRO AZUL (Base + IVA Neto) -->
                                                                 <div class="col-12">
                                                                     <div
                                                                         class="d-flex justify-content-end align-items-center">
                                                                         <div class="text-end w-100">
                                                                             <div
                                                                                 class="fw-semibold small text-white-50 text-right mr-3">
-                                                                                TOTAL</div>
+                                                                                TOTAL BASE + IVA</div>
                                                                             <div class="display-6 fw-bold text-right"
                                                                                 style="color: #38bdf8; letter-spacing: 1px; background: rgba(56,189,248,0.12); border-radius: 0.5rem; padding: 0.25rem 1rem;"
                                                                                 id="total_bolivares2">
@@ -1191,6 +1196,37 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Banner Resaltado: Monto Total a Pagar en Bolívares (Cuadro Azul + Ajustes) -->
+                                            <div id="banner-gran-total-bs" class="card border-0 shadow-lg mb-3"
+                                                style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%); border-radius: 14px; border: 2px solid #6366f1 !important; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.25) !important;">
+                                                <div class="card-body p-3 text-white">
+                                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                                        <div class="d-flex align-items-center gap-3">
+                                                            <div style="width: 46px; height: 46px; border-radius: 12px; background: rgba(99, 102, 241, 0.35); display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.2);">
+                                                                <i class="fas fa-coins text-warning" style="font-size: 22px;"></i>
+                                                            </div>
+                                                            <div>
+                                                                <div class="small text-white-50 text-uppercase fw-bold" style="letter-spacing: 0.5px; font-size: 0.78rem;">MONTO TOTAL A PAGAR (BS.)</div>
+                                                                <div class="small" style="color: #cbd5e1; font-size: 0.8rem;">
+                                                                    <span>Base+IVA: <b id="subtotal-cuadro-azul-bs" class="text-info">0,00 Bs.</b></span>
+                                                                    <span id="wrap-desglose-ajustes-bs" class="ms-2">| Ajustes: <b id="subtotal-ajustes-bs" class="text-warning">0,00 Bs.</b></span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="text-end">
+                                                            <div class="display-6 fw-bold text-end"
+                                                                 style="color: #38bdf8; letter-spacing: 0.5px; font-size: 1.85rem; line-height: 1.1;"
+                                                                 id="gran_total_bolivares">
+                                                                0,00 Bs.
+                                                            </div>
+                                                            <small class="text-white-50" style="font-size: 0.72rem;">
+                                                                Total definitivo a transferir
+                                                            </small>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -2218,46 +2254,31 @@
             const totalDolaresNeto = baseSinIvaDolares + (ivaDolares - retencionDolares);
 
             // Convertir a bolívares aplicando la tasa
-            // Usar variables de PHP para Base y iva desde el backend
-            const totalPagarBs = parseFloat("{{ $totalPagarBs ?? 0 }}") || 0;
+            const saldoBasePuro = parseFloat($('#total_saldo_base_puro').val()) || (parseFloat("{{ $totalSaldoBase ?? 0 }}") || 0);
             const iva_bs = parseFloat("{{ $iva_bs ?? 0 }}") || 0;
+            const retencionBolivares = parseFloat("{{ $totalRetencion ?? 0 }}") || 0;
+            const ivaNetoBolivares = Math.max(iva_bs - retencionBolivares, 0);
 
-            const baseBolivares = totalPagarBs * tasa;
+            const baseBolivares = saldoBasePuro * tasa;
             let ivaBolivares = iva_bs;
 
-            let retencionBolivares = 0;
-            $('.pedido-fila-new').each(function() {
-                const $fila = $(this);
-                const iva = parseFloat($fila.attr('data-iva')) || 0;
+            // Total del cuadro azul oscuro (Base + IVA neto)
+            totalBolivares = (baseBolivares + ivaNetoBolivares);
 
-                // si tiene retencion acumula el valor para retencionBolivares
-                const retencion = parseFloat($fila.attr('data-retencion')) || 0;
-                if (retencion > 0 && iva > 0) {
-                    let porc_retenc2 = (retencion * 100) / iva;
-                    // Aquí asumiendo que el IVA bolívares de la fila proporcional se puede calcular
-                    // o usamos retencionBolivares total
-                    //retencionBolivares += (ivaBolivares * porc_retenc2 / 100);
-                }
-            });
-            retencionBolivares = parseFloat("{{ $totalRetencion ?? 0 }}") || 0;
+            // Ajustes netos (USD y Bs.)
+            const totalAjustesNetosUsd = parseFloat($('#total_ajustes_netos').val()) || 0;
+            const totalAjustesBs = totalAjustesNetosUsd * tasa;
 
-
-            // Verificar o calcular el total
-            totalBolivares = (baseBolivares + (ivaBolivares - retencionBolivares));
+            // Gran total a pagar en bolívares = (Total cuadro azul oscuro) + (Total ajustes en Bs.)
+            const granTotalBolivares = totalBolivares + totalAjustesBs;
 
             console.log('--- Cálculos en Bolívares (Tasa:', tasa, ') ---');
             console.log('Base sin IVA Bs:', baseBolivares);
             console.log('IVA Bs.:', ivaBolivares);
             console.log('Retención Bs:', retencionBolivares);
-            console.log('Total Bs:', totalBolivares);
-
-            // Mostrar cálculos finales
-            console.log('--- Cálculos Finales ---');
-            console.log('Base sin IVA $:', baseSinIvaDolares, 'x', tasa, '=', baseBolivares.toFixed(2), 'Bs.');
-            console.log('IVA $:', ivaDolares, 'x', tasa, '=', ivaBolivares.toFixed(2), 'Bs.');
-            console.log('Retención $:', retencionDolares, 'x', tasa, '=', retencionBolivares.toFixed(2), 'Bs.');
-            console.log('Total Bs:', baseBolivares.toFixed(2), '+', ivaBolivares.toFixed(2), '-', retencionBolivares
-                .toFixed(2), '=', totalBolivares.toFixed(2), 'Bs.');
+            console.log('Total Cuadro Azul (Base + IVA Neto) Bs:', totalBolivares);
+            console.log('Ajustes Bs:', totalAjustesBs);
+            console.log('Gran Total a Pagar Bs:', granTotalBolivares);
 
             // Actualizar la visualización de montos en bolívares
             const formatOptions = {
@@ -2274,14 +2295,11 @@
 
             // Formatear valores
             const ivaFormatted = ivaBolivares.toLocaleString('es-ES', formatOptions);
+            const ivaBolivaresFormateado = ivaFormatted;
             const baseFormatted = baseBolivares.toLocaleString('es-ES', formatOptions);
             const totalFormatted = totalBolivares.toLocaleString('es-ES', formatOptions);
-
-            // Debug: Mostrar valores finales
-            console.log('--- Valores finales para UI ---');
-            console.log('Base Bs:', baseFormatted);
-            console.log('IVA Bs.:', ivaFormatted);
-            console.log('Total Bs:', totalFormatted);
+            const granTotalFormatted = granTotalBolivares.toLocaleString('es-ES', formatOptions);
+            const ajustesBsFormatted = (totalAjustesBs >= 0 ? '+' : '') + totalAjustesBs.toLocaleString('es-ES', formatOptions);
 
             // Mostrar/ocultar montos en dólares/bolívares
             if (tasa > 0) {
@@ -2303,8 +2321,19 @@
 
                 $('#total_iva').val(ivaBolivares);
 
-                // Actualizar total en la interfaz
+                // Actualizar total en el cuadro azul (Base + IVA neto)
                 $('#total_bolivares2').html(totalFormatted + ' Bs.');
+
+                // Actualizar banner resaltado del Gran Total
+                $('#subtotal-cuadro-azul-bs').text(totalFormatted + ' Bs.');
+                $('#subtotal-ajustes-bs').text(ajustesBsFormatted + ' Bs.');
+                if (Math.abs(totalAjustesBs) > 0.001) {
+                    $('#wrap-desglose-ajustes-bs').removeClass('d-none');
+                } else {
+                    $('#wrap-desglose-ajustes-bs').addClass('d-none');
+                }
+                $('#gran_total_bolivares').html(granTotalFormatted + ' Bs.');
+                $('#banner-gran-total-bs').removeClass('d-none');
             } else {
                 // Mostrar montos en dólares
                 $('#base_dolares').removeClass('d-none');
@@ -2319,39 +2348,11 @@
                 const totalDolaresFormatted = (totalDolares + ivaDolares - retencionDolares).toLocaleString('es-ES',
                     formatOptions);
                 $('#total_bolivares2').html(totalDolaresFormatted + ' $');
+                $('#banner-gran-total-bs').addClass('d-none');
             }
 
-            // Guardar el total sin IVA para referencia
-            const totalSinIvaBolivares = totalDolares * tasa;
-
-            // Debug: Mostrar valores en consola
-            console.log('Tasa BCV:', tasa);
-            console.log('Total $:', totalDolares);
-            console.log('IVA $:', ivaDolares);
-            console.log('Total + IVA $:', totalDolares + ivaDolares);
-            console.log('Total Bs:', totalBolivares);
-            //$('#total-iva').html(ivaDolares.toFixed(2));
-
-            // Formatear valores para mostrar
-            const totalBolivaresFormateado = totalBolivares.toLocaleString('es-ES', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-
-            const ivaBolivaresFormateado = ivaBolivares.toLocaleString('es-ES', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-
-            // Actualizar la interfaz con los valores formateados
-            console.log('Actualizando UI con valores:');
-            console.log('Total sin IVA Bs--:', (totalDolares * tasa).toLocaleString('es-ES'));
-            console.log('IVA Bs...:', ivaBolivaresFormateado);
-            console.log('Retención Bs:', (retencionBolivares).toLocaleString('es-ES'));
-            console.log('Total con IVA Bs:', totalBolivaresFormateado);
-
             // Actualizar total en la tabla
-            $('#total-bolivares').text(totalBolivaresFormateado);
+            $('#total-bolivares').text(granTotalFormatted);
 
             // Actualizar subtotal en la sección de resumen
             const subtotalBolivares = (totalDolares * tasa).toLocaleString('es-ES', {
@@ -2365,7 +2366,6 @@
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
-            //$('#retencion_bolivares').text(retencionBolivaresFormateada + ' Bs.');
 
             // Actualizar IVA en la sección de resumen (solo si hay IVA)
             if (ivaBolivares > 0) {
@@ -2374,29 +2374,25 @@
                 $('#impuesto_bolivares').html('0,00 Bs.');
             }
 
-            // Actualizar total en la tarjeta resaltada
-            $('#total_bolivares2').html(totalBolivaresFormateado + ' Bs.');
-
-            // Actualizar el campo oculto con el monto total en bolívares
-            $('#monto-total-bs').val(totalBolivares.toFixed(2));
-
+            // Actualizar los campos ocultos con los montos exactos
+            $('#monto-total-bs').val(granTotalBolivares.toFixed(2));
+            $('#total_bolivares_input').val(granTotalBolivares.toFixed(2));
+            $('input[name="total_pagar"]').val(granTotalBolivares.toFixed(2));
 
             // Actualizar el campo oculto con el monto total
             $('#monto-total').val(totalDolares.toFixed(2));
 
             // Forzar actualización de la UI
             $('body').trigger('conversionCalculada', {
-                total: totalBolivaresFormateado,
+                total: granTotalFormatted,
                 iva: ivaBolivaresFormateado
             });
 
-
-            $('#monto-total-con-descuento').html((totalPagarBs).toFixed(2));
+            $('#monto-total-con-descuento').html((tasa > 0 ? (totalBolivares / tasa) : totalDolares).toFixed(2));
             $('#ahorro-total').html('0,00');
             $('.descuento-adicional').html('0,00');
             $('.pedido-fila-new').each(function() {
                 const montoOriginal = parseFloat($(this).data('monto-original')) || 0;
-                //$(this).find('.monto-pedido').html(montoConDescuento.toFixed(2).replace(/\./g, ','));
             });
         }
 
@@ -2448,7 +2444,7 @@
                 return;
             }
             if (tipo === 'divisa_total') {
-                //$('#bloque-iva-divisa').show();
+                $('#bloque-iva-divisa').show();
             } else {
                 $('#bloque-iva-divisa').hide();
                 $('#iva_en_divisa_check').prop('checked', false);

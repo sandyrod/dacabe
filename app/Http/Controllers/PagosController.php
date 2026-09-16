@@ -149,7 +149,11 @@ class PagosController extends Controller
                     );
                     $this->normalizarSaldosPagados($pedido);
                     $pedido->save();
-                    if ($pedido->estatus === 'PAGADO') {
+                    // Marcar los ajustes como pagados en cuanto su saldo llega a 0, aunque el
+                    // pedido no llegue a PAGADO (la base o el IVA pueden quedar pendientes a
+                    // propósito). De lo contrario pedido_ajustes.pagado sigue en false y el
+                    // ajuste ya cobrado reaparece como pendiente en el siguiente pago.
+                    if ((float) ($pedido->saldo_ajustes ?? 0) <= 0.01) {
                         PedidoAjuste::marcarPagados((int) $pedido->id);
                     }
                 }
@@ -314,7 +318,7 @@ class PagosController extends Controller
                 $this->normalizarSaldosPagados($pedido);
                 $pedido->save();
 
-                if ($pedido->estatus === 'PAGADO') {
+                if ((float) ($pedido->saldo_ajustes ?? 0) <= 0.01) {
                     PedidoAjuste::marcarPagados((int) $pedido->id);
                 }
             }
@@ -437,16 +441,24 @@ class PagosController extends Controller
     // Obtener detalles de un pago
     public function detalle($id)
     {
-        $pago = Pago::with('tipo_pago', 'banco', 'pago_destino')->findOrFail($id);
+        $pago = Pago::with('tipo_pago', 'banco', 'pago_destino', 'pago_grupo')->findOrFail($id);
         $tasaPago = (float) ($pago->rate ?? 0);
         
+        // Obtener distribución de saldos original guardada en el pago_grupo
+        $distribucionSaldos = [];
+        if ($pago->pago_grupo && !empty($pago->pago_grupo->distribucion_saldos)) {
+            $rawDist = $pago->pago_grupo->distribucion_saldos;
+            $distribucionSaldos = is_array($rawDist) ? $rawDist : (json_decode($rawDist, true) ?: []);
+        }
+
         // Obtener los pagos_pedidos asociados
-        $pagosPedidos = $pago->pago_pedidos()->with('pedido')->get();
+        $pagosPedidos = $pago->pago_pedidos()->with(['pedido.pedido_detalle', 'pedido.pedido_factura'])->get();
         
-        $detalles = $pagosPedidos->map(function($pagoPedido) use($pago, $tasaPago) {
+        $detalles = $pagosPedidos->map(function($pagoPedido) use($pago, $tasaPago, $distribucionSaldos) {
             // Calcular el monto total del pedido
             $pedido = $pagoPedido->pedido;
-            $detallesPedido = $pedido->pedido_detalle;
+            $pedidoId = (int) ($pedido->id ?? 0);
+            $detallesPedido = $pedido->pedido_detalle ?? collect();
             $subtotal = 0;
             $ivaTotal = 0;
             foreach($detallesPedido as $det) {
@@ -477,26 +489,54 @@ class PagosController extends Controller
 
             $montoBaseUsd = round((float) ($pagoPedido->monto ?? 0), 2);
             $montoAjusteUsd = round((float) ($pagoPedido->ajustes_monto ?? 0), 2);
+            $montoIvaBs = round((float) ($pagoPedido->iva ?? 0), 2);
+            $montoRetencionBs = round((float) ($pagoPedido->retencion ?? 0), 2);
+            $montoDescuentoUsd = round((float) ($pagoPedido->descuento ?? 0), 2);
+
             $montoBaseBs = round($montoBaseUsd * $tasaPago, 2);
             $montoAjusteBs = round($montoAjusteUsd * $tasaPago, 2);
+            $montoIvaUsd = $tasaPago > 0 ? round($montoIvaBs / $tasaPago, 2) : 0;
+            $montoRetencionUsd = $tasaPago > 0 ? round($montoRetencionBs / $tasaPago, 2) : 0;
+            $montoDescuentoBs = round($montoDescuentoUsd * $tasaPago, 2);
+
+            // Total abonado a este pedido (USD y Bs)
+            $totalAbonadoPedidoUsd = round($montoBaseUsd + $montoAjusteUsd + $montoIvaUsd, 2);
+            $totalAbonadoPedidoBs = round($montoBaseBs + $montoAjusteBs + $montoIvaBs, 2);
+
+            // Selección de saldos realizada por el usuario
+            $seleccionPedido = $distribucionSaldos[$pedidoId] ?? null;
+            $seleccionIva = $seleccionPedido !== null ? !empty($seleccionPedido['iva']) : ($montoIvaBs > 0.001);
+            $seleccionBase = $seleccionPedido !== null ? !empty($seleccionPedido['base']) : ($montoBaseUsd > 0.001);
+            $seleccionAjustes = $seleccionPedido !== null ? !empty($seleccionPedido['ajustes']) : (abs($montoAjusteUsd) > 0.001);
 
             return [
-                'cliente' => $pagoPedido->pedido->descripcion,
+                'cliente' => $pedido->descripcion,
                 'tipo_pago' => $pago->tipo_pago,
                 'pago_destino' => $pago->pago_destino,
-                'fecha_pedido' => formatoFechaDMASimple($pagoPedido->pedido->fecha),
+                'fecha_pedido' => formatoFechaDMASimple($pedido->fecha),
                 'monto_pagado' => number_format($pagoPedido->monto, 2, ',', '.'),
-                'descuento' => $pagoPedido->pedido->monto_descuento,
-                'id' => $pagoPedido->pedido->id,
-                'monto' => $pagoPedido->monto,
+                'descuento' => $pedido->monto_descuento,
+                'id' => $pedido->id,
+                'factura_numero' => $pedido->pedido_factura->factura ?? null,
+                'monto' => $montoBaseUsd,
                 'monto_bs' => $montoBaseBs,
-                'iva' => $pagoPedido->iva,
-                'retencion' => $pagoPedido->retencion,
-                'dcto' => $pagoPedido->descuento,
+                'iva' => $montoIvaBs,
+                'iva_usd' => $montoIvaUsd,
+                'retencion' => $montoRetencionBs,
+                'retencion_usd' => $montoRetencionUsd,
+                'dcto' => $montoDescuentoUsd,
+                'dcto_bs' => $montoDescuentoBs,
                 'ajustes_monto' => $montoAjusteUsd,
                 'ajustes_bs' => $montoAjusteBs,
+                'total_abonado_usd' => $totalAbonadoPedidoUsd,
+                'total_abonado_bs' => $totalAbonadoPedidoBs,
                 'monto_total_pedido' => $montoTotalPedido,
-                'saldo_pendiente' => $saldoPendiente
+                'saldo_pendiente' => $saldoPendiente,
+                'seleccion' => [
+                    'iva' => $seleccionIva,
+                    'base' => $seleccionBase,
+                    'ajustes' => $seleccionAjustes,
+                ],
             ];
         });
 
@@ -603,6 +643,7 @@ class PagosController extends Controller
             'archivos' => $archivos,
             'detalle_pago' => $detallePago,
             'resumen_calculos' => $resumenCalculos,
+            'distribucion_saldos' => $distribucionSaldos,
         ]);
     }
 }

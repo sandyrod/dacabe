@@ -461,24 +461,16 @@
                         <div id="listaArchivos" class="row"></div>
                     </div>
 
-                    <!-- Pedidos Afectados -->
+                    <!-- Distribución de Saldos Abonados por Pedido -->
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <h6 class="font-weight-bold text-navy mb-0">
+                            <i class="fas fa-tasks mr-2 text-info"></i>Distribución de Saldos por Pedido
+                        </h6>
+                        <small class="text-muted font-weight-semibold">Selección del usuario y abonos aplicados</small>
+                    </div>
 
-                    <h6 class="font-weight-bold text-navy mb-3"><i class="fas fa-shopping-cart mr-2"></i>Pedidos
-                        Relacionados</h6>
-                    <div class="table-responsive bg-white rounded shadow-sm mb-4">
-                        <table class="table table-sm table-borderless mb-0">
-                            <thead class="border-bottom">
-                                <tr class="text-muted small text-uppercase">
-                                    <th class="pl-3">Pedido</th>
-                                    <th>Cliente</th>
-                                    <th>Fecha Pedido</th>
-                                    <th class="text-right pr-3">Monto Abonado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="listaPedidosBody">
-                                <!-- JS Load -->
-                            </tbody>
-                        </table>
+                    <div id="listaPedidosDistribucion" class="mb-4">
+                        <!-- JS Load -->
                     </div>
 
                     <!-- Botones Acción -->
@@ -1079,6 +1071,91 @@
         font-weight: 700;
     }
 
+    /* Distribución de Saldos por Pedido en Modal */
+    .distribucion-ped-card {
+        border-radius: 14px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+        background: #ffffff;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+
+    .distribucion-ped-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+    }
+
+    .distribucion-ped-head {
+        background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.65rem 1rem;
+    }
+
+    .distribucion-saldo-box {
+        border-radius: 10px;
+        padding: 0.65rem 0.85rem;
+        border: 1.5px solid transparent;
+        height: 100%;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .distribucion-saldo-box.box-iva {
+        background: linear-gradient(145deg, #ffffff 0%, #fffbeb 100%);
+        border-color: #fde68a;
+    }
+
+    .distribucion-saldo-box.box-base {
+        background: linear-gradient(145deg, #ffffff 0%, #f0fdf4 100%);
+        border-color: #bbf7d0;
+    }
+
+    .distribucion-saldo-box.box-ajustes {
+        background: linear-gradient(145deg, #ffffff 0%, #eef2ff 100%);
+        border-color: #c7d2fe;
+    }
+
+    .distribucion-saldo-box.box-unselected {
+        background: #f8fafc !important;
+        border-color: #e2e8f0 !important;
+        opacity: 0.65;
+    }
+
+    .distribucion-saldo-box.box-unselected .distribucion-box-amount {
+        color: #94a3b8 !important;
+    }
+
+    .distribucion-box-title {
+        font-size: 0.82rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .distribucion-box-amount {
+        font-size: 0.95rem;
+        font-weight: 800;
+        line-height: 1.2;
+        letter-spacing: -0.2px;
+    }
+
+    .distribucion-box-conv {
+        font-size: 0.72rem;
+        color: #64748b;
+        margin-top: 2px;
+    }
+
+    .badge-estado-seleccion {
+        font-size: 0.68rem;
+        font-weight: 700;
+        border-radius: 6px;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+    }
+
     @media (max-width: 767.98px) {
         .payment-amount-primary {
             font-size: 1.35rem;
@@ -1189,6 +1266,146 @@
             $('#calculoTotal').text(formatBolivares(calculos.total_bs));
         }
 
+        function renderDistribucionSaldos(detalles, tasa) {
+            const container = $('#listaPedidosDistribucion');
+            container.empty();
+
+            const items = Array.isArray(detalles) ? detalles : [];
+            if (!items.length) {
+                container.html(`
+                    <div class="text-center py-3 bg-white rounded border text-muted">
+                        <i class="fas fa-info-circle mr-1"></i>No hay pedidos vinculados a este pago.
+                    </div>
+                `);
+                return;
+            }
+
+            const tasaPago = parseAmount(tasa) || 1;
+
+            items.forEach(function(d) {
+                const sel = d.seleccion || {};
+                const selIva = sel.iva === true;
+                const selBase = sel.base === true;
+                const selAjustes = sel.ajustes === true;
+
+                const ivaBs = parseAmount(d.iva);
+                const ivaUsd = parseAmount(d.iva_usd || (tasaPago > 0 ? ivaBs / tasaPago : 0));
+                const baseUsd = parseAmount(d.monto);
+                const baseBs = parseAmount(d.monto_bs || (baseUsd * tasaPago));
+                const ajusteUsd = parseAmount(d.ajustes_monto);
+                const ajusteBs = parseAmount(d.ajustes_bs || (ajusteUsd * tasaPago));
+                const retencionBs = parseAmount(d.retencion);
+                const dctoUsd = parseAmount(d.dcto);
+
+                const totalPedUsd = parseAmount(d.total_abonado_usd || (baseUsd + ajusteUsd + ivaUsd));
+                const totalPedBs = parseAmount(d.total_abonado_bs || (baseBs + ajusteBs + ivaBs));
+
+                const badgeIva = selIva 
+                    ? '<span class="badge badge-success badge-estado-seleccion px-2 py-1"><i class="fas fa-check mr-1"></i>Abonar</span>' 
+                    : '<span class="badge badge-secondary badge-estado-seleccion px-2 py-1"><i class="fas fa-times mr-1"></i>Omitido</span>';
+                
+                const badgeBase = selBase 
+                    ? '<span class="badge badge-success badge-estado-seleccion px-2 py-1"><i class="fas fa-check mr-1"></i>Abonar</span>' 
+                    : '<span class="badge badge-secondary badge-estado-seleccion px-2 py-1"><i class="fas fa-times mr-1"></i>Omitido</span>';
+                
+                const badgeAjustes = selAjustes 
+                    ? '<span class="badge badge-success badge-estado-seleccion px-2 py-1"><i class="fas fa-check mr-1"></i>Abonar</span>' 
+                    : '<span class="badge badge-secondary badge-estado-seleccion px-2 py-1"><i class="fas fa-times mr-1"></i>Omitido</span>';
+
+                const facturaHtml = d.factura_numero
+                    ? `<span class="badge px-2 py-1 font-weight-bold ml-2" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:0.75rem;">
+                        <i class="fas fa-file-invoice mr-1"></i>Factura: ${d.factura_numero}
+                       </span>`
+                    : '';
+
+                container.append(`
+                    <div class="distribucion-ped-card">
+                        <div class="distribucion-ped-head d-flex flex-wrap align-items-center justify-content-between">
+                            <div class="d-flex align-items-center flex-wrap">
+                                <span class="badge badge-primary px-2 py-1 font-weight-bold mr-2 shadow-sm" style="font-size:0.82rem; border-radius:6px; background:linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);">
+                                    <i class="fas fa-box-open mr-1"></i>Pedido #${d.id}
+                                </span>
+                                <span class="text-dark font-weight-bold mr-2" style="font-size:0.88rem;">${d.cliente || ''}</span>
+                                <small class="text-muted"><i class="far fa-calendar-alt mr-1 text-primary"></i>${d.fecha_pedido || ''}</small>
+                                ${facturaHtml}
+                            </div>
+                            <div class="text-right mt-1 mt-sm-0">
+                                <span class="small text-muted mr-1 font-weight-semibold">Abono al pedido:</span>
+                                <span class="badge px-2 py-1 font-weight-bold text-white shadow-sm" style="font-size:0.85rem; background:#0f172a; border-radius:6px;">
+                                    ${formatDollar(totalPedUsd)} | ${formatBolivares(totalPedBs)}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body p-3 bg-white">
+                            <div class="row">
+                                <!-- 1. Saldo IVA -->
+                                <div class="col-md-4 mb-2 mb-md-0">
+                                    <div class="distribucion-saldo-box box-iva ${selIva ? '' : 'box-unselected'}">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="distribucion-box-title" style="color: #92400e;">
+                                                <i class="fas fa-percentage mr-1 text-warning"></i>Saldo IVA (Bs.)
+                                            </span>
+                                            ${badgeIva}
+                                        </div>
+                                        <div class="mt-1">
+                                            <div class="distribucion-box-amount" style="color: #b45309;">
+                                                ${formatBolivares(ivaBs)}
+                                            </div>
+                                            <div class="distribucion-box-conv">
+                                                ≈ ${formatDollar(ivaUsd)}
+                                            </div>
+                                            ${retencionBs > 0 ? `<div class="small font-weight-semibold text-danger mt-1" style="font-size:0.70rem;"><i class="fas fa-shield-alt mr-1"></i>Retención: ${formatBolivares(retencionBs)}</div>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 2. Saldo Base -->
+                                <div class="col-md-4 mb-2 mb-md-0">
+                                    <div class="distribucion-saldo-box box-base ${selBase ? '' : 'box-unselected'}">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="distribucion-box-title" style="color: #166534;">
+                                                <i class="fas fa-dollar-sign mr-1 text-success"></i>Saldo Base ($)
+                                            </span>
+                                            ${badgeBase}
+                                        </div>
+                                        <div class="mt-1">
+                                            <div class="distribucion-box-amount text-success">
+                                                ${formatDollar(baseUsd)}
+                                            </div>
+                                            <div class="distribucion-box-conv">
+                                                ${formatBolivares(baseBs)}
+                                            </div>
+                                            ${dctoUsd > 0 ? `<div class="small font-weight-semibold text-primary mt-1" style="font-size:0.70rem;"><i class="fas fa-tag mr-1"></i>Descuento: ${formatDollar(dctoUsd)}</div>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 3. Saldo Ajustes -->
+                                <div class="col-md-4">
+                                    <div class="distribucion-saldo-box box-ajustes ${selAjustes ? '' : 'box-unselected'}">
+                                        <div class="d-flex align-items-center justify-content-between mb-1">
+                                            <span class="distribucion-box-title" style="color: #3730a3;">
+                                                <i class="fas fa-sliders-h mr-1 text-primary"></i>Ajustes
+                                            </span>
+                                            ${badgeAjustes}
+                                        </div>
+                                        <div class="mt-1">
+                                            <div class="distribucion-box-amount" style="color: ${ajusteUsd >= 0 ? '#4338ca' : '#059669'};">
+                                                ${ajusteUsd >= 0 ? '+' : ''}${formatDollar(ajusteUsd)}
+                                            </div>
+                                            <div class="distribucion-box-conv">
+                                                ${ajusteBs >= 0 ? '+' : ''}${formatBolivares(ajusteBs)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `);
+            });
+        }
+
         $('.btn-ver-detalle').on('click', function() {
             const pagoId = $(this).data('id');
             currentPagoId = pagoId;
@@ -1200,6 +1417,7 @@
             $('#modalDetallePagoTexto').text('Sin observaciones');
             renderAjustesResumen({ ajustes: [], totales_ajustes: {} });
             renderResumenCalculos({});
+            renderDistribucionSaldos([], 1);
             $('#modalDetallePago').modal('show');
 
             // Cargar detalles vía AJAX (usando la ruta nueva o existente)
@@ -1223,6 +1441,7 @@
                         $('#modalDetallePagoTexto').text(detallePago !== '' ? detallePago : 'Sin observaciones');
                         renderAjustesResumen(response.resumen_calculos);
                         renderResumenCalculos(response.resumen_calculos);
+                        renderDistribucionSaldos(response.detalles, p.rate);
 
                         // Manejo de Archivos Adjuntos
                         const archivos = response.archivos || [];
@@ -1262,20 +1481,6 @@
                         } else {
                             $('#sectionArchivos').hide();
                         }
-
-                        const tbody = $('#listaPedidosBody');
-                        tbody.empty();
-
-                        response.detalles.forEach(d => {
-                            tbody.append(`
-                                <tr>
-                                    <td class="pl-3 font-weight-bold">#${d.id}</td>
-                                    <td>${d.cliente}</td>
-                                    <td>${d.fecha_pedido}</td>
-                                    <td class="text-right pr-3 font-weight-bold">${formatDollar(d.monto)}</td>
-                                </tr>
-                            `);
-                        });
 
                         $('#loadingDetalle').hide();
                         $('#contenidoDetalle').fadeIn();

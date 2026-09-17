@@ -54,6 +54,16 @@
                         </a>
                     </li>
 
+                    @if (auth()->user()->hasRole('vendedor'))
+                        <li class="nav-item">
+                            <a href="{{ route('vendedor.lista-precios.index') }}"
+                                class="nav-link {{ request()->routeIs('vendedor.lista-precios.*') ? 'active' : '' }}">
+                                <i class="nav-icon fas fa-tags"></i>
+                                <p>Lista de Precios</p>
+                            </a>
+                        </li>
+                    @endif
+
                     @ability('admin,owner', 'landing-settings')
                         <li class="nav-item">
                             <a href="{{ url('landing-settings') }}" class="nav-link">

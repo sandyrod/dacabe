@@ -1255,8 +1255,8 @@
                         } else {
                             img_promo =
                                 '<img class="mt-2" src="{{ asset('imgs/logos/productos_nacionales.jpg') }}" alt="Producto Nacional" title="Producto Nacional" style="width:100%; float:right;">';
-                            precio1 = inven.BASE2;
-                            precio2 = inven.BASE1;
+                            precio1 = inven.BASE1;
+                            precio2 = inven.BASE2;
                         }
                         let porcentaje_iva = inven.IMPUEST > 0 ? inven.IMPUEST / 100 : 0;
                         let iva_bs = inven.IMPUEST > 0 ? (precio1 * porcentaje_iva).toFixed(2) : 0;

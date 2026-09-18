@@ -1170,8 +1170,8 @@
                         let recargo = response.recargo ? response.recargo : 0;
                         if (inven.BASE2 && inven.BASE2 > 0) {
                             // OJO Cedano Preguntar por la zona para el campo Local/Foraneo
-                            precio2 = inven.BASE4 > 0 && recargo>0 ? inven.BASE4 : inven.BASE2 + ((inven.BASE2 * recargo) / 100);
-                            precio1 = inven.BASE3 > 0  && recargo>0 ? inven.BASE3 : inven.BASE1 + ((inven.BASE1 * recargo) / 100); //precio2;// + ((precio2 * recargo) / 100);
+                            precio2 = inven.BASE4 > 0 && recargo>0 ? inven.BASE4  + ((inven.BASE2 * recargo) / 100) : inven.BASE2 + ((inven.BASE2 * recargo) / 100);
+                            precio1 = inven.BASE3 > 0  && recargo>0 ? inven.BASE3  + ((inven.BASE2 * recargo) / 100) : inven.BASE1 + ((inven.BASE1 * recargo) / 100); //precio2;// + ((precio2 * recargo) / 100);
                         }
                         /*
                         //precio2 = inven.BASE1/(1-(dacabe_percent/100));
@@ -1255,8 +1255,8 @@
                         } else {
                             img_promo =
                                 '<img class="mt-2" src="{{ asset('imgs/logos/productos_nacionales.jpg') }}" alt="Producto Nacional" title="Producto Nacional" style="width:100%; float:right;">';
-                            precio1 = inven.BASE2;
-                            precio2 = inven.BASE1;
+                            precio1 = inven.BASE1 + ((inven.BASE2 * recargo) / 100);
+                            precio2 = inven.BASE2 + ((inven.BASE2 * recargo) / 100);
                         }
                         let porcentaje_iva = inven.IMPUEST > 0 ? inven.IMPUEST / 100 : 0;
                         let iva_bs = inven.IMPUEST > 0 ? (precio1 * porcentaje_iva).toFixed(2) : 0;

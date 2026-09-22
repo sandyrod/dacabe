@@ -795,6 +795,8 @@
                                 <input type="hidden" name="base_real" value="{{ $totalPagarDivisa - $totalDescuento }}">
                                 <input type="hidden" name="monto_total_bs" id="monto-total-bs" value="">
                                 <input type="hidden" name="total_bolivares" id="total_bolivares_input" value="">
+                                <input type="hidden" name="retencion_porcentajes"
+                                    value="{{ json_encode($retencionPorcentajes ?? []) }}">
 
                                 <!-- Moneda de Pago -->
                                 <div class="mb-4">

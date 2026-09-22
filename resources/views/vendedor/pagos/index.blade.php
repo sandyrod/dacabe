@@ -1154,6 +1154,8 @@
                             <input type="hidden" name="monto" value="{{ session('pago_cliente.monto') }}">
                             <input type="hidden" name="total_iva" value="{{ $total_iva ?? 0 }}">
                             <input type="hidden" name="total_retencion" value="{{ $total_retencion ?? 0 }}">
+                            <input type="hidden" name="retencion_porcentajes"
+                                value="{{ json_encode($retencionPorcentajes ?? []) }}">
                             <input type="hidden" name="total_descuento_pago" value="{{ $total_descuento_pago ?? 0 }}">
                             <input type="hidden" name="detallePedidos" value="{{ $detallePedidos ?? 0 }}">
                             <input type="hidden" name="total_ajustes_netos" value="{{ $total_ajustes_netos ?? 0 }}">

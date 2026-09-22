@@ -25,9 +25,11 @@ Route::get('privacy', 'LandingController@privacy');
 Route::get('dacabe', 'LandingController@indexDacabe');
 Route::get('lista-vendedores', 'LandingController@vendedores');
 Route::group(['middleware' => ['auth', 'role:vendedor']], function () {
-    Route::get('vendedor/lista-precios', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'index'])->name('vendedor.lista-precios.index');
-    Route::get('vendedor/lista-precios/pdf', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'pdf'])->name('vendedor.lista-precios.pdf');
+    //Route::get('vendedor/lista-precios', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'index'])->name('vendedor.lista-precios.index');
+    //Route::get('vendedor/lista-precios/pdf', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'pdf'])->name('vendedor.lista-precios.pdf');
 });
+Route::get('vendedor/lista-precios', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'index'])->name('vendedor.lista-precios.index');
+    Route::get('vendedor/lista-precios/pdf', [App\Http\Controllers\Vendedor\ListaPreciosController::class, 'pdf'])->name('vendedor.lista-precios.pdf');
 Route::get('vendedor/{codigo_vendedor?}', 'LandingController@vendedor');
 Route::get('catalogo', 'LandingController@catalogoFull');
 Route::get('lista-productos', 'LandingController@catalogoFullRecargo');

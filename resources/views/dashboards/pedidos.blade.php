@@ -14,6 +14,7 @@
     }, 'cliente_nombre')
     ->where('user_id', auth()->id())
         ->where('estatus', 'RECHAZADO')
+        ->where('updated_at', '>=', now()->subDays(7))
         ->whereNotNull('observaciones')
         ->where('observaciones', '!=', '')
         // No mostrar la alerta cuando cada pedido de este pago rechazado

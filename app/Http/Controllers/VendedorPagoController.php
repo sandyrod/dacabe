@@ -569,7 +569,8 @@ class VendedorPagoController extends Controller
                     $pedido->porcentaje_descuento = abs($pedido->descuento);
                     $pedido->monto_descuento = $pedido->saldo_base * ($pedido->descuento_aplicado / 100);
                     $pedido->saldo_con_descuento = $pedido->saldo_base - $pedido->monto_descuento;
-                    $pedido->retencion = $pedido->porc_retencion > 0 ? $pedido->iva_bs * ($pedido->porc_retencion / 100) : 0;
+                    $saldoIvaPendiente = (float) ($pedido->saldo_iva_bs ?? 0);
+                    $pedido->retencion = $pedido->porc_retencion > 0 ? $saldoIvaPendiente * ($pedido->porc_retencion / 100) : 0;
 
                     return $pedido;
                 });
@@ -1016,7 +1017,10 @@ class VendedorPagoController extends Controller
         // Determinar el total a pagar según el tipo de pago
         $total_pagar_divisa_parcial = 0;
         if ($tipoPago === 'divisa_total') {
-            $total_pagar = $request->total_pagar_divisa;
+            $totalPagarDivisa = (float) $request->input('total_pagar_divisa', 0);
+            $total_pagar = $totalPagarDivisa > 0
+                ? $totalPagarDivisa
+                : (float) $request->input('total_pagar', 0);
         } else {
             $total_pagar = $request->total_pagar;
             if ($tipoPago === 'divisa_parcial') {
@@ -1044,6 +1048,8 @@ class VendedorPagoController extends Controller
                 : 0;
 
             $total_pagar = $totalBolivaresBase + $ajustesNetosBs;
+            $total_bolivares = $total_pagar;
+        } elseif ($tipoPago === 'bs' && (float) $total_pagar > 0) {
             $total_bolivares = $total_pagar;
         }
 

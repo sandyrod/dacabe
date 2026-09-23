@@ -863,6 +863,13 @@
                                     ? ((float) ($totalConAjustes ?? 0) - $calcTotalAjustesBs)
                                     : ((float) ($totalConAjustes ?? 0) - (float) ($calcTotalAjustes ?? 0));
                             }
+
+                            $montoInicialPago = (float) ($totalConAjustes ?? 0);
+                            if ($montoInicialPago <= 0) {
+                                $montoInicialPago = $esPagoBs
+                                    ? (float) ($total_bolivares ?? 0)
+                                    : (float) ($total_pagar ?? 0);
+                            }
                         @endphp
                         <div class="d-flex align-items-center flex-grow-1">
                             <div class="flex-grow-1">
@@ -1715,7 +1722,7 @@
                                                     <td id="saldo-pendiente" colspan="3" class="text-nowrap fw-bold">
                                                         @php
                                                             $montoFormateado = number_format(
-                                                                $montoMostrar ?? 0,
+                                                                $montoInicialPago ?? 0,
                                                                 2,
                                                                 ',',
                                                                 '.',
@@ -1780,7 +1787,7 @@
         const paymentData = (function() {
             try {
                 // @ts-ignore
-                const initialAmount = JSON.parse('{{ json_encode($total_bolivares ?? ($montoMostrar ?? 0)) }}');
+                const initialAmount = JSON.parse('{{ json_encode($montoInicialPago ?? 0) }}');
                 const amount = typeof initialAmount === 'number' ? initialAmount : Number(initialAmount) || 0;
                 const amountFloat = parseFloat(amount.toString()) || 0;
 
@@ -1951,6 +1958,11 @@
 
             const isBolivares = ($('#tipo-moneda').html() || '').trim() === 'Bolívares';
             const nuevoTotal = isBolivares ? sumaBs : sumaUsd;
+            if (totalChecks === 0 || (checksMarcados === 0 && paymentData.totalAPagar > 0)) {
+                totalAPagar = paymentData.totalAPagar;
+                actualizarMontoPendiente();
+                return;
+            }
 
             totalAPagar = parseFloat(nuevoTotal.toFixed(2));
             paymentData.totalAPagar = totalAPagar;
@@ -2160,7 +2172,7 @@
         }
 
         // Variables globales
-        let totalAPagar = 0;
+        let totalAPagar = paymentData.totalAPagar;
         let totalPagado = 0;
         const pagos = [];
 

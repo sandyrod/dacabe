@@ -86,6 +86,7 @@ class ListaPreciosController extends Controller
         $factorIva = '(1 + (CASE WHEN COALESCE(i.IMPUEST, 0) > 0 THEN i.IMPUEST ELSE 0 END / 100))';
         $precioRef1Expression = '(' . $precioDivisaBase . ' * ' . $factorIva . ')';
         $precioRef2Expression = '(' . $precioBsBase . ' * ' . $factorIva . ')';
+        $stockExpression = 'SUM(ad.EUNIDAD - COALESCE(ad.RESERVA, 0))';
 
         $query = DB::connection('company')->table('INVEN as i')
             ->join('ARTDEPOS as ad', function ($join) use ($cdepos) {
@@ -94,7 +95,7 @@ class ListaPreciosController extends Controller
             ->leftJoin('GRUPO as g', 'g.CGRUPO', '=', 'i.CGRUPO')
             ->select([
                 'i.CODIGO', 'i.DESCR', 'i.CGRUPO', 'i.FOTO', 'g.DGRUPO',
-                DB::raw('SUM(ad.EUNIDAD) as stock'),
+                DB::raw($stockExpression . ' as stock'),
                 DB::raw($precioRef1Expression . ' as precio_ref1'),
                 DB::raw($precioRef2Expression . ' as precio_ref2'),
             ])
@@ -119,11 +120,11 @@ class ListaPreciosController extends Controller
         }
 
         if ($request->stock === 'con_stock') {
-            $query->havingRaw('SUM(ad.EUNIDAD) > 0');
+            $query->havingRaw($stockExpression . ' > 0');
         } elseif ($request->stock === 'sin_stock') {
-            $query->havingRaw('SUM(ad.EUNIDAD) <= 0');
+            $query->havingRaw($stockExpression . ' <= 0');
         } elseif ($request->stock === 'bajo') {
-            $query->havingRaw('SUM(ad.EUNIDAD) > 0 AND SUM(ad.EUNIDAD) <= 10');
+            $query->havingRaw($stockExpression . ' > 0 AND ' . $stockExpression . ' <= 10');
         }
 
         switch ($request->input('orden', 'descripcion')) {
@@ -137,7 +138,7 @@ class ListaPreciosController extends Controller
                 $query->orderByRaw($precioRef1Expression . ' DESC');
                 break;
             case 'stock_desc':
-                $query->orderByRaw('SUM(ad.EUNIDAD) DESC');
+                $query->orderByRaw($stockExpression . ' DESC');
                 break;
             default:
                 $query->orderBy('i.DESCR');

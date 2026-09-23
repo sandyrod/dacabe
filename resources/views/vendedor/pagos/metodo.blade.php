@@ -538,13 +538,13 @@
                                                 $pedido->iva > 0
                                                 ? ($nuevo_saldo * 16) / 100
                                                 : 0;
-                                                $totalRetencion +=
-                                                ($pedido->retencion && $pedido->saldo_iva_bs > 0)
-                                                ? $pedido->retencion
+                                                $retencionPendientePedido = ($pedido->retencion && $pedido->saldo_iva_bs > 0)
+                                                ? min((float) $pedido->retencion, (float) $pedido->saldo_iva_bs)
                                                 : 0;
-                                                $porc_retencion =
-                                                $pedido->porc_retencion
-                                                ? ($totalIva * $pedido->porc_retencion) / 100
+                                                $totalRetencion += $retencionPendientePedido;
+                                                $tasaParaRetencion = (float) request('tasa_cambio', $tasaSugerida ?? 0);
+                                                $porc_retencion += $tasaParaRetencion > 0
+                                                ? ($retencionPendientePedido / $tasaParaRetencion)
                                                 : 0;
                                                 $porc_descuento =
                                                 $aplicaDescuentoDivisa ? (abs($descuentoPedido) + $pedido->porcentaje_descuento) : 0;
@@ -556,10 +556,7 @@
                                                 $pedido->iva > 0
                                                 ? ($nuevo_saldo * 16) / 100
                                                 : 0,
-                                                'retencion' =>
-                                                $pedido->retencion
-                                                ? $pedido->retencion
-                                                : 0,
+                                                'retencion' => $retencionPendientePedido,
                                                 'saldo' => $saldoConDescuento,
                                                 'ajustes_neto' => $ajustesNetoPedido,
                                                 ];
@@ -572,7 +569,7 @@
                                                     data-monto-con-descuento="{{ $saldoConDescuento }}"
                                                     data-descuento-pedido="{{ $aplicaDescuentoDivisa ? ($pedido->descuento_pedido ?? 0) : 0 }}"
                                                     data-iva="{{ $pedido->factura != 'NO' ? $pedido->iva : 0 }}"
-                                                    data-retencion="{{ $pedido->retencion ? $pedido->retencion : 0 }}"
+                                                    data-retencion="{{ $retencionPendientePedido }}"
                                                     data-porc_retencion="{{ $pedido->porc_retencion ? $pedido->porc_retencion : 0 }}">
                                                     <td class="py-2">
                                                         <div class="text-dark">#{{ $pedido->id }}</div>
@@ -784,7 +781,7 @@
                                 <input type="hidden" name="detalle_pedidos"
                                     value="{{ json_encode($detalle_pedidos) }}">
                                 <input type="hidden" name="total_descuento" value="{{ $totalDescuento ?? 0 }}">
-                                <input type="hidden" id="tasa_cambio_request"
+                                <input type="hidden" id="tasa_cambio_request" name="tasa_cambio_request"
                                     value="{{ request('tasa_cambio', 0) }}">
                                 <input type="hidden" name="cliente_nombre" value="{{ $cliente->NOMBRE ?? '' }}">
                                 <input type="hidden" name="forma_pago_id" id="forma_pago_id"
@@ -2837,7 +2834,11 @@
                 e.preventDefault();
 
                 const tipoPago = $('input[name="tipo_pago"]:checked').val();
-                let montoTotal = parseFloat($('#monto-total').val()) || 0;
+                let montoTotal = parseFloat($('#monto-total').val()) ||
+                    parseFloat($('#monto-total-bs').val()) ||
+                    parseFloat($('#total_pagar_divisa').val()) ||
+                    parseFloat($('input[name="total_pagar"]').val()) ||
+                    0;
                 const ajustesTotal = parseFloat($('#totalAjustes').val()) || 0;
                 const form = this;
 
@@ -2957,14 +2958,9 @@
 
                         // Si el pago es en bolívares, actualizar el campo oculto con el total en bolívares (que ya incluye IVA)
                         if (tipoPago === 'bs') {
-                            // Obtener el total en bolívares del elemento que lo muestra
-                            const totalBolivaresText = $('#total_bolivares2').text().trim();
-                            // Eliminar el símbolo de moneda y espacios, luego reemplazar comas por puntos
-                            const cleanText = totalBolivaresText.replace(/[^0-9,]/g, '').replace(
-                                ',', '.');
-                            const totalBolivares = parseFloat(cleanText) || 0;
-                            //console.log('Texto original:', totalBolivaresText, 'Texto limpio:', cleanText, 'Valor numérico:', totalBolivares);
-
+                            const totalBolivares = parseFloat($('#total_bolivares_input').val()) ||
+                                parseFloat($('#monto-total-bs').val()) ||
+                                0;
                             //console.log('Total en bolívares a enviar:', totalBolivares);
 
                             // Agregar campo oculto con el total en bolívares

@@ -570,7 +570,7 @@
                                                     data-descuento-pedido="{{ $aplicaDescuentoDivisa ? ($pedido->descuento_pedido ?? 0) : 0 }}"
                                                     data-iva="{{ $pedido->factura != 'NO' ? $pedido->iva : 0 }}"
                                                     data-retencion="{{ $retencionPendientePedido }}"
-                                                    data-porc_retencion="{{ $pedido->porc_retencion ? $pedido->porc_retencion : 0 }}">
+                                                    data-porc_retencion="{{ $pedido->porcentaje_retencion_pago ?? 0 }}">
                                                     <td class="py-2">
                                                         <div class="text-dark">#{{ $pedido->id }}</div>
                                                         <small class="text-muted"><i
@@ -654,10 +654,6 @@
                                                                     <!-- TOTAL+IVA -->
                                                                     <div class="col-12 col-md-3 mb-3 mb-md-0">
                                                                         <h6 class="mb-0 fw-light">BASE</h6>
-                                                                        @php
-                                                                        $totalPagarDivisa +=
-                                                                        $totalIva - $porc_retencion;
-                                                                        @endphp
                                                                         <div class="d-flex align-items-baseline">
                                                                             <span class="h3 mb-0 fw-bold me-2"
                                                                                 id="monto-total-con-descuento">{{ number_format($totalPagarDivisa, 2, ',', '.') }}</span>

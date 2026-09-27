@@ -1951,7 +1951,7 @@ class VendedorPagoController extends Controller
                             $saldosIva[$pedIva->id] = 0;
                             continue;
                         }
-                        $pedActIva = Pedido::select('id', 'saldo_iva_bs', 'porc_retencion')->find($pedIva->id);
+                        $pedActIva = Pedido::select('id', 'iva_bs', 'saldo_iva_bs', 'porc_retencion')->find($pedIva->id);
                         $saldoIvaPedIva = $pedActIva ? (float) ($pedActIva->saldo_iva_bs ?? 0) : 0;
                         if ($opcion_iva === 'retencion') {
                             $retencionIva = $pedActIva
@@ -1986,7 +1986,16 @@ class VendedorPagoController extends Controller
                     $incluyeAjustes = $saldosSeleccionados['ajustes'];
 
                     // Releer el pedido para trabajar siempre con el saldo más reciente en base de datos.
-                    $pedidoActual = Pedido::select('id', 'base', 'saldo_base', 'saldo_iva_bs', 'saldo_ajustes', 'total_ajustes')->find($pedido->id);
+                    $pedidoActual = Pedido::select(
+                        'id',
+                        'base',
+                        'iva_bs',
+                        'saldo_base',
+                        'saldo_iva_bs',
+                        'porc_retencion',
+                        'saldo_ajustes',
+                        'total_ajustes'
+                    )->find($pedido->id);
                     if (!$pedidoActual) {
                         continue;
                     }

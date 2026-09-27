@@ -384,7 +384,13 @@
                                     @endif
                                 </div>
                             </td>
-                            <td class="align-middle small">{{ $pedido->observations }}</td>
+                            <td class="align-middle small">
+                                @if(filled($pedido->observations))
+                                    <div class="alert alert-info border-left border-info mb-0 p-2" role="note" style="border-left-width: 3px !important; white-space: pre-wrap; min-width: 170px;"><i class="far fa-sticky-note mr-1"></i>{{ $pedido->observations }}</div>
+                                @else
+                                    <span class="text-muted">Sin observaciones</span>
+                                @endif
+                            </td>
                             <td class="align-middle small">{{ $pedido->conditions }}</td>
                             <td class="align-middle">
                                 @php

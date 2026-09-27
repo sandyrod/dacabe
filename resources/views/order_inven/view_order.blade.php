@@ -21,6 +21,9 @@
         <div class="row">
             <div class="col-md-12 col-sm-12 col-xs-12">
 
+                @if($pedido && filled($pedido->observations))
+                    <div class="alert alert-info border-left border-info shadow-sm" role="note" style="border-left-width: 4px !important; white-space: pre-wrap;"><i class="far fa-sticky-note mr-2"></i><strong>Observaciones del pedido:</strong> {{ $pedido->observations }}</div>
+                @endif
                 @include('order_inven.details_order')
                 
             </div>

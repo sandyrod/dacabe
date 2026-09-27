@@ -154,6 +154,29 @@ class VendedorPagoController extends Controller
         return view('vendedor.pagos.clientes', compact('clientes', 'descuentos', 'pagoData', 'tasaSugerida'));
     }
 
+    public function actualizarRetencionPedido(Request $request, $pedido)
+    {
+        $data = $request->validate([
+            'porc_retencion' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $orden = Pedido::where('id', $pedido)
+            ->where('user_id', auth()->id())
+            ->where('estatus', 'APROBADO')
+            ->where(function ($query) {
+                $query->where('saldo_base', '>', 0)
+                    ->orWhere('saldo_iva_bs', '>', 0)
+                    ->orWhere('saldo_ajustes', '>', 0);
+            })
+            ->firstOrFail();
+
+        $orden->porc_retencion = (float) $data['porc_retencion'];
+        $orden->cliageret = $orden->porc_retencion > 0 ? 1 : 0;
+        $orden->save();
+
+        return response()->json(['success' => true, 'porc_retencion' => $orden->porc_retencion]);
+    }
+
     /**
      * Obtiene los pedidos pendientes de pago de un cliente especÃ­fico
      *

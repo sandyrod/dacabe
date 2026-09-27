@@ -104,6 +104,9 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('vendedores/pagos/pedidos/{cliente}', 'App\Http\Controllers\VendedorPagoController@getPedidosCliente')
         ->name('vendedores.pagos.pedidos');
 
+    Route::post('vendedores/pagos/pedidos/{pedido}/retencion', 'App\Http\Controllers\VendedorPagoController@actualizarRetencionPedido')
+        ->name('vendedores.pagos.pedidos.retencion');
+
     Route::get('vendedores/pagos/pedidos/revision/{cliente}', 'App\Http\Controllers\VendedorPagoController@getPedidosClienteRevision')
         ->name('vendedores.pagos.pedidos.revision');
 

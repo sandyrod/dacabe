@@ -377,10 +377,15 @@
                         </div>
                         <div class="col-12 mb-3">
                             <div class="payment-detail-item payment-detail-item-obs">
-                                <div class="detail-label" style="color: #5d0808;"><i class="far fa-sticky-note mr-1"></i>Detalle / Observaciones</div>
+                                <div class="detail-label" style="color: #5d0808;"><i class="far fa-sticky-note mr-1"></i>Observaciones del pago</div>
                                 <div class="detail-value" id="modalDetallePagoTexto">Sin observaciones</div>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="font-weight-bold text-navy"><i class="fas fa-receipt mr-2"></i>Pedidos asociados</h6>
+                        <div id="modalPedidosInfo"></div>
                     </div>
 
                     <div class="mb-4">
@@ -1415,6 +1420,7 @@
             $('#modalMonto').text('$0,00');
             $('#modalMontoBs').text('0,00 Bs.');
             $('#modalDetallePagoTexto').text('Sin observaciones');
+            $('#modalPedidosInfo').empty();
             renderAjustesResumen({ ajustes: [], totales_ajustes: {} });
             renderResumenCalculos({});
             renderDistribucionSaldos([], 1);
@@ -1439,6 +1445,19 @@
                         $('#modalMetodo').text(p.tipo_pago ? p.tipo_pago.DPAGO : '');
                         const detallePago = (response.detalle_pago || '').trim();
                         $('#modalDetallePagoTexto').text(detallePago !== '' ? detallePago : 'Sin observaciones');
+                        (response.detalles || []).forEach(function(detalle) {
+                            const bloque = $('<div class="payment-detail-item mb-2"></div>');
+                            $('<div class="font-weight-bold text-primary mb-1"></div>').text('Pedido #' + detalle.id + ' · ' + (detalle.cliente || 'Cliente no identificado')).appendTo(bloque);
+                            const referenciaPedido = String(detalle.referencia_pedido || '').trim();
+                            if (referenciaPedido) {
+                                $('<div class="small mb-1"></div>').text('Referencia del pedido: ' + referenciaPedido).appendTo(bloque);
+                            }
+                            $('<div class="small mb-1" style="white-space: pre-wrap;"></div>').text('Observaciones: ' + (detalle.observaciones_pedido || 'Sin observaciones')).appendTo(bloque);
+                            if (detalle.condiciones_pedido) {
+                                $('<div class="small"></div>').text('Condiciones: ' + detalle.condiciones_pedido).appendTo(bloque);
+                            }
+                            $('#modalPedidosInfo').append(bloque);
+                        });
                         renderAjustesResumen(response.resumen_calculos);
                         renderResumenCalculos(response.resumen_calculos);
                         renderDistribucionSaldos(response.detalles, p.rate);

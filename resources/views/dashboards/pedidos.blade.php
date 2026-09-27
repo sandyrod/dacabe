@@ -197,6 +197,9 @@
                                                               {{@$firstOrder->descuento}}%</b></div>
                                                       </div> 
                                                   @endif
+                                                  @if(filled($firstOrder->observations))
+                                                    <div class="alert alert-info border-left border-info mt-3 mb-2" role="note" style="border-left-width: 4px !important; white-space: pre-wrap;"><i class="far fa-sticky-note mr-1"></i><strong>Observaciones del pedido:</strong> {{ $firstOrder->observations }}</div>
+                                                  @endif
                                                   <hr>
                                                   <ul class="products-list product-list-in-card pl-2 pr-2">
                                                       @php

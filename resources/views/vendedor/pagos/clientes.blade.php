@@ -1104,6 +1104,12 @@
                                     </td>
                                     <td data-label="Pedido">
                                         <div class="fw-bold">Pedido #${pedido.numero}</div>
+                                        <div class="d-flex align-items-center flex-wrap mt-1" style="gap: 6px;">
+                                            <label class="small text-muted mb-0" for="retencion-${pedido.id}">Retención IVA</label>
+                                            <input id="retencion-${pedido.id}" class="form-control form-control-sm js-porcentaje-retencion" type="number" min="0" max="100" step="0.01" value="${porcRetencion}" style="width: 76px;" aria-label="Porcentaje de retención del pedido ${pedido.numero}">
+                                            <span class="small">%</span>
+                                            <button type="button" class="btn btn-sm btn-outline-primary js-guardar-retencion" data-pedido-id="${pedido.id}" title="Guardar retención" aria-label="Guardar retención del pedido ${pedido.numero}"><i class="fas fa-save"></i></button>
+                                        </div>
                                         ${pedido.factura_numero ? `<div class="text-success small">Factura: ${pedido.factura_numero}</div>` : ''}
                                         <small class="text-muted">${pedido.fecha}</small>
                                         ${pedido.fecha_despacho ? `<div class="text-muted small">Despacho: ${pedido.fecha_despacho}</div>` : ''}
@@ -1397,6 +1403,28 @@
                     });
 
                     });
+
+                $(document).on('click', '.js-guardar-retencion', function() {
+                    const boton = $(this);
+                    const pedidoId = boton.data('pedido-id');
+                    const campo = $('#retencion-' + pedidoId);
+                    const porcentaje = Number(campo.val());
+                    if (campo.val() === '' || !Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+                        alert('Indique un porcentaje entre 0 y 100.');
+                        return;
+                    }
+                    boton.prop('disabled', true);
+                    $.post('{{ url('vendedores/pagos/pedidos') }}/' + pedidoId + '/retencion', {
+                        _token: '{{ csrf_token() }}',
+                        porc_retencion: porcentaje
+                    }).done(function() {
+                        $('.cliente-item.active').trigger('click');
+                    }).fail(function(xhr) {
+                        alert(xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'No se pudo guardar la retención.');
+                    }).always(function() {
+                        boton.prop('disabled', false);
+                    });
+                });
 
                 // ── Comprobante de retención ─────────────────────────────────────────
                 let pedidoRetencionActual = null;

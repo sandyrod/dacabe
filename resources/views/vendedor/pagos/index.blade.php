@@ -1399,16 +1399,16 @@
                                     
                                     <div class="iva-summary-responsive d-flex flex-column flex-lg-row" style="display: flex; gap: 20px; background: rgba(255, 255, 255, 0.7); padding: 16px 24px; border-radius: 16px; backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.9);">
                                         <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">IVA Total</div>
-                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($total_iva ?? 0, 2, ',', '.') }}</div>
+                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">IVA pendiente</div>
+                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($saldo_iva_total ?? $total_iva ?? 0, 2, ',', '.') }}</div>
                                         </div>
                                         <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Retención 75%</div>
+                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Retención configurada</div>
                                             <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($total_retencion, 2, ',', '.') }}</div>
                                         </div>
                                         <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">
                                             <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Neto</div>
-                                            <div style="font-size: 18px; font-weight: 700;">Bs. {{ number_format(($total_iva ?? 0) - $total_retencion, 2, ',', '.') }}</div>
+                                            <div style="font-size: 18px; font-weight: 700;">Bs. {{ number_format(max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0), 2, ',', '.') }}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -1427,7 +1427,7 @@
                                                 </div>
                                                 <div style="flex: 1; text-align: left;">
                                                     <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Aplicar Retención</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #ea580c; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format(($total_iva ?? 0) - $total_retencion, 2, ',', '.') }}</div>
+                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #ea580c; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format(max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0), 2, ',', '.') }}</div>
                                                     <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
                                                         <i class="fas fa-file-invoice"></i>
                                                         <span>Comprobante de retención requerido</span>
@@ -1454,7 +1454,7 @@
                                                 </div>
                                                 <div style="flex: 1; text-align: left;">
                                                     <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Pagar IVA Completo</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #2563eb; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format($total_iva ?? 0, 2, ',', '.') }}</div>
+                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #2563eb; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format($saldo_iva_total ?? $total_iva ?? 0, 2, ',', '.') }}</div>
                                                     <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
                                                         <i class="fas fa-info-circle"></i>
                                                         <span>Sin aplicar retención</span>
@@ -1477,12 +1477,12 @@
                                     </div>
                                     <div>
                                         <strong style="display: block; font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 4px;">Comprobante de retención requerido</strong>
-                                        <span style="font-size: 14px; color: #b45309; line-height: 1.4;">Debe adjuntar el comprobante cuando aplica la retención del 75%</span>
+                                        <span style="font-size: 14px; color: #b45309; line-height: 1.4;">Debe adjuntar el comprobante cuando aplica la retención configurada</span>
                                     </div>
                                 </div>
                                 
                                 <!-- Campo oculto -->
-                                <input type="hidden" id="monto_iva_adicional" name="monto_iva_adicional" value="{{ ($total_iva ?? 0) - $total_retencion }}">
+                                <input type="hidden" id="monto_iva_adicional" name="monto_iva_adicional" value="{{ max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0) }}">
                             </div>
                             @endif
 

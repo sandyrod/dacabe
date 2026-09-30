@@ -57,6 +57,7 @@ class PagosController extends Controller
             $pago->save();
 
             $esDivisa = $pago->moneda_pago != 'Bolívares';
+            $saldosActualizados = (bool) ($pago->saldos_actualizados ?? false);
 
             // Si el pago es rechazado, devolver los saldos al estado anterior.
             if ($request->estatus === 'RECHAZADO' && $estatusAnterior !== 'RECHAZADO') {
@@ -68,42 +69,23 @@ class PagosController extends Controller
                         continue;
                     }
 
-                    if ($esDivisa) {
-                        // Divisa: saldo_base y saldo_iva_bs se redujeron al APROBAR, no al registrar.
-                        // Solo restaurar si el pago fue previamente APROBADO.
-                        if ($estatusAnterior === 'APROBADO') {
-                            $pedido->saldo_base = min(
-                                (float) $pedido->saldo_base + (float) ($pagoPedido->monto ?? 0) + (float) ($pagoPedido->descuento ?? 0),
-                                (float) $pedido->base
-                            );
-                            // Restaurar saldo_ajustes (solo si fue reducido al aprobar)
-                            $pedido->saldo_ajustes = min(
-                                (float) ($pedido->saldo_ajustes ?? 0) + (float) ($pagoPedido->ajustes_monto ?? 0),
-                                (float) ($pedido->total_ajustes ?? 0)
-                            );
-                            // Restaurar saldo_iva_bs si se pagó IVA en divisa
-                            if ((float) ($pagoPedido->iva ?? 0) > 0.001) {
-                                $pedido->saldo_iva_bs = min(
-                                    (float) $pedido->saldo_iva_bs + (float) $pagoPedido->iva,
-                                    (float) $pedido->iva_bs
-                                );
-                            }
-                        }
-                    } else {
-                        // Bolívares: el saldo se redujo al registrar (EN REVISION), restaurar siempre.
+                    if (!$esDivisa || $saldosActualizados || $estatusAnterior === 'APROBADO') {
+                        // Los pagos nuevos de ambas monedas ya redujeron saldo al registrarse.
+                        // Los pagos antiguos en divisa solo lo hicieron al aprobarse.
                         $pedido->saldo_base = min(
                             (float) $pedido->saldo_base + (float) ($pagoPedido->monto ?? 0) + (float) ($pagoPedido->descuento ?? 0),
                             (float) $pedido->base
                         );
-                        // Restaurar saldo_ajustes (se redujo al registrar el pago BS)
                         $pedido->saldo_ajustes = min(
                             (float) ($pedido->saldo_ajustes ?? 0) + (float) ($pagoPedido->ajustes_monto ?? 0),
                             (float) ($pedido->total_ajustes ?? 0)
                         );
-                        $pedido->saldo_iva_bs = min(
-                            (float) $pedido->saldo_iva_bs + (float) ($pagoPedido->iva ?? 0),
-                            (float) $pedido->iva_bs
-                        );
+                        if ((float) ($pagoPedido->iva ?? 0) > 0.001) {
+                            $pedido->saldo_iva_bs = min(
+                                (float) $pedido->saldo_iva_bs + (float) $pagoPedido->iva,
+                                (float) $pedido->iva_bs
+                            );
+                        }
                     }
 
                     $pedido->estatus = 'APROBADO';
@@ -111,9 +93,8 @@ class PagosController extends Controller
                 }
             }
 
-            // Si el pago es aprobado:
-            // - Bolívares: saldo ya fue reducido al registrar; solo actualizar estatus del pedido.
-            // - Divisa:    aplicar monto al saldo_base (y saldo_iva_bs si se pagó IVA en divisa).
+            // Los pagos nuevos ya redujeron saldo al registrarse. Aplicar aquí solo los
+            // pagos antiguos en divisa que usaban aprobación diferida.
             if ($request->estatus === 'APROBADO') {
                 $pagosPedidos = $pago->pago_pedidos()->get();
 
@@ -123,7 +104,7 @@ class PagosController extends Controller
                         continue;
                     }
 
-                    if ($esDivisa && $estatusAnterior !== 'APROBADO') {
+                    if ($esDivisa && !$saldosActualizados && $estatusAnterior !== 'APROBADO') {
                         // Reducir saldo_base (incluye el descuento en divisa registrado en pagoPedido->descuento)
                         $montoReduccion = (float) ($pagoPedido->monto + $pagoPedido->descuento);
                         $pedido->saldo_base = max((float) $pedido->saldo_base - $montoReduccion, 0);
@@ -243,6 +224,14 @@ class PagosController extends Controller
         return $tienePagosPendientes ? 'EN REVISION' : 'APROBADO';
     }
 
+    private function ivaNoRetenidoAprobado(Pedido $pedido, float $ivaAprobado): bool
+    {
+        $porcentaje = min(max((float) ($pedido->porc_retencion ?? 0), 0), 100);
+        $ivaNoRetenido = round((float) ($pedido->iva_bs ?? 0) * (1 - ($porcentaje / 100)), 2);
+
+        return round($ivaAprobado, 2) >= $ivaNoRetenido;
+    }
+
     private function tienePagosPendientes(int $pedidoId, ?int $pagoIdExcluir = null): bool
     {
         return PagoPedido::query()
@@ -280,6 +269,49 @@ class PagosController extends Controller
         try {
             $pago = Pago::findOrFail($id);
 
+            if ($pago->estatus !== 'APROBADO') {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El pago debe estar aprobado antes de validar la retención.',
+                ], 422);
+            }
+
+            $pagosPedidos = $pago->pago_pedidos()->get();
+            if (!$pagosPedidos->contains(fn ($pagoPedido) => (float) ($pagoPedido->retencion ?? 0) > 0.001)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Este pago no tiene una retención pendiente de validar.',
+                ], 422);
+            }
+
+            foreach ($pagosPedidos as $pagoPedido) {
+                if ((float) ($pagoPedido->retencion ?? 0) <= 0.001) {
+                    continue;
+                }
+
+                $pedido = Pedido::on('company')->find($pagoPedido->pedido_id);
+                if (!$pedido) {
+                    continue;
+                }
+
+                $ivaAprobado = (float) PagoPedido::query()
+                    ->where('pedido_id', $pedido->id)
+                    ->whereHas('pago', function ($query) {
+                        $query->where('estatus', 'APROBADO');
+                    })
+                    ->sum('iva');
+
+                if (!$this->ivaNoRetenidoAprobado($pedido, $ivaAprobado)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Debe pagar y esperar la aprobación del IVA no retenido antes de validar la retención.',
+                    ], 422);
+                }
+            }
+
             // Guardar comprobante si fue adjuntado
             $rutaComprobante = null;
             if ($request->hasFile('comprobante_retencion')) {
@@ -287,24 +319,16 @@ class PagosController extends Controller
                     ->store('comprobantes/retenciones', 'public');
             }
 
-            $pagosPedidos = $pago->pago_pedidos()->get();
-
             foreach ($pagosPedidos as $pagoPedido) {
                 $pedido = Pedido::on('company')->find($pagoPedido->pedido_id);
                 if (!$pedido) continue;
 
                 // La retención en pagos_pedidos representa el monto Bs pendiente de comprobante
                 $retencionBs = (float) ($pagoPedido->retencion ?? 0);
-                if ($retencionBs <= 0.001 && (float) ($pedido->porc_retencion ?? 0) > 0) {
-                    $retencionBs = round(
-                        (float) ($pedido->iva_bs ?? 0) * ((float) $pedido->porc_retencion / 100),
-                        2
-                    );
-                }
                 if ($retencionBs <= 0.001) continue;
 
-                // Saldar el saldo_iva_bs con la retención validada
-                $pedido->saldo_iva_bs = max((float) $pedido->saldo_iva_bs - $retencionBs, 0);
+                // Validar el comprobante liquida el saldo de IVA restante del pedido.
+                $pedido->saldo_iva_bs = 0;
 
                 // Guardar comprobante en el pedido
                 if ($rutaComprobante) {

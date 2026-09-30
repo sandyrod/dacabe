@@ -642,7 +642,7 @@
                                                     value="{{ $totalRetencion }}">
                                                 <input type="hidden" id="total_iva" name="total_iva"
                                                     value="{{ $totalIva }}">
-                                                <input type="hidden" name="saldo_iva_total" value="{{ $iva_bs }}">
+                                                <input type="hidden" id="saldo_iva_total" name="saldo_iva_total" value="{{ $iva_bs }}">
                                                 <input type="hidden" id="total_descuento_pago"
                                                     name="total_descuento_pago" value="{{ $totalDescuento }}">
                                                 <tr>
@@ -720,6 +720,7 @@
                                                                             <span class="text-info">Bs.</span>
                                                                         </div>
                                                                     </div>
+                                                                    @if($totalRetencion > 0)
                                                                     <!-- Retención -->
                                                                     <div class="col-6 col-md-2">
                                                                         <small
@@ -731,6 +732,7 @@
                                                                             <span class="text-warning">Bs.</span>
                                                                         </div>
                                                                     </div>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -899,13 +901,15 @@
                                                         <input type="hidden" name="iva_bolivares_parcial"
                                                             id="iva-bolivares-parcial-input" value="0">
                                                     </tr>
+                                                    @if($totalRetencion > 0)
                                                     <tr>
-                                                        <td class="text-muted border-0 ps-3">Retención (75% IVA):</td>
+                                                        <td class="text-muted border-0 ps-3">Retención configurada:</td>
                                                         <td class="text-end border-0 pe-3 fw-medium text-danger"
                                                             id="retencion-bolivares-parcial">-0,00 Bs.</td>
                                                         <input type="hidden" name="retencion_bolivares_parcial"
                                                             id="retencion-bolivares-parcial-input" value="0">
                                                     </tr>
+                                                    @endif
                                                     <tr>
                                                         <td class="text-muted border-0 ps-3">Descuento:</td>
                                                         <td class="text-end border-0 pe-3 fw-medium text-success"
@@ -1161,9 +1165,11 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                            @if($totalRetencion > 0)
+                                                            @if($totalRetencion > 0)
                                                             <div class="row mt-2">
                                                                 <div class="col-12 text-right text-white">
-                                                                    <div class="fw-semibold small">- Retención (75%)
+                                                                    <div class="fw-semibold small">- Retención configurada
                                                                     </div>
                                                                     <div class="fw-bold small"
                                                                         id="retencion_bolivares">
@@ -1172,6 +1178,7 @@
                                                                     </div>
                                                                 </div>
                                                             </div>
+                                                            @endif
                                                             <div class="row mt-2">
                                                                 <!-- Segunda fila: TOTAL CUADRO AZUL (Base + IVA Neto) -->
                                                                 <div class="col-12">
@@ -1206,6 +1213,7 @@
                                                                 <i class="fas fa-coins text-warning" style="font-size: 22px;"></i>
                                                             </div>
                                                             <div>
+                                                            @endif
                                                                 <div class="small text-white-50 text-uppercase fw-bold" style="letter-spacing: 0.5px; font-size: 0.78rem;">MONTO TOTAL A PAGAR (BS.)</div>
                                                                 <div class="small" style="color: #cbd5e1; font-size: 0.8rem;">
                                                                     <span>Base+IVA: <b id="subtotal-cuadro-azul-bs" class="text-info">0,00 Bs.</b></span>
@@ -1498,8 +1506,12 @@
             // Calcular IVA (16% del monto en bolívares)
             const iva = montoBolivares * 0.16;
 
-            // Calcular retención (75% del IVA)
-            const retencion = iva * 0.75;
+            const ivaSeleccionado = parseFloat($('#saldo_iva_total').val()) || 0;
+            const retencionConfigurada = parseFloat($('#total_retencion').val()) || 0;
+            const factorRetencion = ivaSeleccionado > 0
+                ? Math.min(retencionConfigurada / ivaSeleccionado, 1)
+                : 0;
+            const retencion = iva * factorRetencion;
 
             // Obtener el porcentaje de descuento (si existe)
             const descuentoPorcentaje = parseFloat('{{ $descuentoProntoPago ?? 0 }}') || 0;
@@ -2129,8 +2141,12 @@
             const porcentajeIva = detallePedidos.some(p => parseFloat(p.iva) > 0) ? 16 : 0;
             const iva = montoBolivares * (porcentajeIva / 100);
 
-            // Calcular retención (75% del IVA)
-            const retencion = iva * 0.75;
+            const ivaSeleccionado = parseFloat($('#saldo_iva_total').val()) || 0;
+            const retencionConfigurada = parseFloat($('#total_retencion').val()) || 0;
+            const factorRetencion = ivaSeleccionado > 0
+                ? Math.min(retencionConfigurada / ivaSeleccionado, 1)
+                : 0;
+            const retencion = iva * factorRetencion;
 
             // Obtener el porcentaje de descuento (si existe)
             const descuentoPorcentaje = parseFloat('{{ $descuentoProntoPago ?? 0 }}') || 0;

@@ -1005,6 +1005,9 @@
                         const pedidosConRetencionPendiente = [];
 
                         function buildRetencionButtonHtml(pedido, compact = false) {
+                            if (!pedido || !pedido.puede_subir_comprobante_retencion) {
+                                return '';
+                            }
                             const comprobanteActual = pedido && pedido.comprobante_retencion
                                 ? encodeURIComponent(String(pedido.comprobante_retencion))
                                 : '';
@@ -1035,8 +1038,8 @@
                             const porcRetencion = parseFloat(pedido.porc_retencion) || 0;
                             const tieneComprobanteRetencion = !!(pedido.comprobante_retencion && pedido.comprobante_retencion !== 'null');
                             
-                            // Validación completa: porc_retencion > 0 && saldo_base <= 0.01 && saldo_iva_bs > 0.01
-                            const tieneRetencionPendiente = porcRetencion > 0 && saldoBase <= 0.01 && saldoIvaBs > 0.01;
+                            const tieneRetencionPendiente = porcRetencion > 0 && saldoIvaBs > 0.01;
+                            const puedeSubirComprobante = !!pedido.puede_subir_comprobante_retencion;
                             
                             if (tieneRetencionPendiente) {
                                 pedidosConRetencionPendiente.push(pedido);
@@ -1122,9 +1125,9 @@
                                         ${ajustesHtml}
                                     </td>
                                     <td class="text-end" data-label="IVA (Bs.)">
-                                         <span class="fw-bold ${tieneRetencionPendiente ? 'text-warning' : 'text-success'}">${formatBS(pedido.saldo_iva_bs)}</span>
-                                         ${tieneRetencionPendiente ? '<br><small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Retención pendiente</small>' : ''}
-                                         ${tieneRetencionPendiente ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
+                                         <span class="fw-bold ${tieneRetencionPendiente ? 'text-danger' : 'text-success'}">${formatBS(pedido.saldo_iva_bs)}</span>
+                                         ${tieneRetencionPendiente ? '<br><small class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Retención pendiente</small>' : ''}
+                                         ${tieneRetencionPendiente && puedeSubirComprobante ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
                                     </td>
                                 </tr>
                             `);
@@ -1141,10 +1144,13 @@
                                 const badge = tieneComprobante
                                     ? `<span style="font-size:11px;color:#16a34a;font-weight:700;margin-right:8px;"><i class="fas fa-check-circle me-1"></i>Cargado</span>`
                                     : '';
+                                const botonComprobante = p.puede_subir_comprobante_retencion
+                                    ? buildRetencionButtonHtml(p, true)
+                                    : '<small style="color:#92400e;">Pague y espere la aprobación del IVA no retenido para cargar el comprobante.</small>';
                                 return `
                                     <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:8px;flex-wrap:wrap;gap:6px;">
                                         <span style="font-size:13px;color:#92400e;font-weight:600;">Pedido #${p.numero} — Bs. ${formatBS(p.saldo_iva_bs)} ${badge}</span>
-                                        ${buildRetencionButtonHtml(p, true)}
+                                        ${botonComprobante}
                                     </div>`;
                             }).join('');
 

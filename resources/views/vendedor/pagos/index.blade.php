@@ -1210,7 +1210,7 @@
                                 <div class="card-body p-3 p-md-4" style="background: #f8fafc;">
                                     @php
                                         // La opción de retención que realmente se aplicará depende del tipo de pago:
-                                        // Bolívares usa 'pago_iva_opcion' ($opcion_iva); Divisa usa 'opcion_iva_divisa'.
+                                        // En Bolívares la retención viene del pedido; en Divisa se conserva la opción del paso anterior.
                                         // Deben coincidir con los defaults usados en storeMultiple() para que lo
                                         // mostrado aquí sea siempre igual a lo que se cobra.
                                         $opcionIvaActiva = session('pago_cliente.tipo_pago') === 'bs'
@@ -1382,108 +1382,6 @@
                                         </div>
                                     </div>
                                 </div>
-                            @endif
-
-                            <!-- Sección de IVA con retención -->
-                            @if (session('pago_cliente.tipo_pago') == 'bs' && ($total_retencion ?? 0) > 0)
-                            <div class="iva-responsive" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-radius: 20px; padding: 32px; margin-bottom: 24px; border: 3px solid #0ea5e9; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); position: relative;">
-                                <!-- Header con resumen -->
-                                <div class="iva-header-responsive" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px;">
-                                    
-                                    <div style="display: flex; align-items: center; gap: 16px;">
-                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(2, 132, 199, 0.3);">
-                                            <i class="fas fa-calculator" style="font-size: 28px; color: #0284c7;"></i>
-                                        </div>
-                                        <h4 style="margin: 0; font-size: 24px; font-weight: 700; color: #075985;">Opciones de IVA con Retención</h4>
-                                    </div>
-                                    
-                                    <div class="iva-summary-responsive d-flex flex-column flex-lg-row" style="display: flex; gap: 20px; background: rgba(255, 255, 255, 0.7); padding: 16px 24px; border-radius: 16px; backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.9);">
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">IVA pendiente</div>
-                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($saldo_iva_total ?? $total_iva ?? 0, 2, ',', '.') }}</div>
-                                        </div>
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Retención configurada</div>
-                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($total_retencion, 2, ',', '.') }}</div>
-                                        </div>
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">
-                                            <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Neto</div>
-                                            <div style="font-size: 18px; font-weight: 700;">Bs. {{ number_format(max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0), 2, ',', '.') }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Opciones de pago -->
-                                <div class="iva-grid-responsive" style="display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch;">
-                                    <!-- Opción 1: Aplicar Retención -->
-                                    <div class="iva-hover iva-selected" style="flex: 1 1 320px; min-width: min(320px, 100%); position: relative;">
-                                        <input type="radio" name="pago_iva_opcion" id="iva_retencion" value="retencion" checked style="position: absolute; opacity: 0; z-index: -1;">
-                                        <label for="iva_retencion" style="display: block; width: 100%; cursor: pointer;">
-                                            <div id="card-retencion" class="iva-card-responsive" style="background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); border-radius: 20px; padding: 28px; border: 3px solid #ffffff; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); transition: all 0.3s ease; position: relative; overflow: hidden; min-height: 160px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                                <div style="flex-shrink: 0;">
-                                                    <div class="icon-wrapper" style="width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; box-shadow: 0 8px 30px rgba(251, 146, 60, 0.4); transition: all 0.3s ease;">
-                                                        <i class="fas fa-percentage"></i>
-                                                    </div>
-                                                </div>
-                                                <div style="flex: 1; text-align: left;">
-                                                    <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Aplicar Retención</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #ea580c; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format(max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0), 2, ',', '.') }}</div>
-                                                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
-                                                        <i class="fas fa-file-invoice"></i>
-                                                        <span>Comprobante de retención requerido</span>
-                                                    </div>
-                                                </div>
-                                                <div style="flex-shrink: 0;">
-                                                    <div id="selector-retencion" style="width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: 3px solid #ffffff; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);">
-                                                        <div id="dot-retencion" style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- Opción 2: Pagar IVA Completo -->
-                                    <div class="iva-hover" style="flex: 1 1 320px; min-width: min(320px, 100%); position: relative;">
-                                        <input type="radio" name="pago_iva_opcion" id="iva_completo" value="completo" style="position: absolute; opacity: 0; z-index: -1;">
-                                        <label for="iva_completo" style="display: block; width: 100%; cursor: pointer;">
-                                            <div id="card-completo" class="iva-card-responsive" style="background: linear-gradient(145deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 20px; padding: 28px; border: 3px solid #ffffff; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); transition: all 0.3s ease; position: relative; overflow: hidden; min-height: 160px; display: flex; align-items: center; gap: 20px; cursor: pointer;">
-                                                <div style="flex-shrink: 0;">
-                                                    <div class="icon-wrapper" style="width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; box-shadow: 0 8px 30px rgba(96, 165, 250, 0.4); transition: all 0.3s ease;">
-                                                        <i class="fas fa-check-circle"></i>
-                                                    </div>
-                                                </div>
-                                                <div style="flex: 1; text-align: left;">
-                                                    <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Pagar IVA Completo</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #2563eb; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format($saldo_iva_total ?? $total_iva ?? 0, 2, ',', '.') }}</div>
-                                                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
-                                                        <i class="fas fa-info-circle"></i>
-                                                        <span>Sin aplicar retención</span>
-                                                    </div>
-                                                </div>
-                                                <div style="flex-shrink: 0;">
-                                                    <div id="selector-completo" style="width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: 3px solid #ffffff; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);">
-                                                        <div id="dot-completo" style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <!-- Alerta de comprobante requerido -->
-                                <div id="alerta-retencion" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #fca5a5; border-radius: 16px; padding: 20px 24px; margin-top: 24px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 20px rgba(251, 146, 60, 0.2);">
-                                    <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                    </div>
-                                    <div>
-                                        <strong style="display: block; font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 4px;">Comprobante de retención requerido</strong>
-                                        <span style="font-size: 14px; color: #b45309; line-height: 1.4;">Debe adjuntar el comprobante cuando aplica la retención configurada</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Campo oculto -->
-                                <input type="hidden" id="monto_iva_adicional" name="monto_iva_adicional" value="{{ max(($saldo_iva_total ?? $total_iva ?? 0) - $total_retencion, 0) }}">
-                            </div>
                             @endif
 
                             @if (session('pago_cliente.metodo_pago') === 'transferencia')
@@ -2928,35 +2826,9 @@
                     return false;
                 }
 
-                // Validar comprobante de retención SOLO si se seleccionó "Aplicar Retención"
-                const opcionRetencion = document.querySelector('input[name="pago_iva_opcion"]:checked');
-                if (opcionRetencion && opcionRetencion.value === 'retencion' && fileInput.files.length === 0) {
-                    e.preventDefault();
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Comprobante de Retención',
-                        text: 'Se recomienda adjuntar el comprobante de retención cuando aplica esta opción, pero puede continuar sin él.',
-                        confirmButtonText: 'Continuar sin comprobante',
-                        confirmButtonColor: '#3b82f6',
-                        showCancelButton: true,
-                        cancelButtonText: 'Adjuntar comprobante',
-                        cancelButtonColor: '#f59e0b'
-                    }).then((result) => {
-                        if (result.isDismissed) {
-                            // Usuario quiere adjuntar comprobante, no hacer nada
-                            e.preventDefault();
-                            return false;
-                        }
-                        // Usuario quiere continuar, permitir el envío
-                        return true;
-                    });
-                    return false;
-                }
-
                 return true;
             });
 
-            // Funcionalidad para opciones de IVA con retención - Diseño garantizado
             function inicializarOpcionesIVA() {
                 // Usar jQuery para mayor compatibilidad
                 $('#card-retencion').on('click', function(e) {
@@ -2993,17 +2865,6 @@
                     }
                 }, 100);
                 
-                // Validación del formulario
-                $('#multiplePaymentsForm').on('submit', function(e) {
-                    const opcionIVA = $('input[name="pago_iva_opcion"]:checked').val();
-                    const fileInput = $('#comprobantes')[0];
-                    
-                    //if (opcionIVA === 'retencion' && fileInput.files.length === 0) {
-                        //e.preventDefault();
-                       // mostrarAlertaRetencion();
-                        //return false;
-                    //}
-                });
             }
             
             function manejarCambioOpcion(opcion) {
@@ -3034,9 +2895,6 @@
                 }
                 
                 console.log('Resultados:', { montoAdicional, nuevoTotal }); // Debug
-                
-                // Actualizar campo oculto
-                $('#monto_iva_adicional').val(montoAdicional);
                 
                 // Actualizar totales con animación
                 actualizarTotales(nuevoTotal, esRetencion);
@@ -3351,8 +3209,6 @@
             // Inicializar cuando el DOM esté listo
             $(document).ready(function() {
                 console.log('DOM listo, inicializando opciones IVA'); // Debug
-                inicializarOpcionesIVA();
-                
                 // Inicializar modal de ajustes
                 const ajustesModal = new bootstrap.Modal(document.getElementById('ajustesModal'));
                 

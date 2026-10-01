@@ -999,11 +999,10 @@ class VendedorPagoController extends Controller
                 ->with('error', 'Datos de pago incompletos '.$clienteRif.' - '.$tipoPago);
         }
 
-        // Store the payment type and IVA en divisa options in the session
+        // Store the payment type and IVA en divisa selection in the session
         session([
             'pago_cliente.tipo_pago'       => $tipoPago,
             'pago_cliente.iva_en_divisa'    => $request->input('iva_en_divisa', 0),
-            'pago_cliente.opcion_iva_divisa' => $request->input('opcion_iva_divisa', 'completo'),
         ]);
         $formaPago = null;
         if ($tipoPago == 'divisa_total') {
@@ -1171,7 +1170,6 @@ class VendedorPagoController extends Controller
             'detallesAjustes' => $detallesAjustes,
             'total_ajustes_netos' => $total_ajustes_netos,
             'base_sin_ajustes' => $base_sin_ajustes,
-            'opcion_iva' => $request->input('pago_iva_opcion', 'retencion'),
         ];
 
         return view('vendedor.pagos.index', $data);
@@ -1841,12 +1839,12 @@ class VendedorPagoController extends Controller
         $distribucionSaldos = json_decode($request->input('distribucion_saldos', '{}'), true);
         $distribucionSaldos = is_array($distribucionSaldos) ? $distribucionSaldos : [];
 
-        // Capturar la opción de IVA seleccionada (para pagos en Bolívares)
-        $opcion_iva = $request->input('pago_iva_opcion', 'completo');
+        // En bolívares, la retención siempre se determina por la configuración de cada pedido.
+        $opcion_iva = 'retencion';
 
-        // IVA en divisa: el vendedor elige pagar saldo_iva_bs convertido a USD
+        // En divisa también se usa la retención configurada en cada pedido.
         $iva_en_divisa     = $request->boolean('iva_en_divisa', false);
-        $opcion_iva_divisa = $request->input('opcion_iva_divisa', 'completo'); // 'completo' o 'retencion'
+        $opcion_iva_divisa = 'retencion';
 
         DB::beginTransaction();
 

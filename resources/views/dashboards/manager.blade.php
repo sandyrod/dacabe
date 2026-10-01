@@ -4,6 +4,44 @@
 
 @section('styles')
 <style>
+    .pedido-observaciones-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        border: 1px solid #d69b16;
+        border-radius: 8px;
+        background: #fff3cd;
+        color: #805600;
+        font-size: 1.1rem;
+        vertical-align: middle;
+    }
+
+    .pedido-observaciones-btn:hover,
+    .pedido-observaciones-btn:focus {
+        background: #ffe69c;
+        color: #664500;
+        border-color: #997000;
+    }
+
+    .pedido-observaciones-modal .modal-content {
+        border-radius: 8px;
+    }
+
+    .pedido-observaciones-modal .modal-title {
+        font-size: 1.1rem;
+        overflow-wrap: anywhere;
+    }
+
+    .pedido-observaciones-mensaje {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        line-height: 1.65;
+        color: #343a40;
+    }
+
     .manager-card {
         border: none;
         border-radius: 15px;
@@ -328,6 +366,7 @@
     .bg-gradient-danger {
         background: linear-gradient(45deg, #cb2d3e 0%, #ef473a 100%);
     }
+</style>
 @endsection
 
 @section('content')
@@ -592,6 +631,38 @@
                                         <span class="client-rif">RIF: {{ $firstOrder->rif }}</span>
                                     </span>
                                 </a>
+                                @if (trim((string) ($firstOrder->observations ?? '')) !== '')
+                                <button type="button" class="btn pedido-observaciones-btn ml-2 hint--top"
+                                    data-toggle="modal" data-target="#pedido-observaciones-{{ $firstOrder->id }}"
+                                    aria-haspopup="dialog" aria-controls="pedido-observaciones-{{ $firstOrder->id }}"
+                                    aria-label="Ver observaciones del vendedor para el pedido #{{ $firstOrder->id }}">
+                                    <i class="fas fa-comment-dots" aria-hidden="true"></i>
+                                </button>
+                                @push('pedido_observaciones_modals')
+                                <div class="modal fade pedido-observaciones-modal" id="pedido-observaciones-{{ $firstOrder->id }}"
+                                    tabindex="-1" role="dialog" aria-labelledby="pedido-observaciones-titulo-{{ $firstOrder->id }}" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <div>
+                                                    <h5 class="modal-title" id="pedido-observaciones-titulo-{{ $firstOrder->id }}">Observaciones del pedido #{{ $firstOrder->id }}</h5>
+                                                    <small class="text-muted">Vendedor: {{ $firstOrder->seller_code }}</small>
+                                                </div>
+                                                <button type="button" class="close" data-dismiss="modal" aria-label="Cerrar">
+                                                    <span aria-hidden="true">&times;</span>
+                                                </button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="pedido-observaciones-mensaje">{{ $firstOrder->observations }}</div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cerrar</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endpush
+                                @endif
                                 <br>
                                 @if (@$firstOrder->direccion)
                                 <i class="fa fa-map-marker-alt"></i> {{ $firstOrder->direccion }}
@@ -1148,6 +1219,8 @@ $(document).ready(function() {
 });
 </script>
 @endpush
+
+@stack('pedido_observaciones_modals')
 
 @include('layouts.partials.order_modal')
 @include('layouts.partials.seller_modal')

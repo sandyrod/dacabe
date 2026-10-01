@@ -569,6 +569,62 @@
 
             @section('styles')
             <style>
+                #tabla-pedidos .iva-detalle {
+                    display: grid;
+                    gap: 6px;
+                    width: 100%;
+                    min-width: 190px;
+                    font-size: .75rem;
+                    color: #6c757d;
+                    line-height: 1.4;
+                }
+
+                #tabla-pedidos .iva-detalle-fila {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    align-items: baseline;
+                    gap: 12px;
+                }
+
+                #tabla-pedidos .iva-detalle-etiqueta {
+                    color: #6c757d;
+                    text-align: left;
+                }
+
+                #tabla-pedidos .iva-detalle-importe {
+                    white-space: nowrap;
+                    font-variant-numeric: tabular-nums;
+                }
+
+                #tabla-pedidos .iva-detalle-total {
+                    border-top: 1px solid #dee2e6;
+                    margin-top: 3px;
+                    padding-top: 9px;
+                    color: #146c43;
+                    font-size: .95rem;
+                    font-weight: 700;
+                }
+
+                #tabla-pedidos .iva-detalle-total .iva-detalle-etiqueta {
+                    color: inherit;
+                }
+
+                @media (max-width: 767.98px) {
+                    #tabla-pedidos td[data-label="IVA (Bs.)"] {
+                        display: block;
+                        text-align: left;
+                    }
+
+                    #tabla-pedidos td[data-label="IVA (Bs.)"]::before {
+                        display: block;
+                        margin-bottom: 10px;
+                    }
+
+                    #tabla-pedidos .iva-detalle {
+                        min-width: 0;
+                    }
+                }
+
                 .cliente-item {
                     transition: all 0.2s;
                     border-left: 3px solid transparent;
@@ -1036,6 +1092,9 @@
                             const saldo = saldoAjustes + saldoBase; // Total pendiente incluyendo ajustes
                             const ajustesNeto = parseFloat(pedido.ajustes_neto) || 0;
                             const porcRetencion = parseFloat(pedido.porc_retencion) || 0;
+                            const ivaOriginal = Math.max(parseFloat(pedido.iva_bs) || 0, 0);
+                            const ivaRetenido = Math.min(Math.round(ivaOriginal * porcRetencion) / 100, Math.max(saldoIvaBs, 0));
+                            const ivaAPagar = Math.max(saldoIvaBs - ivaRetenido, 0);
                             const tieneComprobanteRetencion = !!(pedido.comprobante_retencion && pedido.comprobante_retencion !== 'null');
                             
                             const tieneRetencionPendiente = porcRetencion > 0 && saldoIvaBs > 0.01;
@@ -1125,8 +1184,23 @@
                                         ${ajustesHtml}
                                     </td>
                                     <td class="text-end" data-label="IVA (Bs.)">
-                                         <span class="fw-bold ${tieneRetencionPendiente ? 'text-danger' : 'text-success'}">${formatBS(pedido.saldo_iva_bs)}</span>
-                                         ${tieneRetencionPendiente ? '<br><small class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Retención pendiente</small>' : ''}
+                                         ${porcRetencion > 0 ? `
+                                             <div class="iva-detalle">
+                                                 <div class="iva-detalle-fila">
+                                                     <span class="iva-detalle-etiqueta">IVA total pendiente</span>
+                                                     <span class="iva-detalle-importe">${formatBS(saldoIvaBs)}</span>
+                                                 </div>
+                                                 <div class="iva-detalle-fila">
+                                                     <span class="iva-detalle-etiqueta">IVA retenido (${porcRetencion}%)</span>
+                                                     <span class="iva-detalle-importe">${formatBS(ivaRetenido)}</span>
+                                                 </div>
+                                                 <div class="iva-detalle-fila iva-detalle-total">
+                                                     <span class="iva-detalle-etiqueta">IVA a pagar</span>
+                                                     <span class="iva-detalle-importe">${formatBS(ivaAPagar)}</span>
+                                                 </div>
+                                             </div>
+                                         ` : `<span class="fw-bold text-success">${formatBS(saldoIvaBs)}</span>`}
+                                         ${tieneRetencionPendiente ? '<small class="d-block mt-2 text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Retención Pendiente</small>' : ''}
                                          ${tieneRetencionPendiente && puedeSubirComprobante ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
                                     </td>
                                 </tr>

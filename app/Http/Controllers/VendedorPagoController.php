@@ -162,7 +162,7 @@ class VendedorPagoController extends Controller
 
         $orden = Pedido::where('id', $pedido)
             ->where('user_id', auth()->id())
-            ->where('estatus', 'APROBADO')
+            ->whereIn('estatus', ['APROBADO', 'EN REVISION'])
             ->where(function ($query) {
                 $query->where('saldo_base', '>', 0)
                     ->orWhere('saldo_iva_bs', '>', 0)

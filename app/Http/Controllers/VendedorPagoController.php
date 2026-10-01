@@ -609,9 +609,8 @@ class VendedorPagoController extends Controller
                     $pedido->porcentaje_descuento = abs($pedido->descuento);
                     $pedido->monto_descuento = $pedido->saldo_base * ($pedido->descuento_aplicado / 100);
                     $pedido->saldo_con_descuento = $pedido->saldo_base - $pedido->monto_descuento;
-                    $saldoIvaPendiente = (float) ($pedido->saldo_iva_bs ?? 0);
                     $pedido->porcentaje_retencion_pago = $this->porcentajeRetencionPago($pedido);
-                    $pedido->retencion = $saldoIvaPendiente * ($pedido->porcentaje_retencion_pago / 100);
+                    $pedido->retencion = $this->retencionPendiente($pedido);
 
                     return $pedido;
                 });
@@ -2230,7 +2229,7 @@ class VendedorPagoController extends Controller
                     $pagoPedido->retencion = $opcionRetencionAplicada
                         && $incluyeIva
                         && $ivaAplicadoBs + 0.01 >= $ivaNetoAntesRetencion
-                            ? round($retencionPedido, 2)
+                            ? round($this->retencionPorRegistrar($pedidoActual), 2)
                             : 0;
                     
                     // Guardar solo el descuento realmente aplicado al saldo para poder revertirlo al rechazar.
@@ -2400,16 +2399,26 @@ class VendedorPagoController extends Controller
             return 0;
         }
 
+        return min(
+            $retencionEsperada,
+            max((float) ($pedido->saldo_iva_bs ?? 0), 0)
+        );
+    }
+
+    private function retencionPorRegistrar(Pedido $pedido): float
+    {
+        $retencionPendiente = $this->retencionPendiente($pedido);
+        if ($retencionPendiente <= 0.001) {
+            return 0;
+        }
+
         $retencionesRegistradas = (float) PagoPedido::where('pedido_id', $pedido->id)
             ->whereHas('pago', function ($query) {
                 $query->where('estatus', '!=', 'RECHAZADO');
             })
             ->sum('retencion');
 
-        return min(
-            max($retencionEsperada - $retencionesRegistradas, 0),
-            max((float) ($pedido->saldo_iva_bs ?? 0), 0)
-        );
+        return max($retencionPendiente - $retencionesRegistradas, 0);
     }
 
     private function permiteSubirComprobanteRetencion(Pedido $pedido, float $ivaAprobado): bool

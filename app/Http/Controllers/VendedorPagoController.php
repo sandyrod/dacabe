@@ -154,29 +154,6 @@ class VendedorPagoController extends Controller
         return view('vendedor.pagos.clientes', compact('clientes', 'descuentos', 'pagoData', 'tasaSugerida'));
     }
 
-    public function actualizarRetencionPedido(Request $request, $pedido)
-    {
-        $data = $request->validate([
-            'porc_retencion' => 'required|numeric|min:0|max:100',
-        ]);
-
-        $orden = Pedido::where('id', $pedido)
-            ->where('user_id', auth()->id())
-            ->whereIn('estatus', ['APROBADO', 'EN REVISION'])
-            ->where(function ($query) {
-                $query->where('saldo_base', '>', 0)
-                    ->orWhere('saldo_iva_bs', '>', 0)
-                    ->orWhere('saldo_ajustes', '>', 0);
-            })
-            ->firstOrFail();
-
-        $orden->porc_retencion = (float) $data['porc_retencion'];
-        $orden->cliageret = $orden->porc_retencion > 0 ? 1 : 0;
-        $orden->save();
-
-        return response()->json(['success' => true, 'porc_retencion' => $orden->porc_retencion]);
-    }
-
     /**
      * Obtiene los pedidos pendientes de pago de un cliente especÃ­fico
      *
@@ -317,15 +294,13 @@ class VendedorPagoController extends Controller
                 ->orderBy('pedidos.fecha', 'asc')
                 ->get();
 
-            // Compatibilidad con pagos en divisa antiguos, que todavía se aplicaban al aprobarse.
+            // Los pagos en bolívares reducen los saldos al registrarse. Los pagos en divisa
+            // los reducen al aprobarse, por lo que sus asignaciones EN REVISION deben
+            // descontarse para exponer únicamente el saldo todavía disponible para abonos.
             $compromisosDivisa = PagoPedido::query()
                 ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
                 ->whereIn('pagos_pedidos.pedido_id', $pedidos->pluck('id'))
                 ->where('pagos.estatus', 'EN REVISION')
-                ->where(function ($query) {
-                    $query->whereNull('pagos.saldos_actualizados')
-                        ->orWhere('pagos.saldos_actualizados', false);
-                })
                 ->where(function ($query) {
                     $query->where('pagos.moneda_pago', '!=', 'Bolívares')
                         ->orWhereNull('pagos.moneda_pago');
@@ -338,17 +313,17 @@ class VendedorPagoController extends Controller
                 ->get()
                 ->keyBy('pedido_id');
 
-            $ivaAprobadoPorPedido = PagoPedido::query()
+            $ivaEnRevisionPorPedido = PagoPedido::query()
                 ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
                 ->whereIn('pagos_pedidos.pedido_id', $pedidos->pluck('id'))
-                ->where('pagos.estatus', 'APROBADO')
+                ->where('pagos.estatus', 'EN REVISION')
                 ->groupBy('pagos_pedidos.pedido_id')
-                ->selectRaw('pagos_pedidos.pedido_id, COALESCE(SUM(pagos_pedidos.iva), 0) as iva_aprobado')
+                ->selectRaw('pagos_pedidos.pedido_id, COALESCE(SUM(pagos_pedidos.iva), 0) as iva_en_revision')
                 ->get()
                 ->keyBy('pedido_id');
 
             $pedidos = $pedidos
-                ->map(function ($pedido) use ($compromisosDivisa, $ivaAprobadoPorPedido) {
+                ->map(function ($pedido) use ($compromisosDivisa, $ivaEnRevisionPorPedido) {
                     $compromiso = $compromisosDivisa->get($pedido->id);
                     $pedido->saldo_base = max(
                         (float) $pedido->saldo_base - (float) ($compromiso->saldo_base_comprometido ?? 0),
@@ -362,10 +337,14 @@ class VendedorPagoController extends Controller
                         (float) ($pedido->saldo_ajustes ?? 0) - (float) ($compromiso->saldo_ajustes_comprometido ?? 0),
                         0
                     );
-                    $pedido->iva_aprobado = (float) ($ivaAprobadoPorPedido->get($pedido->id)->iva_aprobado ?? 0);
-                    $pedido->puede_subir_comprobante_retencion = $this->permiteSubirComprobanteRetencion(
+                    $ivaAbonado = max(
+                        (float) ($pedido->iva_bs ?? 0) - (float) ($pedido->saldo_iva_bs ?? 0),
+                        0
+                    );
+                    $ivaEnRevision = (float) ($ivaEnRevisionPorPedido->get($pedido->id)->iva_en_revision ?? 0);
+                    $pedido->puede_subir_comprobante_retencion = $this->puedeSubirComprobanteRetencion(
                         $pedido,
-                        $pedido->iva_aprobado
+                        max($ivaAbonado, $ivaEnRevision)
                     );
 
                     $pedido->ajustes_neto = $pedido->saldo_ajustes;
@@ -493,6 +472,9 @@ class VendedorPagoController extends Controller
                 DB::raw('(pedidos.base - pedidos.saldo_base) as monto_pagado'),
                 'pedidos.saldo_base',
                 'pedidos.saldo_iva_bs',
+                'pedidos.iva_bs',
+                'pedidos.porc_retencion',
+                'pedidos.comprobante_retencion',
             ])
                 ->where('pedidos.rif', $rif)
                 ->where('pedidos.user_id', $user->id)
@@ -501,6 +483,10 @@ class VendedorPagoController extends Controller
                 ->get()
                 ->map(function ($pedido) {
                     $pedido->pago_grupo_id = $this->getPagoGrupoId($pedido->id);
+                    $pedido->puede_subir_comprobante_retencion = $this->puedeSubirComprobanteRetencion(
+                        $pedido,
+                        max((float) $pedido->iva_bs - (float) $pedido->saldo_iva_bs, 0)
+                    );
                     $pedido->fecha = Carbon::parse($pedido->fecha)->format('d/m/Y');
                     return $pedido;
                 })
@@ -580,15 +566,15 @@ class VendedorPagoController extends Controller
                 ->leftJoin('pedidos_facturas', 'pedidos.id', '=', 'pedidos_facturas.pedido_id')
                 ->whereIn('pedidos.id', $pedidosIds)
                 ->where('pedidos.rif', $cliente->RIF)
+                ->where('pedidos.user_id', auth()->id())
                 ->where('pedidos.estatus', '!=', 'CANCELADO')
                 ->get()
                 ->map(function ($pedido) use ($ajustesMap) {
+                    $pedido = $this->saldosDisponiblesPedido($pedido);
                     $pedido->saldo_pendiente = $pedido->saldo_base;
                     $pedido->fecha_formateada = Carbon::parse($pedido->fecha)->format('d/m/Y');
 
-                    // netoPendiente() es la fuente canónica: suma registros pedido_ajustes con pagado=false.
-                    // saldo_ajustes puede estar desactualizado si se crearon ajustes sin actualizar ese campo.
-                    $pedido->ajustes_neto = PedidoAjuste::netoPendiente((int) $pedido->id);
+                    $pedido->ajustes_neto = (float) ($pedido->saldo_ajustes ?? 0);
                     $pedido->saldo_con_ajustes = $pedido->saldo_pendiente + $pedido->ajustes_neto;
 
                     // Obtener detalles de ajustes para mostrar
@@ -609,8 +595,8 @@ class VendedorPagoController extends Controller
                     $pedido->porcentaje_descuento = abs($pedido->descuento);
                     $pedido->monto_descuento = $pedido->saldo_base * ($pedido->descuento_aplicado / 100);
                     $pedido->saldo_con_descuento = $pedido->saldo_base - $pedido->monto_descuento;
-                    $pedido->porcentaje_retencion_pago = $this->porcentajeRetencionPago($pedido);
                     $pedido->retencion = $this->retencionPendiente($pedido);
+                    $pedido->porcentaje_retencion_pago = $this->porcentajeRetencionPago($pedido);
 
                     return $pedido;
                 });
@@ -624,18 +610,7 @@ class VendedorPagoController extends Controller
         }
         $bancos = (new Bank)->getData();
 
-        $retencionPorcentajes = $pedidosSeleccionados
-            ->pluck('porcentaje_retencion_pago', 'id')
-            ->filter(fn ($porcentaje) => (float) $porcentaje > 0)
-            ->all();
-
-        return view('vendedor.pagos.metodo', compact(
-            'cliente',
-            'pedidosSeleccionados',
-            'tasaSugerida',
-            'bancos',
-            'retencionPorcentajes'
-        ));
+        return view('vendedor.pagos.metodo', compact('cliente', 'pedidosSeleccionados', 'tasaSugerida', 'bancos'));
     }
 
     public function mostrarConfirmacion(Request $request)
@@ -961,9 +936,8 @@ class VendedorPagoController extends Controller
         $total_bolivares = $request->input('total_bolivares');
         $total_iva = $request->input('total_iva');
         $total_descuento_pago = $request->input('total_descuento_pago');
-        $total_retencion = 0;
-        $saldo_iva_total = 0;
-        $retencionPorcentajes = [];
+        $total_retencion = $request->input('total_retencion');
+        $saldo_iva_total = $request->input('saldo_iva_total', 0);
         
         $total_ajustes_netos = $request->input('total_ajustes_netos', 0);
         $detallePedidos = $request->input('detalle_pedidos', '');
@@ -999,10 +973,11 @@ class VendedorPagoController extends Controller
                 ->with('error', 'Datos de pago incompletos '.$clienteRif.' - '.$tipoPago);
         }
 
-        // Store the payment type and IVA en divisa selection in the session
+        // Store the payment type and IVA en divisa options in the session
         session([
             'pago_cliente.tipo_pago'       => $tipoPago,
             'pago_cliente.iva_en_divisa'    => $request->input('iva_en_divisa', 0),
+            'pago_cliente.opcion_iva_divisa' => $request->input('opcion_iva_divisa', 'completo'),
         ]);
         $formaPago = null;
         if ($tipoPago == 'divisa_total') {
@@ -1021,11 +996,13 @@ class VendedorPagoController extends Controller
         // cuando existen pagos en revisión y/o descuentos ya reflejados en saldo_base.
         $pedidos = Pedido::on('company')
             ->where('rif', $clienteRif)
+            ->where('user_id', auth()->id())
             ->where('estatus', '!=', 'CANCELADO')
             ->with(['pedido_detalle', 'deposito'])
             ->orderBy('fecha', 'asc')
             ->get()
             ->map(function ($pedido) {
+                $pedido = $this->saldosDisponiblesPedido($pedido);
                 $saldoBase = (float) ($pedido->saldo_base ?? 0);
                 $saldoAjustes = (float) ($pedido->saldo_ajustes ?? 0);
                 $pedido->saldo_pendiente = round($saldoBase + $saldoAjustes, 2);
@@ -1068,10 +1045,7 @@ class VendedorPagoController extends Controller
         // Determinar el total a pagar según el tipo de pago
         $total_pagar_divisa_parcial = 0;
         if ($tipoPago === 'divisa_total') {
-            $totalPagarDivisa = (float) $request->input('total_pagar_divisa', 0);
-            $total_pagar = $totalPagarDivisa > 0
-                ? $totalPagarDivisa
-                : (float) $request->input('total_pagar', 0);
+            $total_pagar = $request->total_pagar_divisa;
         } else {
             $total_pagar = $request->total_pagar;
             if ($tipoPago === 'divisa_parcial') {
@@ -1089,66 +1063,51 @@ class VendedorPagoController extends Controller
             $detallePedidos = $request->input('detalle_pedidos');
         }
 
-        // Si es pago en bolívares, usar el total_bolivares y sumar ajustes netos convertidos a Bs.
-        if ($tipoPago === 'bs' && $total_bolivares) {
-            $totalBolivaresBase = (float) $total_bolivares;
-            $tasaReferencia = (float) ($request->tasa_bcv ?: $request->input('tasa_cambio_request', 0));
-            $ajustesNetosUsd = (float) $total_ajustes_netos;
-            $ajustesNetosBs = ($tasaReferencia > 0)
-                ? ($ajustesNetosUsd * $tasaReferencia)
-                : 0;
+        $tasaBcvActual = (float) ($tasa_bcv ?: $request->input('tasa_cambio_request', 0));
+        $pedidosIdsSeleccionados = array_values(array_unique(array_filter(
+            array_map('intval', explode(',', (string) $pedidos_seleccionados))
+        )));
+        $detallesPorPedido = collect(json_decode($detallePedidos, true) ?: [])
+            ->keyBy(fn($detalle) => (int) ($detalle['pedido_id'] ?? 0));
+        $pedidosDistribucion = $pedidosPendientes
+            ->filter(fn($pedido) => in_array((int) $pedido->id, $pedidosIdsSeleccionados, true))
+            ->map(function ($pedido) use ($detallesPorPedido, $tasaBcvActual) {
+                $detalle = $detallesPorPedido->get((int) $pedido->id, []);
+                $saldoIva = max((float) ($pedido->saldo_iva_bs ?? 0), 0);
+                $saldoBase = max((float) ($pedido->saldo_base ?? 0), 0);
+                $saldoAjustes = (float) ($pedido->saldo_ajustes ?? 0);
+                $retencion = $this->retencionPendiente($pedido);
 
-            $total_pagar = $totalBolivaresBase + $ajustesNetosBs;
-            $total_bolivares = $total_pagar;
-        } elseif ($tipoPago === 'bs' && (float) $total_pagar > 0) {
-            $total_bolivares = $total_pagar;
-        }
-
-        $pedidosIdsArray = is_array($pedidos_seleccionados)
-            ? $pedidos_seleccionados
-            : array_filter(array_map('trim', explode(',', (string) $pedidos_seleccionados)));
-
-        $pedidosDistribucion = Pedido::on('company')
-            ->whereIn('id', $pedidosIdsArray)
-            ->where('rif', $clienteRif)
-            ->with('pedido_factura')
-            ->orderBy('fecha', 'asc')
-            ->get()
-            ->map(function ($pedido) use ($tasa_bcv) {
-                $tasa = (float) $tasa_bcv > 0 ? (float) $tasa_bcv : 1;
-                $saldoBase = (float) ($pedido->saldo_base ?? 0);
-                $saldoIvaBs = (float) ($pedido->saldo_iva_bs ?? 0);
-                $ajustesNeto = PedidoAjuste::netoPendiente((int) $pedido->id);
-                $saldoAjustes = abs($ajustesNeto) > 0.001
-                    ? $ajustesNeto
-                    : (float) ($pedido->saldo_ajustes ?? 0);
-                $retencionPendiente = $this->retencionPendiente($pedido);
-
+                $pedido->fecha_formateada = Carbon::parse($pedido->fecha)->format('d/m/Y');
+                $pedido->factura_numero = $pedido->factura_numero ?? $pedido->factura ?? null;
                 $pedido->saldo_base_num = $saldoBase;
-                $pedido->saldo_base_bs = round($saldoBase * $tasa, 2);
-                $pedido->saldo_iva_bs_num = $saldoIvaBs;
-                $pedido->iva_neto_bs_num = max($saldoIvaBs - $retencionPendiente, 0);
-                $pedido->retencion_bs_num = $retencionPendiente;
+                $pedido->saldo_base_bs = round($saldoBase * $tasaBcvActual, 2);
+                $pedido->saldo_iva_bs_num = $saldoIva;
+                $pedido->retencion_bs_num = $retencion;
+                $pedido->iva_neto_bs_num = max($saldoIva - $retencion, 0);
                 $pedido->saldo_ajustes_num = $saldoAjustes;
-                $pedido->saldo_ajustes_bs = round($saldoAjustes * $tasa, 2);
-                $pedido->fecha_formateada = $pedido->fecha
-                    ? Carbon::parse($pedido->fecha)->format('d/m/Y')
-                    : 'N/A';
-                $pedido->factura_numero = optional($pedido->pedido_factura)->factura;
+                $pedido->saldo_ajustes_bs = round($saldoAjustes * $tasaBcvActual, 2);
+                $pedido->ajustes_abonados_num = round(max((float) ($pedido->total_ajustes ?? 0) - $saldoAjustes, 0), 2);
 
                 return $pedido;
-            });
+            })
+            ->values();
 
-        $total_retencion = $pedidosDistribucion->sum('retencion_bs_num');
-        $saldo_iva_total = $pedidosDistribucion->sum('saldo_iva_bs_num');
-        $retencionPorcentajes = $pedidosDistribucion
-            ->mapWithKeys(fn ($pedido) => [(int) $pedido->id => $this->porcentajeRetencionPago($pedido)])
-            ->filter(fn ($porcentaje) => (float) $porcentaje > 0)
-            ->all();
+        if ($tipoPago === 'bs') {
+            $base_sin_ajustes = round($pedidosDistribucion->sum('saldo_base_num'), 2);
+            $total_ajustes_netos = round($pedidosDistribucion->sum('saldo_ajustes_num'), 2);
+            $total_iva = round($pedidosDistribucion->sum('saldo_iva_bs_num'), 2);
+            $total_retencion = round($pedidosDistribucion->sum('retencion_bs_num'), 2);
+            $total_pagar = round($pedidosDistribucion->sum(fn ($pedido) =>
+                $pedido->saldo_base_bs + $pedido->saldo_ajustes_bs + $pedido->iva_neto_bs_num
+            ), 2);
+            $total_bolivares = $total_pagar;
+        }
 
         $data = [
             'pedidosPendientes' => $pedidosPendientes,
             'pedidosDistribucion' => $pedidosDistribucion,
+            'tasaBcvActual' => $tasaBcvActual,
             'tipos_pago' => $tipos_pago,
             'bancos' => $bancos,
             'pago_destinos' => $pago_destinos,
@@ -1163,7 +1122,6 @@ class VendedorPagoController extends Controller
             'total_iva' => $total_iva,
             'total_descuento_pago' => $total_descuento_pago,
             'total_retencion' => $total_retencion,
-            'retencionPorcentajes' => $retencionPorcentajes,
             'saldo_iva_total' => $saldo_iva_total,
             'detallePedidos' => $detallePedidos,
             'total_pagar_divisa_parcial' => $total_pagar_divisa_parcial,
@@ -1639,7 +1597,6 @@ class VendedorPagoController extends Controller
                     }
                 }
                 //$pedido->estatus = 'PAGADO';
-                $pagoModel->saldos_actualizados = true;
                 $pagoModel->save();
 
 
@@ -1836,17 +1793,21 @@ class VendedorPagoController extends Controller
         $tasa_cambio = $request->input('rate_json');
         $moneda_pago = $request->input('moneda_pago');
         $total_descuento_pago = $request->input('total_descuento_pago');
-        $distribucionSaldos = json_decode($request->input('distribucion_saldos', '{}'), true);
-        $distribucionSaldos = is_array($distribucionSaldos) ? $distribucionSaldos : [];
+        $total_retencion = $request->input('total_retencion');
 
-        // En bolívares, la retención siempre se determina por la configuración de cada pedido.
-        $opcion_iva = 'retencion';
+        // Capturar la opción de IVA seleccionada (para pagos en Bolívares)
+        $opcion_iva = $request->input('pago_iva_opcion', 'retencion');
 
-        // En divisa también se usa la retención configurada en cada pedido.
+        // IVA en divisa: el vendedor elige pagar saldo_iva_bs convertido a USD
         $iva_en_divisa     = $request->boolean('iva_en_divisa', false);
-        $opcion_iva_divisa = 'retencion';
+        $opcion_iva_divisa = $request->input('opcion_iva_divisa', 'completo'); // 'completo' o 'retencion'
 
-        DB::beginTransaction();
+        $distribucionSaldos = json_decode($request->input('distribucion_saldos', '{}'), true);
+        if (!is_array($distribucionSaldos) || ($moneda_pago === 'Bolívares' && (float) $tasa_cambio <= 0)) {
+            return redirect()->back()->withInput()->with('error', 'La distribucion o la tasa de cambio no es valida.');
+        }
+
+        DB::connection('company')->beginTransaction();
 
         try {
             // Obtener el seller_id buscando por email del usuario logueado
@@ -1860,10 +1821,13 @@ class VendedorPagoController extends Controller
             $pago_grupo->fecha_pago = $pagos[0]['fecha_pago'] ?? now();
             $pago_grupo->user_id = $user->id;
             $pago_grupo->seller_id = $seller_id;
-            $pago_grupo->distribucion_saldos = $distribucionSaldos ?: null;
+            $pago_grupo->distribucion_saldos = $distribucionSaldos;
             $pago_grupo->save();
 
             $pedidos = Pedido::whereIn('id', $pedidosIds)
+                ->where('user_id', $user->id)
+                ->where('estatus', '!=', 'CANCELADO')
+                ->lockForUpdate()
                 ->with(['pedido_detalle'])
                 ->get();
 
@@ -1968,8 +1932,39 @@ class VendedorPagoController extends Controller
 
                 \Illuminate\Support\Facades\Log::info('Monto disponible en pago: ' . $montoDisponiblePago);
 
-                if ($montoDisponiblePago <= 0.01) {
+                if ($montoDisponiblePago < 0.01) {
                     continue; // Este pago ya está completamente asignado
+                }
+
+                $distribucionPago = [];
+                if ($esPagoBolivaresConIva) {
+                    $saldosPago = [];
+                    foreach ($pedidos as $pedIva) {
+                        $detPedIva = collect($detallePedidos)->firstWhere('pedido_id', $pedIva->id);
+                        if (!$detPedIva) {
+                            continue;
+                        }
+                        $pedActIva = $this->saldosDisponiblesPedido(Pedido::findOrFail($pedIva->id));
+                        $saldoIvaPedIva = $pedActIva ? (float) ($pedActIva->saldo_iva_bs ?? 0) : 0;
+                        if ($opcion_iva === 'retencion') {
+                            $retencionIva = $pedActIva
+                                ? $this->retencionPendiente($pedActIva)
+                                : 0;
+                            $saldoIvaPedIva = max($saldoIvaPedIva - $retencionIva, 0);
+                        }
+                        $seleccion = $this->saldosSeleccionados($distribucionSaldos, $pedIva->id);
+                        $saldosPago[$pedIva->id] = [
+                            'iva' => $seleccion['iva'] ? $saldoIvaPedIva : 0,
+                            'ajustes' => $seleccion['ajustes'] ? (float) $pedActIva->saldo_ajustes : 0,
+                            'base' => $seleccion['base'] ? (float) $pedActIva->saldo_base : 0,
+                        ];
+                    }
+
+                    $distribucionPago = $this->distribuirSaldosBolivares(
+                        $saldosPago,
+                        $montoDisponiblePago,
+                        (float) $tasa_cambio
+                    );
                 }
 
                 // Distribuir este pago entre los pedidos que aún tienen saldo pendiente
@@ -1981,22 +1976,8 @@ class VendedorPagoController extends Controller
                         continue; // Saltar si no hay detalle para este pedido
                     }
 
-                    $saldosSeleccionados = $this->saldosSeleccionados($distribucionSaldos, (int) $pedido->id);
-                    $incluyeIva = $saldosSeleccionados['iva'];
-                    $incluyeBase = $saldosSeleccionados['base'];
-                    $incluyeAjustes = $saldosSeleccionados['ajustes'];
-
                     // Releer el pedido para trabajar siempre con el saldo más reciente en base de datos.
-                    $pedidoActual = Pedido::select(
-                        'id',
-                        'base',
-                        'iva_bs',
-                        'saldo_base',
-                        'saldo_iva_bs',
-                        'porc_retencion',
-                        'saldo_ajustes',
-                        'total_ajustes'
-                    )->find($pedido->id);
+                    $pedidoActual = Pedido::select('id', 'base', 'saldo_base', 'iva_bs', 'porc_retencion', 'saldo_iva_bs', 'saldo_ajustes', 'total_ajustes')->find($pedido->id);
                     if (!$pedidoActual) {
                         continue;
                     }
@@ -2009,9 +1990,7 @@ class VendedorPagoController extends Controller
 
                     $descuentoDetalle = (float) ($detalle['descuento'] ?? 0);
                     $saldoBaseActual = (float) ($pedidoActual->saldo_base ?? 0);
-                    $saldoIvaPendientePedido = $incluyeIva
-                        ? (float) ($pedidoActual->saldo_iva_bs ?? 0)
-                        : 0;
+                    $saldoIvaPendientePedido = (float) ($pedidoActual->saldo_iva_bs ?? 0);
 
                     // Para pagos en divisa: el descuento solo se registra una vez (primer pago).
                     // Si ya existe un pago previo con descuento > 0 para este pedido, no aplicar de nuevo.
@@ -2021,34 +2000,27 @@ class VendedorPagoController extends Controller
                     $aplicarDescuentoAhora = $moneda_pago != 'Bolívares' && !$descuentoYaAplicado;
                     $descuentoAplicadoAhora = $aplicarDescuentoAhora ? $descuentoDetalle : 0;
 
-                    // Los pagos en divisa antiguos se aplicaban al aprobarse; considerar solo esos
-                    // registros EN REVISION mientras se calcula el saldo disponible.
-                    $montoPendienteDivisa = 0;
+                    // Para pagos en divisa: saldo_base no se reduce al registrar (solo al aprobar).
+                    // Hay que descontar manualmente los montos ya asignados en pagos EN REVISION
+                    // para calcular el saldo real disponible.
+                    $montoPendienteDivisa       = 0;
                     $montoPendienteDivisaAjustes = 0;
                     if ($moneda_pago != 'Bolívares') {
                         $ppEnRevision = PagoPedido::where('pedido_id', $pedido->id)
                             ->whereHas('pago', function ($q) {
                                 $q->where('estatus', 'EN REVISION')
-                                  ->where('moneda_pago', '!=', 'Bolívares')
-                                  ->where(function ($legacy) {
-                                      $legacy->whereNull('saldos_actualizados')
-                                          ->orWhere('saldos_actualizados', false);
-                                  });
+                                  ->where('moneda_pago', '!=', 'Bolívares');
                             });
                         $montoPendienteDivisa        = (float) (clone $ppEnRevision)->sum('monto');
                         $montoPendienteDivisaAjustes = (float) (clone $ppEnRevision)->sum('ajustes_monto');
                     }
 
                     // El saldo real considera el descuento total del pedido (ya aplicado o a aplicar ahora)
-                    // y los pagos divisa antiguos que aún no redujeron saldo_base.
+                    // y los pagos divisa pendientes de aprobación que aún no redujeron saldo_base.
                     $saldoAjustesActual   = (float) ($pedidoActual->saldo_ajustes ?? 0);
                     $descuentoParaSaldoReal = ($descuentoYaAplicado || $aplicarDescuentoAhora) ? $descuentoDetalle : 0;
-                    $saldoReal            = $incluyeBase
-                        ? max($saldoBaseActual - $descuentoParaSaldoReal - $montoPendienteDivisa, 0)
-                        : 0;
-                    $saldoRealAjustes     = $incluyeAjustes
-                        ? max($saldoAjustesActual - $montoPendienteDivisaAjustes, 0)
-                        : 0;
+                    $saldoReal            = max($saldoBaseActual - $descuentoParaSaldoReal - $montoPendienteDivisa, 0);
+                    $saldoRealAjustes     = max($saldoAjustesActual - $montoPendienteDivisaAjustes, 0);
                     // saldoPendientePedido incluye base + ajustes para que el presupuesto no se
                     // consuma prematuramente dejando pedidos parcialmente cubiertos.
                     $saldoPendientePedido = $saldoReal + $saldoRealAjustes;
@@ -2067,17 +2039,14 @@ class VendedorPagoController extends Controller
                             })
                             ->where('iva', '>', 0)
                             ->exists();
-                    $aplicarIvaEnDivisaAhora = !$esPagoBolivaresConIva
-                        && $incluyeIva
-                        && $iva_en_divisa
-                        && !$ivaEnDivisaYaComprometido;
+                    $aplicarIvaEnDivisaAhora = !$esPagoBolivaresConIva && $iva_en_divisa && !$ivaEnDivisaYaComprometido;
 
                     if (!$esPagoBolivaresConIva && $saldoPendientePedido <= 0.01
                         && (!$aplicarIvaEnDivisaAhora || $saldoIvaPendientePedido <= 0.01)) {
                         continue; // Este pedido ya está completamente cubierto
                     }
 
-                    if ($esPagoBolivaresConIva && $saldoPendientePedido <= 0.01 && $saldoIvaPendientePedido <= 0.01) {
+                    if ($esPagoBolivaresConIva && $saldoPendientePedido < 0.01 && $saldoIvaPendientePedido < 0.01) {
                         continue; // Este pedido ya está completamente pagado
                     }
 
@@ -2099,7 +2068,7 @@ class VendedorPagoController extends Controller
                         $montoDisponiblePago = $pago->monto - $montoAsignadoPago;
                     }
 
-                    if ($montoDisponiblePago <= 0.01) {
+                    if (!$esPagoBolivaresConIva && $montoDisponiblePago <= 0.01) {
                         break; // Este pago ya está completamente asignado, pasar al siguiente pago
                     }
 
@@ -2107,36 +2076,22 @@ class VendedorPagoController extends Controller
                     $montoParaAsignarBs = 0;
                     $montoPagadoUsd = 0;
                     $ivaAplicadoBs = 0;
-                    $retencionPedido = 0;
 
                     if ($esPagoBolivaresConIva) {
                         \Illuminate\Support\Facades\Log::info('Opción IVA: ' . $opcion_iva);
                         \Illuminate\Support\Facades\Log::info('Saldo IVA pendiente: ' . $saldoIvaPendientePedido . ' | Monto disponible: ' . $montoDisponiblePago);
 
-                        // ── PASO 1: Calcular cuánto IVA se aplica ────────────────────────────────
-                        $retencionPedido = $opcion_iva === 'retencion'
-                            ? $this->retencionPendiente($pedidoActual)
-                            : 0;
-                        $ivaPendienteAPagar = $opcion_iva === 'retencion'
-                            ? max($saldoIvaPendientePedido - $retencionPedido, 0)
-                            : $saldoIvaPendientePedido;
-                        $ivaAplicadoBs = min($ivaPendienteAPagar, $montoDisponiblePago);
+                        $asignacion = $distribucionPago[$pedido->id] ?? ['iva' => 0, 'ajustes' => 0, 'base' => 0];
+                        $ivaAplicadoBs = $asignacion['iva'];
                         \Illuminate\Support\Facades\Log::info('IVA completo a pagar: ' . $ivaAplicadoBs);
 
-                        // ── PASO 2: En este pedido, pagar base y luego ajustes con el remanente. ─
-                        $restantePagoBs = max($montoDisponiblePago - $ivaAplicadoBs, 0);
-                        $maximoBaseEnBs = max($saldoPendientePedido, 0) * (float) $tasa_cambio;
-                        $montoBaseAplicadoBs = min($restantePagoBs, $maximoBaseEnBs);
+                        $montoPagadoUsd = $asignacion['base'];
+                        $ajustesAsignadoDiv = $asignacion['ajustes'];
+                        $montoBaseAplicadoBs = round(($montoPagadoUsd + $ajustesAsignadoDiv) * (float) $tasa_cambio, 2);
 
                         \Illuminate\Support\Facades\Log::info('IVA aplicado Bs: ' . $ivaAplicadoBs . ' | Base aplicada Bs: ' . $montoBaseAplicadoBs);
 
                         $montoParaAsignarBs = $ivaAplicadoBs + $montoBaseAplicadoBs;
-                        $montoDisponibleUsd = (float) $tasa_cambio > 0 ? $montoBaseAplicadoBs / (float) $tasa_cambio : 0;
-                        [$montoPagadoUsd, $ajustesAsignadoDiv] = $this->distribuirBaseYAjustes(
-                            $saldoReal,
-                            $saldoRealAjustes,
-                            $montoDisponibleUsd
-                        );
                         $montoParaAsignar = $montoPagadoUsd + $ajustesAsignadoDiv;
 
                     } elseif ($aplicarIvaEnDivisaAhora && $saldoIvaPendientePedido > 0.01) {
@@ -2154,22 +2109,19 @@ class VendedorPagoController extends Controller
                         }
                         $ivaUsdEquiv = round($ivaBsAComprometer / $tasaDiv, 2);
 
-                        // Este pedido se cubre en orden: IVA neto, base y ajustes.
+                        // Total USD disponible para este pedido: base + IVA_USD
                         $totalUsdPedido = $saldoPendientePedido + $ivaUsdEquiv;
                         $montoParaAsignar = min($totalUsdPedido, $montoDisponiblePago);
 
-                        $ivaUsdAsignado = min($ivaUsdEquiv, $montoParaAsignar);
+                        // Separar cuánto va a base y cuánto a IVA
+                        $baseUsdAsignado = min($saldoPendientePedido, $montoParaAsignar);
+                        $ivaUsdAsignado  = max($montoParaAsignar - $baseUsdAsignado, 0);
                         // IVA Bs a registrar (proporcional si no alcanzó el total)
                         $ivaAplicadoBs = ($ivaUsdEquiv > 0.001)
                             ? round($ivaBsAComprometer * ($ivaUsdAsignado / $ivaUsdEquiv), 2)
                             : 0;
 
-                        $restanteUsd = max($montoParaAsignar - $ivaUsdAsignado, 0);
-                        [$montoPagadoUsd, $ajustesAsignadoDiv] = $this->distribuirBaseYAjustes(
-                            $saldoReal,
-                            $saldoRealAjustes,
-                            $restanteUsd
-                        );
+                        $montoPagadoUsd    = $baseUsdAsignado;
                         $montoParaAsignarBs = $montoParaAsignar * $tasaDiv; // referencial
 
                         // Rastrear retención pendiente en divisa
@@ -2178,7 +2130,7 @@ class VendedorPagoController extends Controller
                         }
 
                         \Illuminate\Support\Facades\Log::info('Divisa+IVA pedido ' . $pedido->id
-                            . ': base=' . $montoPagadoUsd
+                            . ': base=' . $baseUsdAsignado
                             . ' ivaUsd=' . $ivaUsdAsignado
                             . ' ivaBs=' . $ivaAplicadoBs);
 
@@ -2201,7 +2153,7 @@ class VendedorPagoController extends Controller
                     $montoPagadoUsd     = max((float) $montoPagadoUsd, 0);
                     $ajustesAsignadoDiv = max((float) ($ajustesAsignadoDiv ?? 0), 0);
 
-                    if ($montoPagadoUsd <= 0.01 && $ivaAplicadoBs <= 0.01 && $ajustesAsignadoDiv <= 0.01) {
+                    if ($montoPagadoUsd < 0.01 && $ivaAplicadoBs < 0.01 && $ajustesAsignadoDiv < 0.01) {
                         continue;
                     }
 
@@ -2220,20 +2172,20 @@ class VendedorPagoController extends Controller
                     $pagoPedido->iva = $esPagoBolivaresConIva ? round($ivaAplicadoBs, 2) : 0;
                     
                     // La retención se calcula desde el pedido, no desde un valor enviado por la vista.
-                    $opcionRetencionAplicada = $esPagoBolivaresConIva
-                        ? $opcion_iva === 'retencion'
-                        : $opcion_iva_divisa === 'retencion';
-                    $ivaNetoAntesRetencion = max($saldoIvaPendientePedido - $retencionPedido, 0);
-                    $pagoPedido->retencion = $opcionRetencionAplicada
-                        && $incluyeIva
-                        && $ivaAplicadoBs + 0.01 >= $ivaNetoAntesRetencion
-                            ? round($this->retencionPorRegistrar($pedidoActual), 2)
-                            : 0;
+                    if ($opcion_iva === 'retencion' && $esPagoBolivaresConIva) {
+                        $pagoPedido->retencion = round($this->retencionPorRegistrar($pedidoActual), 2);
+                        \Illuminate\Support\Facades\Log::info('Retención completa registrada: ' . $pagoPedido->retencion);
+                    } elseif ($opcion_iva_divisa === 'retencion' && !$esPagoBolivaresConIva) {
+                        $pagoPedido->retencion = round($this->retencionPorRegistrar($pedidoActual), 2);
+                    } else {
+                        $pagoPedido->retencion = 0;
+                    }
                     
                     // Guardar solo el descuento realmente aplicado al saldo para poder revertirlo al rechazar.
                     $pagoPedido->descuento = round($descuentoAplicadoAhora, 2);
-                    // ajustes_monto almacena los ajustes aplicados, en la misma unidad del saldo.
-                    if ($ajustesAsignadoDiv > 0.001) {
+                    // Para divisa: ajustes_monto almacena el USD de ajustes asignado a este pedido.
+                    // Se aplica a saldo_ajustes cuando el admin APRUEBA el pago.
+                    if (!$esPagoBolivaresConIva && $ajustesAsignadoDiv > 0.001) {
                         $pagoPedido->ajustes_monto = round($ajustesAsignadoDiv, 2);
                     }
                     $pagoPedido->created_at = now();
@@ -2250,7 +2202,8 @@ class VendedorPagoController extends Controller
                     \Illuminate\Support\Facades\Log::info('Base aplicada: ' . $montoPagadoUsd . ', Base restante: ' . $saldoBaseRestante);
                     
                     // Actualizar el registro de pago con los montos corregidos.
-                    // iva almacena Bs aplicados a saldo_iva_bs para todas las monedas.
+                    // iva almacena: para Bolívares = Bs aplicados a saldo_iva_bs (reducido al registrar)
+                    //               para Divisa+IVA = Bs de IVA a reducir al APROBAR (no inmediato)
                     // ajustes_monto = USD de ajustes asignado a este pedido.
                     $pagoPedido->monto = round($montoPagadoUsd, 2);
                     $pagoPedido->iva   = round($ivaAplicadoBs, 2);
@@ -2259,20 +2212,34 @@ class VendedorPagoController extends Controller
                     }
                     $pagoPedido->save();
 
-                    $updatePedido = [
-                        'saldo_base' => DB::raw('GREATEST(saldo_base - ' . (float) ($pagoPedido->monto + $pagoPedido->descuento) . ', 0)')
-                    ];
-                    if ((float) $pagoPedido->iva > 0) {
-                        $updatePedido['saldo_iva_bs'] = DB::raw('GREATEST(saldo_iva_bs - ' . (float) $pagoPedido->iva . ', 0)');
+                    // Bolívares: reducir saldos inmediatamente (EN REVISION).
+                    // Divisa:    saldo_base y saldo_iva_bs se reducen solo al APROBAR.
+                    if ($esPagoBolivaresConIva) {
+                        $updatePedido = [
+                            'saldo_base' => DB::raw('GREATEST(saldo_base - ' . (float) ($pagoPedido->monto + $pagoPedido->descuento) . ', 0)')
+                        ];
+                        if ((float) $pagoPedido->iva > 0) {
+                            $updatePedido['saldo_iva_bs'] = DB::raw('GREATEST(saldo_iva_bs - ' . (float) $pagoPedido->iva . ', 0)');
+                        }
+                        // Reducir saldo_ajustes por el monto del ajuste (USD) incluido en el pago.
+                        $ajustesNetoDetalle = (float) ($pagoPedido->ajustes_monto ?? 0);
+                        if ($ajustesNetoDetalle >= 0.01) {
+                            $updatePedido['saldo_ajustes'] = DB::raw('GREATEST(saldo_ajustes - ' . round($ajustesNetoDetalle, 2) . ', 0)');
+                            $pagoPedido->save();
+                        }
+                        Pedido::where('id', $pedido->id)->update($updatePedido);
                     }
-                    if ((float) ($pagoPedido->ajustes_monto ?? 0) > 0.01) {
-                        $updatePedido['saldo_ajustes'] = DB::raw('GREATEST(saldo_ajustes - ' . round((float) $pagoPedido->ajustes_monto, 2) . ', 0)');
-                    }
-                    Pedido::where('id', $pedido->id)->update($updatePedido);
+                    // Divisa + IVA: saldo_iva_bs NO se reduce aquí; el IVA (Bs) queda
+                    // registrado en pagoPedido->iva y se aplica cuando el admin aprueba.
 
-                    if ((float) $pagoPedido->retencion > 0.01) {
-                        $pedidosConRetencionPendiente[$pedido->id] = (float) $pagoPedido->retencion;
+                    // Rastrear retención pendiente (Bolívares)
+                    if ($opcion_iva === 'retencion' && $esPagoBolivaresConIva) {
+                        $retencionPedido = $this->retencionPendiente($pedidoActual);
+                        if ($retencionPedido > 0.01) {
+                            $pedidosConRetencionPendiente[$pedido->id] = $retencionPedido;
+                        }
                     }
+                    // Rastrear retención pendiente (Divisa) — ya fue asignada en el bloque divisa+IVA
 
                     \Illuminate\Support\Facades\Log::info('Saldos actualizados - IVA: ' . $pagoPedido->iva . ', Base: ' . $pagoPedido->monto);
                 }
@@ -2298,11 +2265,8 @@ class VendedorPagoController extends Controller
                 $detallesPedido = \App\Models\PedidoDetalle::where('pedido_id', $pedido->id)->first();
                 $porc_iva_det = $detallesPedido && isset($detallesPedido) && $detallesPedido->iva > 0 ? $detallesPedido->iva / 100 : 0;
                 $pagoGrupoDetalle->iva = ($detalle['saldo'] - $detalle['descuento']) * $porc_iva_det ?? 0;
-                $retencionRegistrada = (float) PagoPedido::where('pedido_id', $pedido->id)
-                    ->whereIn('pago_id', $pagos_finales->pluck('id'))
-                    ->sum('retencion');
-                $pagoGrupoDetalle->retencion = $retencionRegistrada;
-                $pagoGrupoDetalle->total = ($detalle['saldo'] ?? 0) + (($detalle['iva'] ?? 0) - $retencionRegistrada);
+                $pagoGrupoDetalle->retencion = $detalle['retencion'] ?? 0;
+                $pagoGrupoDetalle->total = ($detalle['saldo'] ?? 0) + (($detalle['iva'] ?? 0) - ($detalle['retencion'] ?? 0));
                 $pagoGrupoDetalle->pedido_id = $pedido->id;
                 $pagoGrupoDetalle->save();
 
@@ -2329,7 +2293,7 @@ class VendedorPagoController extends Controller
                 }
             }
 
-            DB::commit();
+            DB::connection('company')->commit();
 
             // Limpiar la sesión de pago
             session()->forget('pago_cliente');
@@ -2355,7 +2319,7 @@ class VendedorPagoController extends Controller
 
             return $redirectResponse;
         } catch (\Exception $e) {
-            DB::rollBack();
+            DB::connection('company')->rollBack();
             \Illuminate\Support\Facades\Log::error('Error al procesar pago múltiple: ' . $e->getMessage());
             \Illuminate\Support\Facades\Log::error($e->getTraceAsString());
 
@@ -2363,28 +2327,6 @@ class VendedorPagoController extends Controller
                 ->with('error', 'Ocurrió un error al procesar el pago: ' . $e->getMessage())
                 ->withInput();
         }
-    }
-
-    private function porcentajeRetencionPago(Pedido $pedido): float
-    {
-        $porcentajeConfigurado = (float) ($pedido->porc_retencion ?? 0);
-
-        return min(max($porcentajeConfigurado, 0), 100);
-    }
-
-    private function saldosSeleccionados(array $distribucion, int $pedidoId): array
-    {
-        if (!array_key_exists($pedidoId, $distribucion)) {
-            return ['iva' => true, 'base' => true, 'ajustes' => true];
-        }
-
-        $seleccion = is_array($distribucion[$pedidoId]) ? $distribucion[$pedidoId] : [];
-
-        return [
-            'iva' => !empty($seleccion['iva']),
-            'base' => !empty($seleccion['base']),
-            'ajustes' => !empty($seleccion['ajustes']),
-        ];
     }
 
     private function retencionPendiente(Pedido $pedido): float
@@ -2405,8 +2347,12 @@ class VendedorPagoController extends Controller
 
     private function retencionPorRegistrar(Pedido $pedido): float
     {
-        $retencionPendiente = $this->retencionPendiente($pedido);
-        if ($retencionPendiente <= 0.001) {
+        $retencionEsperada = round(
+            (float) ($pedido->iva_bs ?? 0) * ((float) ($pedido->porc_retencion ?? 0) / 100),
+            2
+        );
+
+        if ($retencionEsperada <= 0.001) {
             return 0;
         }
 
@@ -2416,22 +2362,106 @@ class VendedorPagoController extends Controller
             })
             ->sum('retencion');
 
-        return max($retencionPendiente - $retencionesRegistradas, 0);
+        return min(
+            max($retencionEsperada - $retencionesRegistradas, 0),
+            max((float) ($pedido->saldo_iva_bs ?? 0), 0)
+        );
     }
 
-    private function permiteSubirComprobanteRetencion(Pedido $pedido, float $ivaAprobado): bool
+    private function puedeSubirComprobanteRetencion(Pedido $pedido, float $ivaReportado): bool
     {
-        $ivaOriginal = (float) ($pedido->iva_bs ?? 0);
-        $porcentaje = $this->porcentajeRetencionPago($pedido);
-        $saldoIva = (float) ($pedido->saldo_iva_bs ?? 0);
+        $porcentajeRetencion = min(max((float) ($pedido->porc_retencion ?? 0), 0), 100);
 
-        if ($porcentaje <= 0 || $ivaOriginal <= 0.01 || $saldoIva <= 0.01) {
-            return false;
+        return $porcentajeRetencion > 0
+            && ($ivaReportado > 0.001 || $porcentajeRetencion >= 100);
+    }
+
+    private function porcentajeRetencionPago(Pedido $pedido): float
+    {
+        return min(max((float) ($pedido->porc_retencion ?? 0), 0), 100);
+    }
+
+    private function saldosDisponiblesPedido(Pedido $pedido): Pedido
+    {
+        $compromisos = PagoPedido::query()
+            ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
+            ->where('pagos_pedidos.pedido_id', $pedido->id)
+            ->where('pagos.estatus', 'EN REVISION')
+            ->where(function ($query) {
+                $query->where('pagos.moneda_pago', '!=', 'Bolívares')->orWhereNull('pagos.moneda_pago');
+            })
+            ->selectRaw('COALESCE(SUM(pagos_pedidos.monto + COALESCE(pagos_pedidos.descuento, 0)), 0) as base,
+                COALESCE(SUM(pagos_pedidos.iva), 0) as iva,
+                COALESCE(SUM(pagos_pedidos.ajustes_monto), 0) as ajustes')
+            ->first();
+
+        $disponible = clone $pedido;
+        $disponible->saldo_base = round(max((float) $pedido->saldo_base - (float) $compromisos->base, 0), 2);
+        $disponible->saldo_iva_bs = round(max((float) $pedido->saldo_iva_bs - (float) $compromisos->iva, 0), 2);
+        $disponible->saldo_ajustes = round((float) $pedido->saldo_ajustes - (float) $compromisos->ajustes, 2);
+
+        return $disponible;
+    }
+
+    private function saldosSeleccionados(array $distribucion, int $pedidoId): array
+    {
+        $seleccion = $distribucion[$pedidoId] ?? ['iva' => true, 'base' => true, 'ajustes' => true];
+
+        return [
+            'iva' => !empty($seleccion['iva']),
+            'base' => !empty($seleccion['base']),
+            'ajustes' => !empty($seleccion['ajustes']),
+        ];
+    }
+
+    private function prioridadDistribucionSaldos(): array
+    {
+        return ['iva', 'ajustes', 'base'];
+    }
+
+    private function distribuirSaldosBolivares(array $saldos, float $disponibleBs, float $tasa): array
+    {
+        $distribucion = [];
+        $disponibleBs = round(max($disponibleBs, 0), 2);
+        foreach ($saldos as $pedidoId => $saldo) {
+            $distribucion[$pedidoId] = ['iva' => 0.0, 'ajustes' => 0.0, 'base' => 0.0];
+        }
+        foreach ($this->prioridadDistribucionSaldos() as $tipo) {
+            foreach ($saldos as $pedidoId => $saldo) {
+                $pendiente = round(max((float) ($saldo[$tipo] ?? 0), 0), 2);
+                $monto = $tipo === 'iva'
+                    ? min($pendiente, $disponibleBs)
+                    : (round($pendiente * $tasa, 2) <= $disponibleBs
+                        ? $pendiente
+                        : min($pendiente, floor(($disponibleBs + 0.000001) / $tasa * 100) / 100));
+                $monto = round($monto, 2);
+                $distribucion[$pedidoId][$tipo] = $monto;
+                $disponibleBs = round(max($disponibleBs - ($tipo === 'iva' ? $monto : round($monto * $tasa, 2)), 0), 2);
+            }
         }
 
-        $ivaNoRetenido = round($ivaOriginal * (1 - ($porcentaje / 100)), 2);
+        return $distribucion;
+    }
 
-        return round($ivaAprobado, 2) >= $ivaNoRetenido;
+    private function reservarIvaPrioritario(array $saldosIva, float $montoDisponibleBs): array
+    {
+        $reservadoPorPedido = [];
+        $presupuestoDisponible = max($montoDisponibleBs, 0);
+
+        foreach ($saldosIva as $pedidoId => $saldoIva) {
+            $reservado = min(max((float) $saldoIva, 0), $presupuestoDisponible);
+            $reservadoPorPedido[$pedidoId] = $reservado;
+            $presupuestoDisponible -= $reservado;
+        }
+
+        $reservadoPosterior = [];
+        $acumulado = 0;
+        foreach (array_reverse($reservadoPorPedido, true) as $pedidoId => $reservado) {
+            $reservadoPosterior[$pedidoId] = $acumulado;
+            $acumulado += $reservado;
+        }
+
+        return [$reservadoPorPedido, $reservadoPosterior];
     }
 
     private function distribuirBaseYAjustes(
@@ -2439,13 +2469,40 @@ class VendedorPagoController extends Controller
         float $saldoAjustes,
         float $montoDisponibleUsd
     ): array {
-        $montoBase = min(max($saldoBase, 0), max($montoDisponibleUsd, 0));
-        $montoAjustes = min(
-            max($saldoAjustes, 0),
-            max($montoDisponibleUsd - $montoBase, 0)
+        $montoAjustes = min(max($saldoAjustes, 0), max($montoDisponibleUsd, 0));
+        $montoBase = min(
+            max($saldoBase, 0),
+            max($montoDisponibleUsd - $montoAjustes, 0)
         );
 
         return [$montoBase, $montoAjustes];
+    }
+
+    public function actualizarRetencionPedido(Request $request, $pedidoId)
+    {
+        $validated = $request->validate([
+            'porc_retencion' => 'required|numeric|between:0,100',
+        ]);
+
+        $pedido = Pedido::on('company')
+            ->where('id', $pedidoId)
+            ->where('user_id', auth()->id())
+            ->whereIn('estatus', ['APROBADO', 'EN REVISION'])
+            ->where(function ($query) {
+                $query->where('saldo_base', '>', 0)
+                    ->orWhere('saldo_iva_bs', '>', 0)
+                    ->orWhere('saldo_ajustes', '>', 0);
+            })
+            ->firstOrFail();
+
+        $pedido->porc_retencion = (float) $validated['porc_retencion'];
+        $pedido->cliageret = $pedido->porc_retencion > 0 ? 1 : 0;
+        $pedido->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Porcentaje de retención actualizado correctamente.',
+        ]);
     }
 
     /**
@@ -2469,20 +2526,23 @@ class VendedorPagoController extends Controller
             ->where('id', $pedidoId)
             ->where('user_id', $user->id)
             ->where('porc_retencion', '>', 0)
-            ->where('saldo_iva_bs', '>', 0)
             ->firstOrFail();
 
-        $ivaAprobado = (float) PagoPedido::query()
-            ->where('pedido_id', $pedido->id)
-            ->whereHas('pago', function ($query) {
-                $query->where('estatus', 'APROBADO');
-            })
-            ->sum('iva');
+        $ivaReportado = (float) PagoPedido::query()
+            ->join('pagos', 'pagos.id', '=', 'pagos_pedidos.pago_id')
+            ->where('pagos_pedidos.pedido_id', $pedido->id)
+            ->where('pagos.estatus', 'EN REVISION')
+            ->sum('pagos_pedidos.iva');
 
-        if (!$this->permiteSubirComprobanteRetencion($pedido, $ivaAprobado)) {
+        $ivaAbonado = max(
+            (float) ($pedido->iva_bs ?? 0) - (float) ($pedido->saldo_iva_bs ?? 0),
+            0
+        );
+
+        if (!$this->puedeSubirComprobanteRetencion($pedido, max($ivaAbonado, $ivaReportado))) {
             return response()->json([
                 'success' => false,
-                'message' => 'Debe pagar y esperar la aprobación del IVA no retenido antes de cargar el comprobante.',
+                'message' => 'Debe registrar un abono de IVA antes de cargar el comprobante, salvo que la retención sea del 100%.',
             ], 422);
         }
 

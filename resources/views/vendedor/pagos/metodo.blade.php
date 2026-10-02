@@ -582,6 +582,13 @@
                                                         @endif
                                                         
                                                         <!-- Mostrar detalles de ajustes si existen -->
+                                                        @if((float) ($pedido->total_ajustes ?? 0) != 0 || (float) ($pedido->saldo_ajustes ?? 0) != 0)
+                                                            <small class="d-block text-muted mt-1">
+                                                                Ajustes: ${{ number_format($pedido->total_ajustes ?? 0, 2, ',', '.') }};
+                                                                abonos: ${{ number_format(max((float) ($pedido->total_ajustes ?? 0) - (float) ($pedido->saldo_ajustes ?? 0), 0), 2, ',', '.') }};
+                                                                saldo: ${{ number_format($pedido->saldo_ajustes ?? 0, 2, ',', '.') }}
+                                                            </small>
+                                                        @endif
                                                         @if(isset($pedido->ajustes_detalle) && count($pedido->ajustes_detalle) > 0)
                                                             <div class="mt-2">
                                                                 @foreach($pedido->ajustes_detalle as $ajuste)
@@ -762,7 +769,7 @@
                             </div>
                             @endif
 
-                            <form action="{{ route('vendedores.pagos.index') }}" method="POST" id="form-pago" novalidate>
+                            <form action="{{ route('vendedores.pagos.index') }}" method="POST" id="form-pago" data-saldos-bs="{{ json_encode($pedidosSeleccionados->map(fn($pedido) => ['base' => (float) $pedido->saldo_base, 'ajustes' => (float) $pedido->saldo_ajustes])->values()) }}" novalidate>
                                 @csrf
                                 @php
                                     $tieneSaldoIvaBs = collect($pedidosSeleccionados)->contains(function ($pedido) {
@@ -2239,7 +2246,8 @@
             const retencionBolivares = parseFloat("{{ $totalRetencion ?? 0 }}") || 0;
             const ivaNetoBolivares = Math.max(iva_bs - retencionBolivares, 0);
 
-            const baseBolivares = saldoBasePuro * tasa;
+            const saldosPedidos = JSON.parse($('#form-pago').attr('data-saldos-bs') || '[]');
+            const baseBolivares = saldosPedidos.reduce((total, pedido) => total + Math.round(pedido.base * tasa * 100) / 100, 0);
             let ivaBolivares = iva_bs;
 
             // Total del cuadro azul oscuro (Base + IVA neto)
@@ -2247,7 +2255,7 @@
 
             // Ajustes netos (USD y Bs.)
             const totalAjustesNetosUsd = parseFloat($('#total_ajustes_netos').val()) || 0;
-            const totalAjustesBs = totalAjustesNetosUsd * tasa;
+            const totalAjustesBs = saldosPedidos.reduce((total, pedido) => total + Math.round(pedido.ajustes * tasa * 100) / 100, 0);
 
             // Gran total a pagar en bolívares = (Total cuadro azul oscuro) + (Total ajustes en Bs.)
             const granTotalBolivares = totalBolivares + totalAjustesBs;

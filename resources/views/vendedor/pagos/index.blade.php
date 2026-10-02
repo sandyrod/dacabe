@@ -812,27 +812,7 @@
                     </div>
                     <div class="card-body p-4 d-flex flex-column" style="padding: 1.5rem !important;">
                         @php
-                            $calcTotalAjustes = 0;
-                            if (isset($detallesAjustes) && !empty($detallesAjustes)) {
-                                foreach ($detallesAjustes as $ajustes) {
-                                    if ($ajustes && $ajustes->count() > 0) {
-                                        foreach ($ajustes as $ajuste) {
-                                            // Los ajustes ya cobrados (pagado=1) no deben volver a sumarse al
-                                            // total a pagar; solo se listan en el modal como referencia histórica.
-                                            if (!empty($ajuste->pagado)) {
-                                                continue;
-                                            }
-                                            $tipoAjuste = isset($ajuste->tipo) ? strtolower($ajuste->tipo) : '';
-                                            $monto = $ajuste->monto ?? 0;
-                                            if ($tipoAjuste == 'cargo' || $tipoAjuste == 'debito') {
-                                                $calcTotalAjustes += $monto;
-                                            } else {
-                                                $calcTotalAjustes -= $monto;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            $calcTotalAjustes = (float) ($total_ajustes_netos ?? 0);
 
                             $tipoPagoSesion = session('pago_cliente.tipo_pago');
                             $esPagoBs = $tipoPagoSesion === 'bs';
@@ -845,10 +825,10 @@
                             $totalBolivaresBase = (float) ($total_bolivares ?? 0);
                             $totalIvaBs = (float) ($total_iva ?? 0);
                             $totalRetencionBs = (float) ($total_retencion ?? 0);
-                            $baseBsSeparada = $totalBolivaresBase - $totalIvaBs + $totalRetencionBs;
+                            $baseBsSeparada = $totalBolivaresBase - $totalIvaBs + $totalRetencionBs - $calcTotalAjustesBs;
 
                             $totalConAjustes = $esPagoBs
-                                ? ($totalBolivaresBase + $calcTotalAjustesBs)
+                                ? $totalBolivaresBase
                                 : (float) ($total_pagar ?? 0) + (float) $calcTotalAjustes;
 
                             // La base sin ajustes viene de metodo.blade.php (base_real).
@@ -1169,6 +1149,7 @@
                             {{-- IVA en divisa: propagados desde metodo.blade.php --}}
                             <input type="hidden" name="iva_en_divisa" value="{{ request('iva_en_divisa', 0) }}">
                             <input type="hidden" name="opcion_iva_divisa" value="{{ request('opcion_iva_divisa', 'retencion') }}">
+                            <input type="hidden" name="pago_iva_opcion" value="retencion">
                             <input type="hidden" name="distribucion_saldos" id="distribucion-saldos-json" value="">
                             @csrf
 
@@ -1194,7 +1175,7 @@
                                         <div>
                                             <h5 class="mb-0 fw-bold" style="letter-spacing: 0.3px;">Distribución de Saldos a Abonar por Pedido</h5>
                                             <small class="text-white-50" style="font-size: 0.8rem;">
-                                                Marque o desmarque los saldos específicos a abonar en este pago (Prioridad de cobro: 1. IVA, 2. Base, 3. Ajustes).
+                                                Prioridad de cobro: 1. IVA, 2. Ajustes, 3. Bases.
                                             </small>
                                         </div>
                                     </div>
@@ -1252,6 +1233,13 @@
                                                 </div>
                                             </div>
                                             <div class="card-body p-3">
+                                                @if($ped->ajustes_abonados_num > 0 || abs($ped->saldo_ajustes_num) > 0.001)
+                                                    <div class="small mb-3 d-flex flex-wrap" style="gap: 8px 20px;">
+                                                        <span>Total ajustes: <strong>$ {{ number_format($ped->total_ajustes ?? 0, 2, ',', '.') }}</strong></span>
+                                                        <span>Abonos a ajustes: <strong>$ {{ number_format($ped->ajustes_abonados_num, 2, ',', '.') }}</strong></span>
+                                                        <span>Saldo de ajustes: <strong>$ {{ number_format($ped->saldo_ajustes_num, 2, ',', '.') }}</strong></span>
+                                                    </div>
+                                                @endif
                                                 <div class="row">
                                                     {{-- 1. Saldo IVA en Bs --}}
                                                     @if($ped->saldo_iva_bs_num > 0.001)
@@ -1415,8 +1403,8 @@
 
                                 <div class="col-md-3">
                                     <label for="monto_bs">Monto </label>
-                                    <input type="number" class="form-control @error('monto_bs') is-invalid @enderror"
-                                        id="monto_bs" name="monto_bs" step="0.01"
+                                    <input type="text" inputmode="decimal" class="form-control @error('monto_bs') is-invalid @enderror"
+                                        id="monto_bs" name="monto_bs" autocomplete="off"
                                         value="{{ old('monto_bs', number_format($totalConAjustes ?? 0, 2, '.', '')) }}">
                                     @error('monto_bs')
                                         <span class="invalid-feedback" role="alert">
@@ -1775,6 +1763,29 @@
             $('#rate-json').val(JSON.stringify({{ $tasa_bcv }}));
         }
 
+        function parseMontoPago(valor) {
+            let normalizado = String(valor ?? '').trim().replace(/\s/g, '');
+            if (!normalizado) return 0;
+
+            const tieneComa = normalizado.includes(',');
+            const tienePunto = normalizado.includes('.');
+            if (tieneComa && tienePunto) {
+                const separadorDecimal = normalizado.lastIndexOf(',') > normalizado.lastIndexOf('.') ? ',' : '.';
+                const separadorMiles = separadorDecimal === ',' ? /\./g : /,/g;
+                normalizado = normalizado.replace(separadorMiles, '').replace(separadorDecimal, '.');
+            } else if (tieneComa || tienePunto) {
+                const separador = tieneComa ? ',' : '.';
+                if (/^\d{1,3}([.,]\d{3})+$/.test(normalizado)) {
+                    normalizado = normalizado.replace(/[.,]/g, '');
+                } else if (separador === ',') {
+                    normalizado = normalizado.replace(',', '.');
+                }
+            }
+
+            const monto = Number.parseFloat(normalizado);
+            return Number.isFinite(monto) ? monto : 0;
+        }
+
         // Actualizar el monto pendiente por pagar
         function actualizarMontoPendiente() {
             const montoPendiente = parseFloat((totalAPagar - totalPagado).toFixed(2));
@@ -1856,7 +1867,7 @@
 
             const isBolivares = ($('#tipo-moneda').html() || '').trim() === 'Bolívares';
             const nuevoTotal = isBolivares ? sumaBs : sumaUsd;
-            if (totalChecks === 0 || (checksMarcados === 0 && paymentData.totalAPagar > 0)) {
+            if (totalChecks === 0) {
                 totalAPagar = paymentData.totalAPagar;
                 actualizarMontoPendiente();
                 return;
@@ -1991,7 +2002,7 @@
         // Función para agregar un pago a la lista
         function agregarPago() {
             // Obtener los datos del formulario
-            const monto = parseFloat($('#monto_bs').val()) || 0;
+            const monto = parseMontoPago($('#monto_bs').val());
             const tipoPago = $('#tpago_id option:selected').text();
             const referencia = $('#referencia').val() || '';
             const bancoOrigen = $('#banco_codigo option:selected').text();
@@ -2274,7 +2285,7 @@
             // Función para calcular y actualizar monto cuando cambia monto_bs
             function updateMonto() {
                 // Con input type="number", el valor ya es numérico
-                const monto_bs = parseFloat($('#monto_bs').val()) || 0;
+                const monto_bs = parseMontoPago($('#monto_bs').val());
                 const rate = parseFloat($('#rate').val()) || 0;
 
                 console.log('Calculando monto:', monto_bs, '/', rate);
@@ -2338,7 +2349,7 @@
             // Manejar cambios en el campo monto_bs
             $('#monto_bs').on('input', function() {
                 // Con input type="number", el valor ya es numérico
-                const monto_bs = parseFloat($(this).val()) || 0;
+                const monto_bs = parseMontoPago($(this).val());
                 console.log('Valor monto_bs ingresado:', $(this).val(), 'parseado como:', monto_bs);
 
                 // Actualizar el campo oculto

@@ -376,7 +376,6 @@
                                     <!-- Pestaña de Pedidos Pendientes -->
                                     <div class="tab-pane fade show active" id="pendientes" role="tabpanel"
                                         aria-labelledby="pendientes-tab">
-                                        <div id="aviso-retencion-pendiente" class="d-none" style="margin: 12px 12px 0;"></div>
                                         <div id="pedidos-container" class="d-none">
                                             <div class="table-responsive">
                                                 <table class="table table-hover mb-0">
@@ -1058,9 +1057,10 @@
                             return;
                         }
 
-                        const pedidosConRetencionPendiente = [];
+                        renderPedidosPendientes(pedidos, tbody);
+                    }
 
-                        function buildRetencionButtonHtml(pedido, compact = false) {
+                    function buildRetencionButtonHtml(pedido) {
                             if (!pedido || !pedido.puede_subir_comprobante_retencion) {
                                 return '';
                             }
@@ -1070,14 +1070,9 @@
                             const etiquetaBoton = pedido && pedido.comprobante_retencion
                                 ? 'Actualizar comprobante'
                                 : 'Subir comprobante';
-                            const estilo = compact
-                                ? 'border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;'
-                                : 'font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;';
-                            const clases = compact ? 'btn btn-sm js-abrir-modal-retencion' : 'btn btn-sm mt-1 js-abrir-modal-retencion';
-
                             return `<button type="button"
-                                class="${clases}"
-                                style="${estilo}"
+                                class="btn btn-sm mt-1 js-abrir-modal-retencion"
+                                style="font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;"
                                 data-pedido-id="${pedido.id}"
                                 data-pedido-num="${pedido.numero}"
                                 data-comprobante="${comprobanteActual}">
@@ -1085,6 +1080,7 @@
                             </button>`;
                         }
 
+                    function renderPedidosPendientes(pedidos, tbody) {
                         pedidos.forEach((pedido, index) => {
                             const saldoBase = parseFloat(pedido.saldo_base) || 0;
                             const saldoIvaBs = parseFloat(pedido.saldo_iva_bs) || 0;
@@ -1095,14 +1091,8 @@
                             const ivaOriginal = Math.max(parseFloat(pedido.iva_bs) || 0, 0);
                             const ivaRetenido = Math.min(Math.round(ivaOriginal * porcRetencion) / 100, Math.max(saldoIvaBs, 0));
                             const ivaAPagar = Math.max(saldoIvaBs - ivaRetenido, 0);
-                            const tieneComprobanteRetencion = !!(pedido.comprobante_retencion && pedido.comprobante_retencion !== 'null');
-                            
-                            const tieneRetencionPendiente = porcRetencion > 0 && saldoIvaBs > 0.01;
+                            const tieneRetencionPendiente = ivaRetenido > 0.01;
                             const puedeSubirComprobante = !!pedido.puede_subir_comprobante_retencion;
-                            
-                            if (tieneRetencionPendiente) {
-                                pedidosConRetencionPendiente.push(pedido);
-                            }
 
                             const totalmentePagado = saldo <= 0.01 && saldoIvaBs <= 0.01;
                             // Cuando saldo_base = 0 pero saldo_iva_bs > 0, el usuario puede registrar pago:
@@ -1184,71 +1174,18 @@
                                         ${ajustesHtml}
                                     </td>
                                     <td class="text-end" data-label="IVA (Bs.)">
-                                         ${porcRetencion > 0 ? `
-                                             <div class="iva-detalle">
-                                                 <div class="iva-detalle-fila">
-                                                     <span class="iva-detalle-etiqueta">IVA total pendiente</span>
-                                                     <span class="iva-detalle-importe">${formatBS(saldoIvaBs)}</span>
-                                                 </div>
-                                                 <div class="iva-detalle-fila">
-                                                     <span class="iva-detalle-etiqueta">IVA retenido (${porcRetencion}%)</span>
-                                                     <span class="iva-detalle-importe">${formatBS(ivaRetenido)}</span>
-                                                 </div>
-                                                 <div class="iva-detalle-fila iva-detalle-total">
-                                                     <span class="iva-detalle-etiqueta">IVA a pagar</span>
-                                                     <span class="iva-detalle-importe">${formatBS(ivaAPagar)}</span>
-                                                 </div>
+                                         <div class="iva-detalle">
+                                             <div class="iva-detalle-fila iva-detalle-total">
+                                                 <span class="iva-detalle-etiqueta">IVA a pagar</span>
+                                                 <span class="iva-detalle-importe">${formatBS(ivaAPagar)}</span>
                                              </div>
-                                         ` : `<span class="fw-bold text-success">${formatBS(saldoIvaBs)}</span>`}
-                                         ${tieneRetencionPendiente ? '<small class="d-block mt-2 text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Retención Pendiente</small>' : ''}
-                                         ${tieneRetencionPendiente && puedeSubirComprobante ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
+                                             ${puedeSubirComprobante ? buildRetencionButtonHtml(pedido) : ''}
+                                         </div>
                                     </td>
                                 </tr>
                             `);
                             tbody.append(tr);
                         });
-
-                        // Mostrar aviso global si hay pedidos con retención de IVA pendiente
-                        if (pedidosConRetencionPendiente.length > 0) {
-                            const totalRetencion = pedidosConRetencionPendiente.reduce((s, p) => s + parseFloat(p.saldo_iva_bs), 0);
-                            const ids = pedidosConRetencionPendiente.map(p => '#' + p.numero).join(', ');
-
-                            const ordenesHtml = pedidosConRetencionPendiente.map(p => {
-                                const tieneComprobante = p.comprobante_retencion && p.comprobante_retencion !== 'null';
-                                const badge = tieneComprobante
-                                    ? `<span style="font-size:11px;color:#16a34a;font-weight:700;margin-right:8px;"><i class="fas fa-check-circle me-1"></i>Cargado</span>`
-                                    : '';
-                                const botonComprobante = p.puede_subir_comprobante_retencion
-                                    ? buildRetencionButtonHtml(p, true)
-                                    : '<small style="color:#92400e;">Pague y espere la aprobación del IVA no retenido para cargar el comprobante.</small>';
-                                return `
-                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:8px;flex-wrap:wrap;gap:6px;">
-                                        <span style="font-size:13px;color:#92400e;font-weight:600;">Pedido #${p.numero} — Bs. ${formatBS(p.saldo_iva_bs)} ${badge}</span>
-                                        ${botonComprobante}
-                                    </div>`;
-                            }).join('');
-
-                            $('#aviso-retencion-pendiente').html(`
-                                <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 2px solid #f97316; border-radius: 10px; padding: 14px 18px;">
-                                    <div style="display:flex;align-items:flex-start;gap:14px;">
-                                        <div style="flex-shrink:0;width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#f97316,#ea580c);display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-file-invoice" style="color:white;font-size:16px;"></i>
-                                        </div>
-                                        <div style="flex:1;">
-                                            <div style="font-weight:700;color:#9a3412;font-size:14px;margin-bottom:4px;">
-                                                IVA retenido pendiente de validación — Pedido${pedidosConRetencionPendiente.length > 1 ? 's' : ''} ${ids}
-                                            </div>
-                                            <div style="color:#c2410c;font-size:13px;line-height:1.5;">
-                                                El IVA retenido (Bs. ${formatBS(totalRetencion)}) quedará pendiente hasta que suba el comprobante y el administrador lo valide.
-                                            </div>
-                                            ${ordenesHtml}
-                                        </div>
-                                    </div>
-                                </div>
-                            `).removeClass('d-none');
-                        } else {
-                            $('#aviso-retencion-pendiente').addClass('d-none');
-                        }
 
                         $('#sin-pedidos').addClass('d-none');
                         $('#pedidos-container').removeClass('d-none');
@@ -1285,7 +1222,7 @@
                                     <td data-label="Fecha">${pedido.fecha}</td>
                                     <td class="text-end" data-label="Total">${formatMoney(pedido.total)}</td>
                                     <td class="text-end" data-label="Estatus"><span class="badge badge-warning">EN REVISIÓN</span></td>
-                                    <td class="text-end" data-label="Estatus">${comprobanteHtml}</td>
+                                    <td class="text-end" data-label="Estatus">${comprobanteHtml}${buildRetencionButtonHtml(pedido)}</td>
                                 </tr>
                             `;
                             //html+=tr;

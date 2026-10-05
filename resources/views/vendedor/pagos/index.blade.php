@@ -812,27 +812,7 @@
                     </div>
                     <div class="card-body p-4 d-flex flex-column" style="padding: 1.5rem !important;">
                         @php
-                            $calcTotalAjustes = 0;
-                            if (isset($detallesAjustes) && !empty($detallesAjustes)) {
-                                foreach ($detallesAjustes as $ajustes) {
-                                    if ($ajustes && $ajustes->count() > 0) {
-                                        foreach ($ajustes as $ajuste) {
-                                            // Los ajustes ya cobrados (pagado=1) no deben volver a sumarse al
-                                            // total a pagar; solo se listan en el modal como referencia histórica.
-                                            if (!empty($ajuste->pagado)) {
-                                                continue;
-                                            }
-                                            $tipoAjuste = isset($ajuste->tipo) ? strtolower($ajuste->tipo) : '';
-                                            $monto = $ajuste->monto ?? 0;
-                                            if ($tipoAjuste == 'cargo' || $tipoAjuste == 'debito') {
-                                                $calcTotalAjustes += $monto;
-                                            } else {
-                                                $calcTotalAjustes -= $monto;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            $calcTotalAjustes = (float) ($total_ajustes_netos ?? 0);
 
                             $tipoPagoSesion = session('pago_cliente.tipo_pago');
                             $esPagoBs = $tipoPagoSesion === 'bs';
@@ -845,10 +825,10 @@
                             $totalBolivaresBase = (float) ($total_bolivares ?? 0);
                             $totalIvaBs = (float) ($total_iva ?? 0);
                             $totalRetencionBs = (float) ($total_retencion ?? 0);
-                            $baseBsSeparada = $totalBolivaresBase - $totalIvaBs + $totalRetencionBs;
+                            $baseBsSeparada = $totalBolivaresBase - $totalIvaBs + $totalRetencionBs - $calcTotalAjustesBs;
 
                             $totalConAjustes = $esPagoBs
-                                ? ($totalBolivaresBase + $calcTotalAjustesBs)
+                                ? $totalBolivaresBase
                                 : (float) ($total_pagar ?? 0) + (float) $calcTotalAjustes;
 
                             // La base sin ajustes viene de metodo.blade.php (base_real).
@@ -1169,6 +1149,7 @@
                             {{-- IVA en divisa: propagados desde metodo.blade.php --}}
                             <input type="hidden" name="iva_en_divisa" value="{{ request('iva_en_divisa', 0) }}">
                             <input type="hidden" name="opcion_iva_divisa" value="{{ request('opcion_iva_divisa', 'retencion') }}">
+                            <input type="hidden" name="pago_iva_opcion" value="retencion">
                             <input type="hidden" name="distribucion_saldos" id="distribucion-saldos-json" value="">
                             @csrf
 
@@ -1194,7 +1175,7 @@
                                         <div>
                                             <h5 class="mb-0 fw-bold" style="letter-spacing: 0.3px;">Distribución de Saldos a Abonar por Pedido</h5>
                                             <small class="text-white-50" style="font-size: 0.8rem;">
-                                                Marque o desmarque los saldos específicos a abonar en este pago (Prioridad de cobro: 1. IVA, 2. Base, 3. Ajustes).
+                                                Prioridad de cobro: 1. IVA, 2. Ajustes, 3. Bases.
                                             </small>
                                         </div>
                                     </div>
@@ -1210,7 +1191,7 @@
                                 <div class="card-body p-3 p-md-4" style="background: #f8fafc;">
                                     @php
                                         // La opción de retención que realmente se aplicará depende del tipo de pago:
-                                        // Bolívares usa 'pago_iva_opcion' ($opcion_iva); Divisa usa 'opcion_iva_divisa'.
+                                        // En Bolívares la retención viene del pedido; en Divisa se conserva la opción del paso anterior.
                                         // Deben coincidir con los defaults usados en storeMultiple() para que lo
                                         // mostrado aquí sea siempre igual a lo que se cobra.
                                         $opcionIvaActiva = session('pago_cliente.tipo_pago') === 'bs'
@@ -1252,6 +1233,13 @@
                                                 </div>
                                             </div>
                                             <div class="card-body p-3">
+                                                @if($ped->ajustes_abonados_num > 0 || abs($ped->saldo_ajustes_num) > 0.001)
+                                                    <div class="small mb-3 d-flex flex-wrap" style="gap: 8px 20px;">
+                                                        <span>Total ajustes: <strong>$ {{ number_format($ped->total_ajustes ?? 0, 2, ',', '.') }}</strong></span>
+                                                        <span>Abonos a ajustes: <strong>$ {{ number_format($ped->ajustes_abonados_num, 2, ',', '.') }}</strong></span>
+                                                        <span>Saldo de ajustes: <strong>$ {{ number_format($ped->saldo_ajustes_num, 2, ',', '.') }}</strong></span>
+                                                    </div>
+                                                @endif
                                                 <div class="row">
                                                     {{-- 1. Saldo IVA en Bs --}}
                                                     @if($ped->saldo_iva_bs_num > 0.001)
@@ -1384,108 +1372,6 @@
                                 </div>
                             @endif
 
-                            <!-- Sección de IVA con retención -->
-                            @if (session('pago_cliente.tipo_pago') == 'bs' && ($total_retencion ?? 0) > 0)
-                            <div class="iva-responsive" style="background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); border-radius: 20px; padding: 32px; margin-bottom: 24px; border: 3px solid #0ea5e9; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15); position: relative;">
-                                <!-- Header con resumen -->
-                                <div class="iva-header-responsive" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px;">
-                                    
-                                    <div style="display: flex; align-items: center; gap: 16px;">
-                                        <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(255, 255, 255, 0.9); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(2, 132, 199, 0.3);">
-                                            <i class="fas fa-calculator" style="font-size: 28px; color: #0284c7;"></i>
-                                        </div>
-                                        <h4 style="margin: 0; font-size: 24px; font-weight: 700; color: #075985;">Opciones de IVA con Retención</h4>
-                                    </div>
-                                    
-                                    <div class="iva-summary-responsive d-flex flex-column flex-lg-row" style="display: flex; gap: 20px; background: rgba(255, 255, 255, 0.7); padding: 16px 24px; border-radius: 16px; backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.9);">
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">IVA Total</div>
-                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($total_iva ?? 0, 2, ',', '.') }}</div>
-                                        </div>
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto;">
-                                            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Retención 75%</div>
-                                            <div style="font-size: 16px; font-weight: 700; color: #1e293b;">Bs. {{ number_format($total_retencion, 2, ',', '.') }}</div>
-                                        </div>
-                                        <div class="iva-summary-item" style="text-align: center; flex: 1 1 auto; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">
-                                            <div style="font-size: 11px; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Neto</div>
-                                            <div style="font-size: 18px; font-weight: 700;">Bs. {{ number_format(($total_iva ?? 0) - $total_retencion, 2, ',', '.') }}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Opciones de pago -->
-                                <div class="iva-grid-responsive" style="display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch;">
-                                    <!-- Opción 1: Aplicar Retención -->
-                                    <div class="iva-hover iva-selected" style="flex: 1 1 320px; min-width: min(320px, 100%); position: relative;">
-                                        <input type="radio" name="pago_iva_opcion" id="iva_retencion" value="retencion" checked style="position: absolute; opacity: 0; z-index: -1;">
-                                        <label for="iva_retencion" style="display: block; width: 100%; cursor: pointer;">
-                                            <div id="card-retencion" class="iva-card-responsive" style="background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%); border-radius: 20px; padding: 28px; border: 3px solid #ffffff; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); transition: all 0.3s ease; position: relative; overflow: hidden; min-height: 160px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                                <div style="flex-shrink: 0;">
-                                                    <div class="icon-wrapper" style="width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; box-shadow: 0 8px 30px rgba(251, 146, 60, 0.4); transition: all 0.3s ease;">
-                                                        <i class="fas fa-percentage"></i>
-                                                    </div>
-                                                </div>
-                                                <div style="flex: 1; text-align: left;">
-                                                    <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Aplicar Retención</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #ea580c; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format(($total_iva ?? 0) - $total_retencion, 2, ',', '.') }}</div>
-                                                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
-                                                        <i class="fas fa-file-invoice"></i>
-                                                        <span>Comprobante de retención requerido</span>
-                                                    </div>
-                                                </div>
-                                                <div style="flex-shrink: 0;">
-                                                    <div id="selector-retencion" style="width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: 3px solid #ffffff; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);">
-                                                        <div id="dot-retencion" style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- Opción 2: Pagar IVA Completo -->
-                                    <div class="iva-hover" style="flex: 1 1 320px; min-width: min(320px, 100%); position: relative;">
-                                        <input type="radio" name="pago_iva_opcion" id="iva_completo" value="completo" style="position: absolute; opacity: 0; z-index: -1;">
-                                        <label for="iva_completo" style="display: block; width: 100%; cursor: pointer;">
-                                            <div id="card-completo" class="iva-card-responsive" style="background: linear-gradient(145deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 20px; padding: 28px; border: 3px solid #ffffff; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); transition: all 0.3s ease; position: relative; overflow: hidden; min-height: 160px; display: flex; align-items: center; gap: 20px; cursor: pointer;">
-                                                <div style="flex-shrink: 0;">
-                                                    <div class="icon-wrapper" style="width: 64px; height: 64px; border-radius: 18px; background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%); display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; box-shadow: 0 8px 30px rgba(96, 165, 250, 0.4); transition: all 0.3s ease;">
-                                                        <i class="fas fa-check-circle"></i>
-                                                    </div>
-                                                </div>
-                                                <div style="flex: 1; text-align: left;">
-                                                    <h5 class="elegant-title" style="font-size: 18px; font-weight: 700; color: #1e293b; margin: 0 0 8px 0; line-height: 1.2;">Pagar IVA Completo</h5>
-                                                    <div class="elegant-amount" style="font-size: 22px; font-weight: 800; color: #2563eb; margin: 0 0 12px 0; line-height: 1;">Bs. {{ number_format($total_iva ?? 0, 2, ',', '.') }}</div>
-                                                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #64748b; font-weight: 500;">
-                                                        <i class="fas fa-info-circle"></i>
-                                                        <span>Sin aplicar retención</span>
-                                                    </div>
-                                                </div>
-                                                <div style="flex-shrink: 0;">
-                                                    <div id="selector-completo" style="width: 32px; height: 32px; border-radius: 50%; background: #f1f5f9; border: 3px solid #ffffff; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);">
-                                                        <div id="dot-completo" style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8; transition: all 0.3s ease;"></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                                
-                                <!-- Alerta de comprobante requerido -->
-                                <div id="alerta-retencion" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 2px solid #fca5a5; border-radius: 16px; padding: 20px 24px; margin-top: 24px; display: flex; align-items: center; gap: 16px; box-shadow: 0 4px 20px rgba(251, 146, 60, 0.2);">
-                                    <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3);">
-                                        <i class="fas fa-exclamation-triangle"></i>
-                                    </div>
-                                    <div>
-                                        <strong style="display: block; font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 4px;">Comprobante de retención requerido</strong>
-                                        <span style="font-size: 14px; color: #b45309; line-height: 1.4;">Debe adjuntar el comprobante cuando aplica la retención del 75%</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Campo oculto -->
-                                <input type="hidden" id="monto_iva_adicional" name="monto_iva_adicional" value="{{ ($total_iva ?? 0) - $total_retencion }}">
-                            </div>
-                            @endif
-
                             @if (session('pago_cliente.metodo_pago') === 'transferencia')
                                 <div class="row mb-4">
                                     <div class="col-md-4">
@@ -1517,8 +1403,8 @@
 
                                 <div class="col-md-3">
                                     <label for="monto_bs">Monto </label>
-                                    <input type="number" class="form-control @error('monto_bs') is-invalid @enderror"
-                                        id="monto_bs" name="monto_bs" step="0.01"
+                                    <input type="text" inputmode="decimal" class="form-control @error('monto_bs') is-invalid @enderror"
+                                        id="monto_bs" name="monto_bs" autocomplete="off"
                                         value="{{ old('monto_bs', number_format($totalConAjustes ?? 0, 2, '.', '')) }}">
                                     @error('monto_bs')
                                         <span class="invalid-feedback" role="alert">
@@ -1877,6 +1763,29 @@
             $('#rate-json').val(JSON.stringify({{ $tasa_bcv }}));
         }
 
+        function parseMontoPago(valor) {
+            let normalizado = String(valor ?? '').trim().replace(/\s/g, '');
+            if (!normalizado) return 0;
+
+            const tieneComa = normalizado.includes(',');
+            const tienePunto = normalizado.includes('.');
+            if (tieneComa && tienePunto) {
+                const separadorDecimal = normalizado.lastIndexOf(',') > normalizado.lastIndexOf('.') ? ',' : '.';
+                const separadorMiles = separadorDecimal === ',' ? /\./g : /,/g;
+                normalizado = normalizado.replace(separadorMiles, '').replace(separadorDecimal, '.');
+            } else if (tieneComa || tienePunto) {
+                const separador = tieneComa ? ',' : '.';
+                if (/^\d{1,3}([.,]\d{3})+$/.test(normalizado)) {
+                    normalizado = normalizado.replace(/[.,]/g, '');
+                } else if (separador === ',') {
+                    normalizado = normalizado.replace(',', '.');
+                }
+            }
+
+            const monto = Number.parseFloat(normalizado);
+            return Number.isFinite(monto) ? monto : 0;
+        }
+
         // Actualizar el monto pendiente por pagar
         function actualizarMontoPendiente() {
             const montoPendiente = parseFloat((totalAPagar - totalPagado).toFixed(2));
@@ -1958,7 +1867,7 @@
 
             const isBolivares = ($('#tipo-moneda').html() || '').trim() === 'Bolívares';
             const nuevoTotal = isBolivares ? sumaBs : sumaUsd;
-            if (totalChecks === 0 || (checksMarcados === 0 && paymentData.totalAPagar > 0)) {
+            if (totalChecks === 0) {
                 totalAPagar = paymentData.totalAPagar;
                 actualizarMontoPendiente();
                 return;
@@ -2093,7 +2002,7 @@
         // Función para agregar un pago a la lista
         function agregarPago() {
             // Obtener los datos del formulario
-            const monto = parseFloat($('#monto_bs').val()) || 0;
+            const monto = parseMontoPago($('#monto_bs').val());
             const tipoPago = $('#tpago_id option:selected').text();
             const referencia = $('#referencia').val() || '';
             const bancoOrigen = $('#banco_codigo option:selected').text();
@@ -2376,7 +2285,7 @@
             // Función para calcular y actualizar monto cuando cambia monto_bs
             function updateMonto() {
                 // Con input type="number", el valor ya es numérico
-                const monto_bs = parseFloat($('#monto_bs').val()) || 0;
+                const monto_bs = parseMontoPago($('#monto_bs').val());
                 const rate = parseFloat($('#rate').val()) || 0;
 
                 console.log('Calculando monto:', monto_bs, '/', rate);
@@ -2440,7 +2349,7 @@
             // Manejar cambios en el campo monto_bs
             $('#monto_bs').on('input', function() {
                 // Con input type="number", el valor ya es numérico
-                const monto_bs = parseFloat($(this).val()) || 0;
+                const monto_bs = parseMontoPago($(this).val());
                 console.log('Valor monto_bs ingresado:', $(this).val(), 'parseado como:', monto_bs);
 
                 // Actualizar el campo oculto
@@ -2928,35 +2837,9 @@
                     return false;
                 }
 
-                // Validar comprobante de retención SOLO si se seleccionó "Aplicar Retención"
-                const opcionRetencion = document.querySelector('input[name="pago_iva_opcion"]:checked');
-                if (opcionRetencion && opcionRetencion.value === 'retencion' && fileInput.files.length === 0) {
-                    e.preventDefault();
-                    Swal.fire({
-                        icon: 'info',
-                        title: 'Comprobante de Retención',
-                        text: 'Se recomienda adjuntar el comprobante de retención cuando aplica esta opción, pero puede continuar sin él.',
-                        confirmButtonText: 'Continuar sin comprobante',
-                        confirmButtonColor: '#3b82f6',
-                        showCancelButton: true,
-                        cancelButtonText: 'Adjuntar comprobante',
-                        cancelButtonColor: '#f59e0b'
-                    }).then((result) => {
-                        if (result.isDismissed) {
-                            // Usuario quiere adjuntar comprobante, no hacer nada
-                            e.preventDefault();
-                            return false;
-                        }
-                        // Usuario quiere continuar, permitir el envío
-                        return true;
-                    });
-                    return false;
-                }
-
                 return true;
             });
 
-            // Funcionalidad para opciones de IVA con retención - Diseño garantizado
             function inicializarOpcionesIVA() {
                 // Usar jQuery para mayor compatibilidad
                 $('#card-retencion').on('click', function(e) {
@@ -2993,17 +2876,6 @@
                     }
                 }, 100);
                 
-                // Validación del formulario
-                $('#multiplePaymentsForm').on('submit', function(e) {
-                    const opcionIVA = $('input[name="pago_iva_opcion"]:checked').val();
-                    const fileInput = $('#comprobantes')[0];
-                    
-                    //if (opcionIVA === 'retencion' && fileInput.files.length === 0) {
-                        //e.preventDefault();
-                       // mostrarAlertaRetencion();
-                        //return false;
-                    //}
-                });
             }
             
             function manejarCambioOpcion(opcion) {
@@ -3034,9 +2906,6 @@
                 }
                 
                 console.log('Resultados:', { montoAdicional, nuevoTotal }); // Debug
-                
-                // Actualizar campo oculto
-                $('#monto_iva_adicional').val(montoAdicional);
                 
                 // Actualizar totales con animación
                 actualizarTotales(nuevoTotal, esRetencion);
@@ -3351,8 +3220,6 @@
             // Inicializar cuando el DOM esté listo
             $(document).ready(function() {
                 console.log('DOM listo, inicializando opciones IVA'); // Debug
-                inicializarOpcionesIVA();
-                
                 // Inicializar modal de ajustes
                 const ajustesModal = new bootstrap.Modal(document.getElementById('ajustesModal'));
                 

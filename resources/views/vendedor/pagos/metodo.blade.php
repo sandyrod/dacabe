@@ -582,6 +582,13 @@
                                                         @endif
                                                         
                                                         <!-- Mostrar detalles de ajustes si existen -->
+                                                        @if((float) ($pedido->total_ajustes ?? 0) != 0 || (float) ($pedido->saldo_ajustes ?? 0) != 0)
+                                                            <small class="d-block text-muted mt-1">
+                                                                Ajustes: ${{ number_format($pedido->total_ajustes ?? 0, 2, ',', '.') }};
+                                                                abonos: ${{ number_format(max((float) ($pedido->total_ajustes ?? 0) - (float) ($pedido->saldo_ajustes ?? 0), 0), 2, ',', '.') }};
+                                                                saldo: ${{ number_format($pedido->saldo_ajustes ?? 0, 2, ',', '.') }}
+                                                            </small>
+                                                        @endif
                                                         @if(isset($pedido->ajustes_detalle) && count($pedido->ajustes_detalle) > 0)
                                                             <div class="mt-2">
                                                                 @foreach($pedido->ajustes_detalle as $ajuste)
@@ -642,7 +649,7 @@
                                                     value="{{ $totalRetencion }}">
                                                 <input type="hidden" id="total_iva" name="total_iva"
                                                     value="{{ $totalIva }}">
-                                                <input type="hidden" name="saldo_iva_total" value="{{ $iva_bs }}">
+                                                <input type="hidden" id="saldo_iva_total" name="saldo_iva_total" value="{{ $iva_bs }}">
                                                 <input type="hidden" id="total_descuento_pago"
                                                     name="total_descuento_pago" value="{{ $totalDescuento }}">
                                                 <tr>
@@ -720,6 +727,7 @@
                                                                             <span class="text-info">Bs.</span>
                                                                         </div>
                                                                     </div>
+                                                                    @if($totalRetencion > 0)
                                                                     <!-- Retención -->
                                                                     <div class="col-6 col-md-2">
                                                                         <small
@@ -731,6 +739,7 @@
                                                                             <span class="text-warning">Bs.</span>
                                                                         </div>
                                                                     </div>
+                                                                    @endif
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -760,7 +769,7 @@
                             </div>
                             @endif
 
-                            <form action="{{ route('vendedores.pagos.index') }}" method="POST" id="form-pago" novalidate>
+                            <form action="{{ route('vendedores.pagos.index') }}" method="POST" id="form-pago" data-saldos-bs="{{ json_encode($pedidosSeleccionados->map(fn($pedido) => ['base' => (float) $pedido->saldo_base, 'ajustes' => (float) $pedido->saldo_ajustes])->values()) }}" novalidate>
                                 @csrf
                                 @php
                                     $tieneSaldoIvaBs = collect($pedidosSeleccionados)->contains(function ($pedido) {
@@ -899,13 +908,15 @@
                                                         <input type="hidden" name="iva_bolivares_parcial"
                                                             id="iva-bolivares-parcial-input" value="0">
                                                     </tr>
+                                                    @if($totalRetencion > 0)
                                                     <tr>
-                                                        <td class="text-muted border-0 ps-3">Retención (75% IVA):</td>
+                                                        <td class="text-muted border-0 ps-3">Retención configurada:</td>
                                                         <td class="text-end border-0 pe-3 fw-medium text-danger"
                                                             id="retencion-bolivares-parcial">-0,00 Bs.</td>
                                                         <input type="hidden" name="retencion_bolivares_parcial"
                                                             id="retencion-bolivares-parcial-input" value="0">
                                                     </tr>
+                                                    @endif
                                                     <tr>
                                                         <td class="text-muted border-0 ps-3">Descuento:</td>
                                                         <td class="text-end border-0 pe-3 fw-medium text-success"
@@ -1151,24 +1162,28 @@
                                                                     </div>
                                                                 </div>
                                                                 <div class="col-6 col-md-3 mb-2 mb-md-0">
-                                                                    <div class="fw-semibold small">Impuesto (16%)</div>
+                                                                    <div class="fw-semibold small">IVA a pagar</div>
                                                                     <div class="fw-bold small">
                                                                         <span
                                                                             id="impuesto_dolares">{{ number_format($iva_bs ?? 0, 2, ',', '.') }}
                                                                             $</span>
                                                                         <span id="impuesto_bolivares"
-                                                                            class="d-none">0,00 Bs.</span>
+                                                                            class="d-none">{{ number_format(max(($iva_bs ?? 0) - ($totalRetencion ?? 0), 0), 2, ',', '.') }}
+                                                                            Bs.</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                            <div class="row mt-2">
-                                                                <div class="col-12 text-right text-white">
-                                                                    <div class="fw-semibold small">- Retención (75%)
+                                                            <div class="row mt-2 text-white-50 small">
+                                                                <div class="col-6">
+                                                                    <div class="fw-normal">IVA total</div>
+                                                                    <div class="fw-normal" id="iva_total_bolivares">
+                                                                        {{ number_format($iva_bs ?? 0, 2, ',', '.') }} Bs.
                                                                     </div>
-                                                                    <div class="fw-bold small"
-                                                                        id="retencion_bolivares">
-                                                                        {{ number_format($totalRetencion ?? 0, 2, ',', '.') }}
-                                                                        Bs.
+                                                                </div>
+                                                                <div class="col-6 text-end">
+                                                                    <div class="fw-normal">- Retención configurada</div>
+                                                                    <div class="fw-normal" id="retencion_bolivares">
+                                                                        {{ number_format($totalRetencion ?? 0, 2, ',', '.') }} Bs.
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1360,7 +1375,7 @@
                             $ivaNetoEnDivisaUsd = max($ivaEnDivisaUsd - $retencionEnDivisaUsd, 0);
                         @endphp
                         @if($iva_bs > 0)
-                        <div id="bloque-iva-divisa" class="mt-3" style="display:none;">
+                        <div id="bloque-iva-divisa" class="mt-3 d-none" style="display:none;">
                             {{-- Tarjeta seleccionable: clic en cualquier parte la activa --}}
                             <div id="iva-divisa-card"
                                  style="background:linear-gradient(135deg,#e0f2fe 0%,#bae6fd 100%);border-radius:14px;padding:20px 22px;border:2px solid #0ea5e9;cursor:pointer;transition:border-color .2s,box-shadow .2s;"
@@ -1383,47 +1398,16 @@
                                 </div>
                                 {{-- checkbox real oculto --}}
                                 <input class="d-none" type="checkbox" id="iva_en_divisa_check" name="iva_en_divisa" value="1">
-                                {{-- Opciones de retención (solo visibles cuando está activo) --}}
-                                @if($totalRetencion > 0)
-                                <div id="iva-divisa-opciones" class="d-none ps-2 pt-3" onclick="event.stopPropagation()">
-                                    <label class="d-block mb-2 fw-semibold text-secondary" style="font-size:13px;">Opción de retención:</label>
-                                    <div class="d-flex gap-3 flex-wrap">
-                                        <div class="retention-option">
-                                            <input type="radio" name="opcion_iva_divisa" id="retencion-iva" value="retencion" checked class="retention-radio">
-                                            <label for="retencion-iva" class="retention-label">
-                                                <div class="retention-content">
-                                                    <div class="retention-icon">
-                                                        <i class="fas fa-percentage"></i>
-                                                    </div>
-                                                    <div class="retention-text">
-                                                        <strong>Aplicar retención</strong>
-                                                        <small class="d-block text-muted">Pagar ${{ number_format($ivaNetoEnDivisaUsd,2,',','.') }} (IVA neto)</small>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                        <div class="retention-option ml-3">
-                                            <input type="radio" name="opcion_iva_divisa" id="completo-iva" value="completo" class="retention-radio">
-                                            <label for="completo-iva" class="retention-label">
-                                                <div class="retention-content">
-                                                    <div class="retention-icon">
-                                                        <i class="fas fa-coins"></i>
-                                                    </div>
-                                                    <div class="retention-text">
-                                                        <strong>Pagar IVA completo</strong>
-                                                        <small class="d-block text-muted">Pagar ${{ number_format($ivaEnDivisaUsd,2,',','.') }}</small>
-                                                    </div>
-                                                </div>
-                                            </label>
-                                        </div>
-                                    </div>
+                                {{-- Resumen de solo lectura según la retención configurada en el pedido --}}
+                                <div id="iva-divisa-resumen" class="d-none ps-2 pt-3" onclick="event.stopPropagation()">
+                                    <small class="d-block text-muted">
+                                        Retención del pedido: ${{ number_format($retencionEnDivisaUsd,2,',','.') }}
+                                    </small>
+                                    <strong class="d-block text-secondary" style="font-size:13px;">
+                                        IVA a pagar: ${{ number_format($ivaNetoEnDivisaUsd,2,',','.') }}
+                                    </strong>
                                 </div>
-                                @else
-                                <input type="hidden" name="opcion_iva_divisa" value="completo">
-                                @endif
                                 {{-- Campos ocultos --}}
-                                <input type="hidden" id="iva_en_divisa_usd" value="{{ $ivaEnDivisaUsd }}">
-                                <input type="hidden" id="iva_bs_total" value="{{ $iva_bs }}">
                                 <input type="hidden" id="iva_neto_divisa_usd" value="{{ $ivaNetoEnDivisaUsd }}">
                             </div>
                         </div>
@@ -1498,8 +1482,12 @@
             // Calcular IVA (16% del monto en bolívares)
             const iva = montoBolivares * 0.16;
 
-            // Calcular retención (75% del IVA)
-            const retencion = iva * 0.75;
+            const ivaSeleccionado = parseFloat($('#saldo_iva_total').val()) || 0;
+            const retencionConfigurada = parseFloat($('#total_retencion').val()) || 0;
+            const factorRetencion = ivaSeleccionado > 0
+                ? Math.min(retencionConfigurada / ivaSeleccionado, 1)
+                : 0;
+            const retencion = iva * factorRetencion;
 
             // Obtener el porcentaje de descuento (si existe)
             const descuentoPorcentaje = parseFloat('{{ $descuentoProntoPago ?? 0 }}') || 0;
@@ -2129,8 +2117,12 @@
             const porcentajeIva = detallePedidos.some(p => parseFloat(p.iva) > 0) ? 16 : 0;
             const iva = montoBolivares * (porcentajeIva / 100);
 
-            // Calcular retención (75% del IVA)
-            const retencion = iva * 0.75;
+            const ivaSeleccionado = parseFloat($('#saldo_iva_total').val()) || 0;
+            const retencionConfigurada = parseFloat($('#total_retencion').val()) || 0;
+            const factorRetencion = ivaSeleccionado > 0
+                ? Math.min(retencionConfigurada / ivaSeleccionado, 1)
+                : 0;
+            const retencion = iva * factorRetencion;
 
             // Obtener el porcentaje de descuento (si existe)
             const descuentoPorcentaje = parseFloat('{{ $descuentoProntoPago ?? 0 }}') || 0;
@@ -2254,7 +2246,8 @@
             const retencionBolivares = parseFloat("{{ $totalRetencion ?? 0 }}") || 0;
             const ivaNetoBolivares = Math.max(iva_bs - retencionBolivares, 0);
 
-            const baseBolivares = saldoBasePuro * tasa;
+            const saldosPedidos = JSON.parse($('#form-pago').attr('data-saldos-bs') || '[]');
+            const baseBolivares = saldosPedidos.reduce((total, pedido) => total + Math.round(pedido.base * tasa * 100) / 100, 0);
             let ivaBolivares = iva_bs;
 
             // Total del cuadro azul oscuro (Base + IVA neto)
@@ -2262,7 +2255,7 @@
 
             // Ajustes netos (USD y Bs.)
             const totalAjustesNetosUsd = parseFloat($('#total_ajustes_netos').val()) || 0;
-            const totalAjustesBs = totalAjustesNetosUsd * tasa;
+            const totalAjustesBs = saldosPedidos.reduce((total, pedido) => total + Math.round(pedido.ajustes * tasa * 100) / 100, 0);
 
             // Gran total a pagar en bolívares = (Total cuadro azul oscuro) + (Total ajustes en Bs.)
             const granTotalBolivares = totalBolivares + totalAjustesBs;
@@ -2289,8 +2282,7 @@
             if (isNaN(totalBolivares)) totalBolivares = 0;
 
             // Formatear valores
-            const ivaFormatted = ivaBolivares.toLocaleString('es-ES', formatOptions);
-            const ivaBolivaresFormateado = ivaFormatted;
+            const ivaNetoBolivaresFormateado = ivaNetoBolivares.toLocaleString('es-ES', formatOptions);
             const baseFormatted = baseBolivares.toLocaleString('es-ES', formatOptions);
             const totalFormatted = totalBolivares.toLocaleString('es-ES', formatOptions);
             const granTotalFormatted = granTotalBolivares.toLocaleString('es-ES', formatOptions);
@@ -2312,7 +2304,7 @@
                 $('#impuesto_dolares').addClass('d-none');
                 $('#impuesto_bolivares')
                     .removeClass('d-none')
-                    .text(ivaFormatted + ' Bs.');
+                    .text(ivaNetoBolivaresFormateado + ' Bs.');
 
                 $('#total_iva').val(ivaBolivares);
 
@@ -2361,10 +2353,16 @@
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
+            const ivaTotalBolivaresFormateado = ivaBolivares.toLocaleString('es-ES', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+            $('#iva_total_bolivares').text(ivaTotalBolivaresFormateado + ' Bs.');
+            $('#retencion_bolivares').text(retencionBolivaresFormateada + ' Bs.');
 
             // Actualizar IVA en la sección de resumen (solo si hay IVA)
-            if (ivaBolivares > 0) {
-                $('#impuesto_bolivares').html(ivaBolivaresFormateado + ' Bs.');
+            if (ivaNetoBolivares > 0) {
+                $('#impuesto_bolivares').html(ivaNetoBolivaresFormateado + ' Bs.');
             } else {
                 $('#impuesto_bolivares').html('0,00 Bs.');
             }
@@ -2380,7 +2378,7 @@
             // Forzar actualización de la UI
             $('body').trigger('conversionCalculada', {
                 total: granTotalFormatted,
-                iva: ivaBolivaresFormateado
+                iva: ivaNetoBolivaresFormateado
             });
 
             $('#monto-total-con-descuento').html((tasa > 0 ? (totalBolivares / tasa) : totalDolares).toFixed(2));
@@ -2427,7 +2425,6 @@
 
         // ── IVA en Divisa: mostrar/ocultar bloque y actualizar total ────────────
         const SOLO_IVA_BS = {{ $soloIvaEnBs ? 'true' : 'false' }};
-        const ivaEnDivisaUsdBase = parseFloat($('#iva_en_divisa_usd').val()) || 0;
         const ivaNetoEnDivisaUsdBase = parseFloat($('#iva_neto_divisa_usd').val()) || 0;
         const baseTotalPagarDivisa = parseFloat('{{ $totalPagarDivisa }}') || 0;
 
@@ -2462,27 +2459,22 @@
             if (!checked) {
                 $('#total_pagar_divisa').val(baseTotalPagarDivisa.toFixed(2));
                 $('#monto-total-con-descuento').text(baseTotalPagarDivisa.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}));
-                $('#iva-divisa-opciones').addClass('d-none');
+                $('#iva-divisa-resumen').addClass('d-none');
                 return;
             }
-            $('#iva-divisa-opciones').removeClass('d-none');
-            const opcion = $('input[name="opcion_iva_divisa"]:checked').val() || 'retencion';
-            const ivaAdd = opcion === 'retencion' ? ivaNetoEnDivisaUsdBase : ivaEnDivisaUsdBase;
-            const nuevoTotal = baseTotalPagarDivisa + ivaAdd;
+            $('#iva-divisa-resumen').removeClass('d-none');
+            const nuevoTotal = baseTotalPagarDivisa + ivaNetoEnDivisaUsdBase;
             $('#total_pagar_divisa').val(nuevoTotal.toFixed(2));
             $('#monto-total-con-descuento').text(nuevoTotal.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}));
         }
 
         // Clic en cualquier parte de la tarjeta = toggle checkbox
         $(document).on('click', '#iva-divisa-card', function(e) {
-            // Ignorar clics directos en radios (opciones de retención)
-            if ($(e.target).is('input[type="radio"]') || $(e.target).closest('label').find('input[type="radio"]').length) return;
             $('#iva_en_divisa_check').prop('checked', !$('#iva_en_divisa_check').is(':checked'));
             actualizarTotalConIvaDivisa();
         });
 
         $(document).on('change', 'input[name="tipo_pago"]', toggleBloqueIvaDivisa);
-        $(document).on('change', 'input[name="opcion_iva_divisa"]', actualizarTotalConIvaDivisa);
 
         // Inicializar al cargar
         toggleBloqueIvaDivisa();
@@ -2863,8 +2855,6 @@
                     // IVA en divisa
                     const ivaChecked = $('#iva_en_divisa_check').is(':checked') ? '1' : '0';
                     $('<input>').attr({type:'hidden',name:'iva_en_divisa',value:ivaChecked}).appendTo(form);
-                    const opcionIvaDiv = $('input[name="opcion_iva_divisa"]:checked').val() || 'completo';
-                    $('<input>').attr({type:'hidden',name:'opcion_iva_divisa',value:opcionIvaDiv}).appendTo(form);
                 } else if (tipoPago === 'bs') {
                     // Para pago en bolívares, asegurarse de incluir total_iva y otros campos necesarios
                     let addFields = ['total_retencion', 'total_descuento_pago', 'total_iva'];

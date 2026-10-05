@@ -376,7 +376,6 @@
                                     <!-- Pestaña de Pedidos Pendientes -->
                                     <div class="tab-pane fade show active" id="pendientes" role="tabpanel"
                                         aria-labelledby="pendientes-tab">
-                                        <div id="aviso-retencion-pendiente" class="d-none" style="margin: 12px 12px 0;"></div>
                                         <div id="pedidos-container" class="d-none">
                                             <div class="table-responsive">
                                                 <table class="table table-hover mb-0">
@@ -569,6 +568,62 @@
 
             @section('styles')
             <style>
+                #tabla-pedidos .iva-detalle {
+                    display: grid;
+                    gap: 6px;
+                    width: 100%;
+                    min-width: 190px;
+                    font-size: .75rem;
+                    color: #6c757d;
+                    line-height: 1.4;
+                }
+
+                #tabla-pedidos .iva-detalle-fila {
+                    display: grid;
+                    grid-template-columns: minmax(0, 1fr) auto;
+                    align-items: baseline;
+                    gap: 12px;
+                }
+
+                #tabla-pedidos .iva-detalle-etiqueta {
+                    color: #6c757d;
+                    text-align: left;
+                }
+
+                #tabla-pedidos .iva-detalle-importe {
+                    white-space: nowrap;
+                    font-variant-numeric: tabular-nums;
+                }
+
+                #tabla-pedidos .iva-detalle-total {
+                    border-top: 1px solid #dee2e6;
+                    margin-top: 3px;
+                    padding-top: 9px;
+                    color: #146c43;
+                    font-size: .95rem;
+                    font-weight: 700;
+                }
+
+                #tabla-pedidos .iva-detalle-total .iva-detalle-etiqueta {
+                    color: inherit;
+                }
+
+                @media (max-width: 767.98px) {
+                    #tabla-pedidos td[data-label="IVA (Bs.)"] {
+                        display: block;
+                        text-align: left;
+                    }
+
+                    #tabla-pedidos td[data-label="IVA (Bs.)"]::before {
+                        display: block;
+                        margin-bottom: 10px;
+                    }
+
+                    #tabla-pedidos .iva-detalle {
+                        min-width: 0;
+                    }
+                }
+
                 .cliente-item {
                     transition: all 0.2s;
                     border-left: 3px solid transparent;
@@ -1002,23 +1057,22 @@
                             return;
                         }
 
-                        const pedidosConRetencionPendiente = [];
+                        renderPedidosPendientes(pedidos, tbody);
+                    }
 
-                        function buildRetencionButtonHtml(pedido, compact = false) {
+                    function buildRetencionButtonHtml(pedido) {
+                            if (!pedido || !pedido.puede_subir_comprobante_retencion) {
+                                return '';
+                            }
                             const comprobanteActual = pedido && pedido.comprobante_retencion
                                 ? encodeURIComponent(String(pedido.comprobante_retencion))
                                 : '';
                             const etiquetaBoton = pedido && pedido.comprobante_retencion
                                 ? 'Actualizar comprobante'
                                 : 'Subir comprobante';
-                            const estilo = compact
-                                ? 'border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:8px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;'
-                                : 'font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;';
-                            const clases = compact ? 'btn btn-sm js-abrir-modal-retencion' : 'btn btn-sm mt-1 js-abrir-modal-retencion';
-
                             return `<button type="button"
-                                class="${clases}"
-                                style="${estilo}"
+                                class="btn btn-sm mt-1 js-abrir-modal-retencion"
+                                style="font-size:11px;padding:2px 8px;border:1.5px solid #ea580c;color:#ea580c;background:white;border-radius:6px;cursor:pointer;"
                                 data-pedido-id="${pedido.id}"
                                 data-pedido-num="${pedido.numero}"
                                 data-comprobante="${comprobanteActual}">
@@ -1026,6 +1080,7 @@
                             </button>`;
                         }
 
+                    function renderPedidosPendientes(pedidos, tbody) {
                         pedidos.forEach((pedido, index) => {
                             const saldoBase = parseFloat(pedido.saldo_base) || 0;
                             const saldoIvaBs = parseFloat(pedido.saldo_iva_bs) || 0;
@@ -1033,14 +1088,11 @@
                             const saldo = saldoAjustes + saldoBase; // Total pendiente incluyendo ajustes
                             const ajustesNeto = parseFloat(pedido.ajustes_neto) || 0;
                             const porcRetencion = parseFloat(pedido.porc_retencion) || 0;
-                            const tieneComprobanteRetencion = !!(pedido.comprobante_retencion && pedido.comprobante_retencion !== 'null');
-                            
-                            // Validación completa: porc_retencion > 0 && saldo_base <= 0.01 && saldo_iva_bs > 0.01
-                            const tieneRetencionPendiente = porcRetencion > 0 && saldoBase <= 0.01 && saldoIvaBs > 0.01;
-                            
-                            if (tieneRetencionPendiente) {
-                                pedidosConRetencionPendiente.push(pedido);
-                            }
+                            const ivaOriginal = Math.max(parseFloat(pedido.iva_bs) || 0, 0);
+                            const ivaRetenido = Math.min(Math.round(ivaOriginal * porcRetencion) / 100, Math.max(saldoIvaBs, 0));
+                            const ivaAPagar = Math.max(saldoIvaBs - ivaRetenido, 0);
+                            const tieneRetencionPendiente = ivaRetenido > 0.01;
+                            const puedeSubirComprobante = !!pedido.puede_subir_comprobante_retencion;
 
                             const totalmentePagado = saldo <= 0.01 && saldoIvaBs <= 0.01;
                             // Cuando saldo_base = 0 pero saldo_iva_bs > 0, el usuario puede registrar pago:
@@ -1104,6 +1156,12 @@
                                     </td>
                                     <td data-label="Pedido">
                                         <div class="fw-bold">Pedido #${pedido.numero}</div>
+                                        <div class="d-flex align-items-center flex-wrap mt-1" style="gap: 6px;">
+                                            <label class="small text-muted mb-0" for="retencion-${pedido.id}">Retención IVA</label>
+                                            <input id="retencion-${pedido.id}" class="form-control form-control-sm js-porcentaje-retencion" type="number" min="0" max="100" step="0.01" value="${porcRetencion}" style="width: 76px;" aria-label="Porcentaje de retención del pedido ${pedido.numero}">
+                                            <span class="small">%</span>
+                                            <button type="button" class="btn btn-sm btn-outline-primary js-guardar-retencion" data-pedido-id="${pedido.id}" title="Guardar retención" aria-label="Guardar retención del pedido ${pedido.numero}"><i class="fas fa-save"></i></button>
+                                        </div>
                                         ${pedido.factura_numero ? `<div class="text-success small">Factura: ${pedido.factura_numero}</div>` : ''}
                                         <small class="text-muted">${pedido.fecha}</small>
                                         ${pedido.fecha_despacho ? `<div class="text-muted small">Despacho: ${pedido.fecha_despacho}</div>` : ''}
@@ -1116,53 +1174,18 @@
                                         ${ajustesHtml}
                                     </td>
                                     <td class="text-end" data-label="IVA (Bs.)">
-                                         <span class="fw-bold ${tieneRetencionPendiente ? 'text-warning' : 'text-success'}">${formatBS(pedido.saldo_iva_bs)}</span>
-                                         ${tieneRetencionPendiente ? '<br><small class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>Retención pendiente</small>' : ''}
-                                         ${tieneRetencionPendiente ? `<br>${buildRetencionButtonHtml(pedido)}` : ''}
+                                         <div class="iva-detalle">
+                                             <div class="iva-detalle-fila iva-detalle-total">
+                                                 <span class="iva-detalle-etiqueta">IVA a pagar</span>
+                                                 <span class="iva-detalle-importe">${formatBS(ivaAPagar)}</span>
+                                             </div>
+                                             ${puedeSubirComprobante ? buildRetencionButtonHtml(pedido) : ''}
+                                         </div>
                                     </td>
                                 </tr>
                             `);
                             tbody.append(tr);
                         });
-
-                        // Mostrar aviso global si hay pedidos con retención de IVA pendiente
-                        if (pedidosConRetencionPendiente.length > 0) {
-                            const totalRetencion = pedidosConRetencionPendiente.reduce((s, p) => s + parseFloat(p.saldo_iva_bs), 0);
-                            const ids = pedidosConRetencionPendiente.map(p => '#' + p.numero).join(', ');
-
-                            const ordenesHtml = pedidosConRetencionPendiente.map(p => {
-                                const tieneComprobante = p.comprobante_retencion && p.comprobante_retencion !== 'null';
-                                const badge = tieneComprobante
-                                    ? `<span style="font-size:11px;color:#16a34a;font-weight:700;margin-right:8px;"><i class="fas fa-check-circle me-1"></i>Cargado</span>`
-                                    : '';
-                                return `
-                                    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding:8px 12px;background:rgba(255,255,255,.6);border-radius:8px;flex-wrap:wrap;gap:6px;">
-                                        <span style="font-size:13px;color:#92400e;font-weight:600;">Pedido #${p.numero} — Bs. ${formatBS(p.saldo_iva_bs)} ${badge}</span>
-                                        ${buildRetencionButtonHtml(p, true)}
-                                    </div>`;
-                            }).join('');
-
-                            $('#aviso-retencion-pendiente').html(`
-                                <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 2px solid #f97316; border-radius: 10px; padding: 14px 18px;">
-                                    <div style="display:flex;align-items:flex-start;gap:14px;">
-                                        <div style="flex-shrink:0;width:38px;height:38px;border-radius:8px;background:linear-gradient(135deg,#f97316,#ea580c);display:flex;align-items:center;justify-content:center;">
-                                            <i class="fas fa-file-invoice" style="color:white;font-size:16px;"></i>
-                                        </div>
-                                        <div style="flex:1;">
-                                            <div style="font-weight:700;color:#9a3412;font-size:14px;margin-bottom:4px;">
-                                                IVA retenido pendiente de validación — Pedido${pedidosConRetencionPendiente.length > 1 ? 's' : ''} ${ids}
-                                            </div>
-                                            <div style="color:#c2410c;font-size:13px;line-height:1.5;">
-                                                El IVA retenido (Bs. ${formatBS(totalRetencion)}) quedará pendiente hasta que suba el comprobante y el administrador lo valide.
-                                            </div>
-                                            ${ordenesHtml}
-                                        </div>
-                                    </div>
-                                </div>
-                            `).removeClass('d-none');
-                        } else {
-                            $('#aviso-retencion-pendiente').addClass('d-none');
-                        }
 
                         $('#sin-pedidos').addClass('d-none');
                         $('#pedidos-container').removeClass('d-none');
@@ -1199,7 +1222,7 @@
                                     <td data-label="Fecha">${pedido.fecha}</td>
                                     <td class="text-end" data-label="Total">${formatMoney(pedido.total)}</td>
                                     <td class="text-end" data-label="Estatus"><span class="badge badge-warning">EN REVISIÓN</span></td>
-                                    <td class="text-end" data-label="Estatus">${comprobanteHtml}</td>
+                                    <td class="text-end" data-label="Estatus">${comprobanteHtml}${buildRetencionButtonHtml(pedido)}</td>
                                 </tr>
                             `;
                             //html+=tr;
@@ -1397,6 +1420,28 @@
                     });
 
                     });
+
+                $(document).on('click', '.js-guardar-retencion', function() {
+                    const boton = $(this);
+                    const pedidoId = boton.data('pedido-id');
+                    const campo = $('#retencion-' + pedidoId);
+                    const porcentaje = Number(campo.val());
+                    if (campo.val() === '' || !Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+                        alert('Indique un porcentaje entre 0 y 100.');
+                        return;
+                    }
+                    boton.prop('disabled', true);
+                    $.post('{{ url('vendedores/pagos/pedidos') }}/' + pedidoId + '/retencion', {
+                        _token: '{{ csrf_token() }}',
+                        porc_retencion: porcentaje
+                    }).done(function() {
+                        $('.cliente-item.active').trigger('click');
+                    }).fail(function(xhr) {
+                        alert(xhr.responseJSON && xhr.responseJSON.message ? xhr.responseJSON.message : 'No se pudo guardar la retención.');
+                    }).always(function() {
+                        boton.prop('disabled', false);
+                    });
+                });
 
                 // ── Comprobante de retención ─────────────────────────────────────────
                 let pedidoRetencionActual = null;

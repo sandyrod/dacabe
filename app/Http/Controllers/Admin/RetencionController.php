@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PagoPedido;
 use App\Models\Pedido;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -186,6 +187,25 @@ class RetencionController extends Controller
 
         if ((float) $pedido->saldo_iva_bs <= 0) {
             return response()->json(['error' => 'Este pedido no tiene retención de IVA pendiente'], 422);
+        }
+
+        if (!$pedido->comprobante_retencion) {
+            return response()->json(['error' => 'Este pedido no tiene comprobante de retención cargado'], 422);
+        }
+
+        $ivaAprobado = (float) PagoPedido::query()
+            ->where('pedido_id', $pedido->id)
+            ->whereHas('pago', function ($query) {
+                $query->where('estatus', 'APROBADO');
+            })
+            ->sum('iva');
+        $porcentajeRetencion = min(max((float) ($pedido->porc_retencion ?? 0), 0), 100);
+        $ivaNoRetenido = round((float) ($pedido->iva_bs ?? 0) * (1 - ($porcentajeRetencion / 100)), 2);
+
+        if (round($ivaAprobado, 2) < $ivaNoRetenido) {
+            return response()->json([
+                'error' => 'El IVA no retenido debe estar pagado y aprobado antes de validar este comprobante.',
+            ], 422);
         }
 
         $update = ['saldo_iva_bs' => 0, 'updated_at' => now()];

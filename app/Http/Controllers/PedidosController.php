@@ -421,7 +421,8 @@ class PedidosController extends Controller
         */
 
         $url = 'https://santiscodes.com/send-whatsapp?to=' . $phone . '&template=' . $template . '&pedido_id=' . $pedido_id . '&cliente=' . $cliente;
-        $response = file_get_contents($url);
+        // OJO CEDANO DESCOMENTAR
+        //$response = file_get_contents($url);
 
         /*
         return Response::json([

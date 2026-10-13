@@ -238,6 +238,8 @@
                                                             @endif
                                                             <button class="btn-factura-pedido"
                                                                 data-pedido-id="{{ $pp->pedido_id }}"
+                                                                data-pago-id="{{ $pago->id }}"
+                                                                data-pago-rate="{{ $pago->rate }}"
                                                                 title="Ver factura completa del pedido #{{ $pp->pedido_id }}"
                                                                 style="padding:2px 8px;font-size:0.7rem;border-radius:6px;background:linear-gradient(135deg,#e0f2fe,#bae6fd);border:1px solid #38bdf8;color:#0369a1;font-weight:700;cursor:pointer;white-space:nowrap;">
                                                                 <i class="fas fa-file-invoice-dollar mr-1"></i>Ver Factura
@@ -701,8 +703,12 @@
                                             <td class="font-weight-bold py-1" id="factReferencia">—</td>
                                         </tr>
                                         <tr>
-                                            <td class="pl-0 text-muted py-1">Tasa BCV</td>
+                                            <td class="pl-0 text-muted py-1">Tasa BCV Pedido</td>
                                             <td class="font-weight-bold py-1 text-success" id="factTasa">—</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="pl-0 text-muted py-1">Tasa BCV Pago</td>
+                                            <td class="font-weight-bold py-1 text-primary" id="factTasaPago">—</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -1690,14 +1696,19 @@
     $(document).on('click', '.btn-factura-pedido', function (e) {
         e.stopPropagation();
         const pedidoId = $(this).data('pedido-id');
+        const pagoRate = $(this).data('pago-rate');
+        const pagoId   = $(this).data('pago-id') || currentPagoId || '';
 
         $('#loadingFactura').show();
         $('#contenidoFactura').hide();
         $('#modalFacturaPedido').modal('show');
 
-        $.get('{{ url("pedidos") }}/' + pedidoId + '/ver-factura')
+        $.get('{{ url("pedidos") }}/' + pedidoId + '/ver-factura', {
+            pago_id: pagoId,
+            pago_rate: (pagoRate !== undefined && pagoRate !== null) ? pagoRate : ''
+        })
             .done(function (r) {
-                renderFactura(r);
+                renderFactura(r, pagoRate);
                 $('#loadingFactura').hide();
                 $('#contenidoFactura').fadeIn(200);
             })
@@ -1727,7 +1738,7 @@
         setTimeout(() => { ventana.print(); ventana.close(); }, 400);
     });
 
-    function renderFactura(r) {
+    function renderFactura(r, pagoRateFallback) {
         const p  = r.pedido   || {};
         const t  = r.totales  || {};
         const items = r.items || [];
@@ -1782,6 +1793,14 @@
         $('#factVendedor').text(p.vendedor   || '—');
         $('#factReferencia').text(p.referencia || '—');
         $('#factTasa').text(p.tasa > 0 ? 'Bs. ' + fmt(p.tasa) : '—');
+
+        const ratePagoVal = (r.pago_rate !== undefined && r.pago_rate !== null && r.pago_rate !== '')
+            ? r.pago_rate
+            : ((r.pago && r.pago.rate !== undefined && r.pago.rate !== null && r.pago.rate !== '')
+                ? r.pago.rate
+                : pagoRateFallback);
+        const ratePagoNum = parseFloat(ratePagoVal) || 0;
+        $('#factTasaPago').text(ratePagoNum > 0 ? 'Bs. ' + fmt(ratePagoNum) : '—');
 
         /* — observaciones — */
         const obs = [p.observations, p.conditions].filter(Boolean).join(' | ');

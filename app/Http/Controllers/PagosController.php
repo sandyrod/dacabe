@@ -424,6 +424,22 @@ class PagosController extends Controller
             $user = \App\User::find($pedido->user_id);
         }
 
+        $pagoRate = null;
+        $pagoId = request('pago_id');
+        if ($pagoId) {
+            $pago = Pago::on('company')->find($pagoId);
+            if ($pago) {
+                $pagoRate = (float) $pago->rate;
+            }
+        } elseif (request()->filled('pago_rate')) {
+            $pagoRate = (float) request('pago_rate');
+        } else {
+            $pp = PagoPedido::on('company')->where('pedido_id', $pedido->id)->latest('id')->first();
+            if ($pp && $pp->pago) {
+                $pagoRate = (float) $pp->pago->rate;
+            }
+        }
+
         return response()->json([
             'pedido' => [
                 'id'         => $pedido->id,
@@ -442,6 +458,7 @@ class PagosController extends Controller
                 'observations' => $pedido->observations,
                 'conditions'   => $pedido->conditions,
             ],
+            'pago_rate' => $pagoRate,
             'items'   => $items->values()->toArray(),
             'totales' => [
                 'subtotal_usd'   => $subtotalUsd,

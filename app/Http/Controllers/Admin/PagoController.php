@@ -112,6 +112,10 @@ class PagoController extends Controller
         if ($request->filled('tipo_pago')) {
             $query->where('tpago_id', $request->tipo_pago);
         }
+
+        if ($request->filled('pago_destino')) {
+            $query->where('pago_destino_id', $request->pago_destino);
+        }
         
         if ($request->filled('estado')) {
             $query->where('estatus', $request->estado);
@@ -165,8 +169,12 @@ class PagoController extends Controller
             ->get();
 
         $tipos_pago = DB::connection('company')->table('TPAGO')->get();
+        $pago_destinos = DB::connection('company')
+            ->table('pago_destinos')
+            ->orderBy('nombre')
+            ->get();
 
-        return view('admin.pagos.aprobar', compact('pagos', 'vendedores', 'tipos_pago', 'totalPendiente', 'totalEnRevision', 'totalHoy'));
+        return view('admin.pagos.aprobar', compact('pagos', 'vendedores', 'tipos_pago', 'pago_destinos', 'totalPendiente', 'totalEnRevision', 'totalHoy'));
     }
 
     public function tasasHistorico(Request $request)

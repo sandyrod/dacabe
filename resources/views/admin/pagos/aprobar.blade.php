@@ -18,7 +18,7 @@
                 <div class="card-body bg-light-silver p-4">
                     <!-- Filtros -->
                     <form method="GET" action="{{ route('pagos.aprobar') }}" class="mb-0">
-                        <div class="row g-3 align-items-end">
+                        <div class="row align-items-end">
                             <div class="col-md-3">
                                 <div class="form-group mb-0">
                                     <label for="search" class="font-weight-bold text-primary mb-1">
@@ -64,6 +64,38 @@
                             </div>
                             <div class="col-md-2">
                                 <div class="form-group mb-0">
+                                    <label for="tipo_pago" class="font-weight-bold text-primary mb-1">
+                                        <i class="fas fa-money-check-alt mr-1"></i>Método de Pago
+                                    </label>
+                                    <select name="tipo_pago" id="tipo_pago" class="form-control">
+                                        <option value="">Todos</option>
+                                        @foreach ($tipos_pago as $tipo_pago)
+                                        <option value="{{ $tipo_pago->CPAGO }}"
+                                            {{ request('tipo_pago') == $tipo_pago->CPAGO ? 'selected' : '' }}>
+                                            {{ $tipo_pago->DPAGO }}
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group mb-0">
+                                    <label for="pago_destino" class="font-weight-bold text-primary mb-1">
+                                        <i class="fas fa-university mr-1"></i>Banco destino
+                                    </label>
+                                    <select name="pago_destino" id="pago_destino" class="form-control">
+                                        <option value="">Todos</option>
+                                        @foreach ($pago_destinos as $pago_destino)
+                                        <option value="{{ $pago_destino->id }}"
+                                            {{ request('pago_destino') == $pago_destino->id ? 'selected' : '' }}>
+                                            {{ $pago_destino->nombre }}
+                                        </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mt-3">
+                                <div class="form-group mb-0">
                                     <label class="font-weight-bold text-primary mb-1">
                                         <i class="far fa-calendar-alt mr-1"></i>Desde
                                     </label>
@@ -71,7 +103,7 @@
                                         value="{{ request('fecha_inicio') }}">
                                 </div>
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-3 mt-3">
                                 <div class="form-group mb-0">
                                     <label class="font-weight-bold text-primary mb-1">
                                         <i class="far fa-calendar-check mr-1"></i>Hasta
@@ -80,7 +112,7 @@
                                         value="{{ request('fecha_fin') }}">
                                 </div>
                             </div>
-                            <div class="col-md-2 d-flex flex-column align-items-end">
+                            <div class="col-md-2 mt-3 d-flex flex-column align-items-end">
                                 <div class="d-flex w-100 mt-2">
                                     <button type="submit" class="btn btn-primary flex-grow-1 mr-1" title="Filtrar">
                                         <i class="fas fa-filter"></i>

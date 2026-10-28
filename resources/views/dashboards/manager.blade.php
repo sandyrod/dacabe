@@ -366,6 +366,240 @@
     .bg-gradient-danger {
         background: linear-gradient(45deg, #cb2d3e 0%, #ef473a 100%);
     }
+
+    .activity-feed-item {
+        padding: 0.75rem !important;
+        border: 1px solid #e6e9ed;
+        border-left: 5px solid #2f7d73;
+        border-radius: 12px;
+        background: #f1f8f5;
+        box-shadow: 0 4px 12px rgba(27, 45, 54, 0.06);
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .activity-feed-item:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 7px 18px rgba(27, 45, 54, 0.1);
+    }
+
+    .activity-feed-item.payment {
+        border-left-color: #b7791f;
+        background: #fbf5e4;
+    }
+
+    .activity-feed-item.retention {
+        border-left-color: #bd4b3b;
+        background: #fbefed;
+    }
+
+    .activity-feed-topline,
+    .activity-feed-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+    }
+
+    .activity-feed-topline {
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+    }
+
+    .activity-feed-heading {
+        min-width: 0;
+        flex-wrap: wrap;
+    }
+
+    .activity-feed-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 20px;
+        background: #28756c;
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .activity-feed-item.payment .activity-feed-badge {
+        background: #a87316;
+    }
+
+    .activity-feed-item.retention .activity-feed-badge {
+        background: #ad4537;
+    }
+
+    .activity-feed-title {
+        margin: 0;
+        color: #173c36;
+        font-size: 0.9rem;
+        font-weight: 700;
+        overflow-wrap: anywhere;
+    }
+
+    .activity-feed-item.payment .activity-feed-title {
+        color: #59400e;
+    }
+
+    .activity-feed-item.retention .activity-feed-title {
+        color: #632c25;
+    }
+
+    .activity-feed-message {
+        flex: 1 1 20rem;
+        min-width: 0;
+        margin: 0;
+        color: #303943;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+    }
+
+    .activity-feed-message strong {
+        color: #17212b;
+    }
+
+    .activity-feed-time {
+        color: #77818b;
+        font-size: 0.72rem;
+        white-space: nowrap;
+    }
+
+    .activity-feed-details {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .activity-feed-footer {
+        display: flex;
+        justify-content: flex-end;
+        flex: 0 0 auto;
+    }
+
+    .activity-feed-link {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.6rem;
+        border: 1px solid rgba(40, 117, 108, 0.24);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.72);
+        font-size: 0.78rem;
+        color: #236a61;
+        font-weight: 600;
+        text-decoration: none;
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .activity-feed-link:hover,
+    .activity-feed-link:focus {
+        border-color: #28756c;
+        background: #fff;
+        color: #174e47;
+        text-decoration: none;
+    }
+
+    .activity-category + .activity-category {
+        border-top: 1px solid #e6e9ed;
+    }
+
+    .activity-category-toggle {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.85rem 0.65rem;
+        border: 0;
+        background: transparent;
+        color: #303943;
+        text-align: left;
+        font-weight: 600;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .activity-category-toggle:hover,
+    .activity-category-toggle:focus {
+        color: #236a61;
+        background: #f4f8f7;
+        text-decoration: none;
+    }
+
+    .activity-feed-panel.manager-card {
+        overflow: hidden;
+        border: 1px solid #dfe8e5;
+        border-top: 4px solid #28756c;
+        border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(27, 45, 54, 0.08);
+    }
+
+    .activity-feed-header {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 1rem 1.15rem;
+        background: linear-gradient(110deg, #f1f7f5 0%, #fff 72%);
+    }
+
+    .activity-heading-mark {
+        display: grid;
+        flex: 0 0 38px;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 50%;
+        background: #dfefeb;
+        color: #28756c;
+    }
+
+    .activity-total {
+        padding: 0.35rem 0.65rem;
+        border: 1px solid #dce8e4;
+        border-radius: 20px;
+        background: #fff;
+        color: #52635f;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .activity-category-toggle:hover {
+        background: #f4f8f7;
+    }
+
+    .activity-category-toggle .activity-chevron {
+        margin-left: auto;
+        color: #77818b;
+        transition: transform 0.2s ease;
+    }
+
+    .activity-category-toggle[aria-expanded="true"] .activity-chevron {
+        transform: rotate(180deg);
+    }
+
+    @media (max-width: 575.98px) {
+        .activity-feed-topline {
+            align-items: flex-start;
+            flex-direction: column-reverse;
+            gap: 0.4rem;
+        }
+
+        .activity-feed-time {
+            align-self: flex-end;
+        }
+
+        .activity-feed-details {
+            align-items: flex-start;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .activity-feed-footer {
+            align-self: flex-end;
+        }
+    }
 </style>
 @endsection
 
@@ -827,6 +1061,118 @@
 
                 </div>
             </div>
+            <section class="card manager-card activity-feed-panel mt-3" aria-labelledby="activity-feed-title">
+                <div class="activity-feed-header">
+                    <span class="activity-heading-mark"><i class="fas fa-comments"></i></span>
+                    <div class="flex-fill">
+                        <h5 class="mb-0" id="activity-feed-title">Actividad reciente</h5>
+                        <small class="text-muted">Movimientos comerciales</small>
+                    </div>
+                    <span class="activity-total">{{ $recentActivity->count() }} eventos</span>
+                </div>
+                <div class="card-body bg-white py-0">
+                    @php
+                        $activityCategories = [
+                            'order' => ['label' => 'Pedidos', 'icon' => 'fa-shopping-bag', 'color' => 'text-success'],
+                            'payment' => ['label' => 'Pagos', 'icon' => 'fa-money-bill-wave', 'color' => 'text-warning'],
+                            'retention' => ['label' => 'Retenciones', 'icon' => 'fa-file-invoice', 'color' => 'text-danger'],
+                        ];
+                    @endphp
+                    <div class="activity-accordion" id="activityFeedAccordion">
+                        @foreach($activityCategories as $type => $category)
+                            @php
+                                $categoryEvents = $recentActivity->where('type', $type);
+                            @endphp
+                            <div class="activity-category">
+                                <h6 class="mb-0">
+                                    <button class="activity-category-toggle collapsed" type="button" data-toggle="collapse"
+                                        data-target="#activity-{{ $type }}" aria-expanded="false" aria-controls="activity-{{ $type }}">
+                                        <i class="fas {{ $category['icon'] }} {{ $category['color'] }} mr-2"></i>
+                                        {{ $category['label'] }}
+                                        <span class="badge badge-light ml-2">{{ $categoryEvents->count() }}</span>
+                                        <i class="fas fa-chevron-down activity-chevron"></i>
+                                    </button>
+                                </h6>
+                                <div id="activity-{{ $type }}" class="collapse" data-parent="#activityFeedAccordion">
+                                    <div class="row pt-2 pb-3">
+                                        @forelse($categoryEvents as $activity)
+                                    <div class="col-12 mb-3">
+                                                <article class="activity-feed-item {{ $activity->type }} p-3">
+                                            @php
+                                                $payment = $activity->type === 'payment' ? $activity->payment : null;
+                                                $isBolivares = $payment && in_array(mb_strtolower((string) $payment->moneda_pago), ['bs', 'bolívares', 'bolivares'], true);
+                                                $amount = $payment ? ($isBolivares && (float) $payment->monto_bs > 0 ? $payment->monto_bs : $payment->monto) : 0;
+                                                $currency = $payment ? ($isBolivares ? 'Bs.' : ($payment->moneda_pago === 'No Indicado' ? 'moneda no indicada' : '$')) : '';
+                                                $method = $payment ? (optional($payment->tipo_pago)->DPAGO ?: optional($payment->pago_destino)->nombre ?: 'método no indicado') : '';
+                                                $activityTitle = $activity->type === 'order'
+                                                    ? 'Nuevo pedido registrado'
+                                                    : ($activity->type === 'payment' ? 'Nuevo pago recibido' : 'Comprobante de retención cargado');
+                                            @endphp
+
+                                            <div class="activity-feed-topline">
+                                                <div class="activity-feed-heading">
+                                                    <span class="activity-feed-badge">
+                                                        <i class="fas {{ $category['icon'] }}" aria-hidden="true"></i>
+                                                        {{ $category['label'] }}
+                                                    </span>
+                                                    <h6 class="activity-feed-title">{{ $activityTitle }}</h6>
+                                                </div>
+                                                <time class="activity-feed-time" datetime="{{ $activity->occurred_at->toIso8601String() }}"
+                                                    title="{{ $activity->occurred_at->format('d/m/Y H:i') }}">
+                                                    {{ $activity->occurred_at->diffForHumans() }}
+                                                </time>
+                                            </div>
+
+                                            <div class="activity-feed-details">
+                                                <p class="activity-feed-message">
+                                                    <strong>{{ $activity->seller }}</strong>
+                                                    @if($activity->type === 'order')
+                                                            registró un nuevo pedido para <strong>{{ $activity->client }}</strong>
+                                                            @if(trim((string) $activity->observations) !== '')
+                                                                con observaciones: “{{ $activity->observations }}”
+                                                            @else
+                                                                sin observaciones adicionales.
+                                                            @endif
+                                                        @elseif($activity->type === 'payment')
+                                                            registró un pago para <strong>{{ $activity->client }}</strong>
+                                                            @if($activity->order_ids->isNotEmpty())
+                                                                en los pedidos <strong>{{ $activity->order_ids->map(function ($id) { return '#' . $id; })->implode(', ') }}</strong>
+                                                            @endif
+                                                            por <strong>{{ $currency }} {{ number_format((float) $amount, 2, ',', '.') }}</strong>
+                                                            en <strong>{{ $method }}</strong>.
+                                                        @else
+                                                            cargó un comprobante de retención para <strong>{{ $activity->client }}</strong>.
+                                                    @endif
+                                                </p>
+
+                                                <div class="activity-feed-footer">
+                                                    @if($activity->type === 'order')
+                                                        <a href="{{ url('pedidos/pdf/' . $activity->order_id) }}" target="_blank" rel="noopener" class="activity-feed-link small">
+                                                            Ver pedido <i class="fas fa-arrow-right ml-2"></i>
+                                                        </a>
+                                                    @elseif($activity->type === 'retention')
+                                                        <a href="{{ route('admin.retenciones.index', ['cliente' => $activity->client]) }}" class="activity-feed-link small">
+                                                            Revisar retenciones <i class="fas fa-arrow-right ml-2"></i>
+                                                        </a>
+                                                    @else
+                                                        <a href="{{ url('admin/pagos/aprobar') }}" class="activity-feed-link small">
+                                                            Ver pagos <i class="fas fa-arrow-right ml-2"></i>
+                                                        </a>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                                </article>
+                                            </div>
+                                        @empty
+                                            <div class="col-12 py-2 text-muted small">No hay eventos recientes en esta categoría.</div>
+                                        @endforelse
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </section>
         </div>
         <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4">
 

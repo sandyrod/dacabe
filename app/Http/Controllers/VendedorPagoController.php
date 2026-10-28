@@ -2552,7 +2552,10 @@ class VendedorPagoController extends Controller
         DB::connection('company')
             ->table('pedidos')
             ->where('id', $pedido->id)
-            ->update(['comprobante_retencion' => $ruta]);
+            ->update([
+                'comprobante_retencion' => $ruta,
+                'comprobante_retencion_at' => now(),
+            ]);
 
         return response()->json([
             'success' => true,

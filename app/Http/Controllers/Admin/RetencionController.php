@@ -239,6 +239,7 @@ class RetencionController extends Controller
             ->where('id', $pedidoId)
             ->update([
                 'comprobante_retencion' => null,
+                'comprobante_retencion_at' => null,
                 'updated_at' => now(),
             ]);
 

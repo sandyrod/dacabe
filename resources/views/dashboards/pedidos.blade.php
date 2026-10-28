@@ -2,6 +2,10 @@
 
 
 @php
+  $vendedorNotificacionesId = \App\Models\Vendedor::query()
+    ->whereRaw('LOWER(TRIM(COALESCE(email, ""))) = ?', [strtolower(trim((string) auth()->user()->email))])
+    ->value('id');
+
   $pagosRechazados = \App\Models\Pago::select('pagos.*')
     ->selectSub(function ($query) {
       $query->from('pagos_pedidos as pp')
@@ -12,11 +16,15 @@
         ->whereColumn('pp.pago_id', 'pagos.id')
         ->selectRaw("GROUP_CONCAT(DISTINCT c.NOMBRE ORDER BY c.NOMBRE SEPARATOR ', ')");
     }, 'cliente_nombre')
-    ->where('user_id', auth()->id())
-        ->where('estatus', 'RECHAZADO')
+    ->where(function ($query) use ($vendedorNotificacionesId) {
+        $query->where('user_id', auth()->id());
+
+        if ($vendedorNotificacionesId) {
+            $query->orWhere('seller_id', $vendedorNotificacionesId);
+        }
+    })
+        ->whereRaw('UPPER(TRIM(COALESCE(estatus, ""))) = "RECHAZADO"')
         ->where('updated_at', '>=', now()->subDays(7))
-        ->whereNotNull('observaciones')
-        ->where('observaciones', '!=', '')
         // No mostrar la alerta cuando cada pedido de este pago rechazado
         // ya fue cubierto por un pago posterior aprobado del mismo vendedor.
         /*
@@ -623,103 +631,265 @@
 
   @if($pagosRechazados->isNotEmpty() || (isset($pedidosVencidos) && count($pedidosVencidos) > 0))
     <style>
-      .apr-alerta { transition: opacity 0.35s ease, transform 0.35s ease; }
+      .seller-notifications {
+        overflow: hidden;
+        border: 1px solid #dfe8e5;
+        border-top: 4px solid #28756c;
+        border-radius: 10px;
+        box-shadow: 0 8px 22px rgba(27, 45, 54, 0.08);
+      }
+
+      .seller-notifications-header {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 1rem 1.15rem;
+        background: linear-gradient(110deg, #f1f7f5 0%, #fff 72%);
+      }
+
+      .seller-notifications-mark {
+        display: grid;
+        flex: 0 0 38px;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 50%;
+        background: #dfefeb;
+        color: #28756c;
+      }
+
+      .seller-notifications-total,
+      .seller-notification-count {
+        padding: 0.35rem 0.65rem;
+        border: 1px solid #dce8e4;
+        border-radius: 20px;
+        background: #fff;
+        color: #52635f;
+        font-size: 0.78rem;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .seller-notification-category + .seller-notification-category {
+        border-top: 1px solid #e6e9ed;
+      }
+
+      .seller-notification-toggle {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.85rem 1.15rem;
+        border: 0;
+        background: transparent;
+        color: #303943;
+        text-align: left;
+        font-weight: 600;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+
+      .seller-notification-toggle:hover,
+      .seller-notification-toggle:focus {
+        color: #236a61;
+        background: #f4f8f7;
+        text-decoration: none;
+      }
+
+      .seller-notification-chevron {
+        margin-left: auto;
+        color: #77818b;
+        transition: transform 0.2s ease;
+      }
+
+      .seller-notification-toggle[aria-expanded="true"] .seller-notification-chevron {
+        transform: rotate(180deg);
+      }
+
+      .seller-notification-card {
+        height: 100%;
+        padding: 1rem;
+        border: 1px solid #e6e9ed;
+        border-left: 5px solid #bd4b3b;
+        border-radius: 10px;
+        background: #fbefed;
+        box-shadow: 0 4px 12px rgba(27, 45, 54, 0.06);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+      }
+
+      .seller-notification-card.overdue {
+        border-left-color: #d69b16;
+        background: #fff9e8;
+      }
+
+      .seller-notification-card-heading {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.65rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .seller-notification-card-heading h6 {
+        flex: 1;
+        margin: 0;
+        font-weight: 700;
+      }
+
+      .seller-notification-card-body {
+        padding: 0.75rem;
+        border-radius: 7px;
+        background: rgba(255, 255, 255, 0.7);
+        overflow-wrap: anywhere;
+      }
+
+      .seller-notification-card-body ul {
+        max-height: 180px;
+        overflow-y: auto;
+      }
+
+      @media (max-width: 575.98px) {
+        .seller-notifications-header {
+          gap: 0.55rem;
+          padding: 0.85rem;
+        }
+
+        .seller-notifications-total {
+          font-size: 0.7rem;
+        }
+      }
     </style>
-    <div id="alertas-vendedor" class="row">
-      @foreach ($pagosRechazados as $pagoRec)
-        <div class="apr-alerta col-12 col-lg-6 mb-3" data-pago-id="{{ $pagoRec->id }}">
-          <div class="d-flex align-items-start h-100 p-0 shadow-sm" style="border-radius: 8px; overflow: hidden; background: #fff;">
-            <div style="width: 6px; flex-shrink: 0; background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);"></div>
-            <div class="flex-grow-1 p-3">
-              <div class="d-flex align-items-center mb-2">
-                <div style="background: #fdecea; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-right: 10px;">
-                  <i class="fas fa-times-circle" style="color: #c0392b; font-size: 1rem;"></i>
-                </div>
-                <div style="flex: 1;">
-                  <div class="font-weight-bold" style="color: #922b21; font-size: 0.92rem; line-height: 1.2;">Pago Rechazado</div>
-                  <div class="text-muted" style="font-size: 0.75rem;">
-                    {{ \Carbon\Carbon::parse($pagoRec->updated_at)->format('d/m/Y H:i') }} &nbsp;·&nbsp;
-                    Cliente: <strong>{{ $pagoRec->cliente_nombre ?: 'No identificado' }}</strong> &nbsp;·&nbsp;
-                    Ref: <strong>{{ $pagoRec->referencia ?? 'N/A' }}</strong> &nbsp;·&nbsp;
-                    ${{ number_format($pagoRec->monto, 2) }}
-                  </div>
-                </div>
-                <button type="button" onclick="cerrarAlertaPago(this)" class="btn btn-sm btn-link text-muted" title="Cerrar">
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <div style="background: #fdecea; border-radius: 6px; padding: 10px 14px;">
-                <div class="mb-1" style="font-size: 0.72rem; text-transform: uppercase; color: #c0392b; font-weight: 700;">
-                  <i class="far fa-sticky-note mr-1"></i>Observación del administrador
-                </div>
-                <div style="color: #5d2020; font-size: 0.88rem; line-height: 1.5;">{{ $pagoRec->observaciones }}</div>
-              </div>
-            </div>
-          </div>
+    @php($totalNotificacionesVendedor = $pagosRechazados->count() + (isset($pedidosVencidos) ? count($pedidosVencidos) : 0))
+    <section class="seller-notifications card mb-3" aria-labelledby="seller-notifications-title">
+      <div class="seller-notifications-header">
+        <span class="seller-notifications-mark"><i class="fas fa-bell" aria-hidden="true"></i></span>
+        <div class="flex-fill">
+          <h5 class="mb-0" id="seller-notifications-title">Notificaciones</h5>
+          <small class="text-muted">Avisos importantes sobre pedidos y pagos</small>
         </div>
-      @endforeach
-
-      @if(isset($pedidosVencidos) && count($pedidosVencidos) > 0)
-        <div class="col-12 col-lg-6 mb-3">
-          <div id="alerta-pedidos-vencidos" class="alert alert-warning alert-dismissible fade show h-100 mb-0" role="alert" style="background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); border: none; border-left: 5px solid #f39c12;">
-          <button type="button" class="btn-close" onclick="cerrarAlertaPedidosVencidos()" aria-label="Close"></button>
-          <div class="d-flex align-items-center">
-              <div class="me-3">
-                  <i class="fas fa-exclamation-triangle fa-2x" style="color: #f39c12;"></i>
-              </div>
-              <div>
-                  <h5 class="alert-heading mb-2" style="color: #856404; font-weight: 700;">
-                      <i class="fas fa-clock me-2"></i>¡Tiene Pedidos Vencidos!
-                  </h5>
-                  <p class="mb-2" style="color: #856404;">
-                      Usted tiene <strong>{{ count($pedidosVencidos) }}</strong> pedido(s) que han superado el plazo de crédito establecido.
-                  </p>
-                  <div class="mb-0">
-                      <small class="text-muted">Pedidos afectados:</small>
-                      <ul class="mb-0 mt-2" style="max-height: 120px; overflow-y: auto;">
-                          @foreach($pedidosVencidos as $pedido)
-                              <li class="mb-1" style="color: #856404;">
-                                  <strong>#{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}</strong> - 
-                                  {{ $pedido->descripcion }} 
-                                  <span class="badge bg-danger text-white ms-2">
-                                      Vencido hace {{ (int) $pedido->dias_vencidos }} días
-                                  </span>
-                              </li>
-                          @endforeach
-                      </ul>
+        <span class="seller-notifications-total"><span data-notification-total>{{ $totalNotificacionesVendedor }}</span> pendientes</span>
+      </div>
+      <div class="card-body p-0" id="sellerNotificationsAccordion">
+        @if($pagosRechazados->isNotEmpty())
+          <div class="seller-notification-category" data-notification-category>
+            <h6 class="mb-0">
+              <button class="seller-notification-toggle collapsed" type="button" data-toggle="collapse"
+                data-target="#sellerRejectedPayments" aria-expanded="false" aria-controls="sellerRejectedPayments">
+                <i class="fas fa-times-circle text-danger mr-2" aria-hidden="true"></i>
+                Pagos rechazados
+                <span class="seller-notification-count ml-2" data-category-count>{{ $pagosRechazados->count() }}</span>
+                <i class="fas fa-chevron-down seller-notification-chevron" aria-hidden="true"></i>
+              </button>
+            </h6>
+            <div id="sellerRejectedPayments" class="collapse" data-parent="#sellerNotificationsAccordion">
+              <div class="row px-3 pt-2 pb-1">
+                @foreach ($pagosRechazados as $pagoRec)
+                  <div class="col-12 col-lg-6 mb-3 seller-notification-item" data-notification-count="1" data-pago-id="{{ $pagoRec->id }}">
+                    <article class="seller-notification-card">
+                      <div class="seller-notification-card-heading">
+                        <i class="fas fa-times-circle text-danger mt-1" aria-hidden="true"></i>
+                        <h6 style="color: #922b21;">Pago rechazado</h6>
+                        <button type="button" class="btn btn-sm btn-link text-muted p-0" data-dismiss-notification title="Cerrar notificación" aria-label="Cerrar notificación">
+                          <i class="fas fa-times" aria-hidden="true"></i>
+                        </button>
+                      </div>
+                      <div class="small text-muted mb-2">
+                        {{ \Carbon\Carbon::parse($pagoRec->updated_at)->format('d/m/Y H:i') }} &middot;
+                        Cliente: <strong>{{ $pagoRec->cliente_nombre ?: 'No identificado' }}</strong> &middot;
+                        Ref: <strong>{{ $pagoRec->referencia ?? 'N/A' }}</strong> &middot;
+                        ${{ number_format($pagoRec->monto, 2) }}
+                      </div>
+                      <div class="seller-notification-card-body">
+                        <div class="small text-uppercase font-weight-bold text-danger mb-1">
+                          <i class="far fa-sticky-note mr-1" aria-hidden="true"></i>Observación del administrador
+                        </div>
+                        <div style="color: #5d2020; font-size: 0.88rem; line-height: 1.5;">{{ $pagoRec->observaciones ?: 'El administrador no agregó una observación.' }}</div>
+                      </div>
+                    </article>
                   </div>
-                  <div class="mt-3">
-                      <a href="{{ route('vendedores.pagos.clientes') }}" class="btn btn-warning btn-sm">
-                          <i class="fas fa-hand-holding-usd me-2"></i>Ir a Gestión de Pagos
-                      </a>
-                      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cerrarAlertaPedidosVencidos()">
-                          <i class="fas fa-times me-2"></i>Ocultar
-                      </button>
-                  </div>
-              </div>
-          </div>
+                @endforeach
               </div>
             </div>
-            @endif
           </div>
+        @endif
 
-          <script>
-                function cerrarAlertaPago(btn) {
-                var alerta = btn.closest('.apr-alerta');
-                alerta.style.opacity = '0';
-                alerta.style.transform = 'translateX(20px)';
-                setTimeout(function() { alerta.remove(); }, 350);
-              }
-          function cerrarAlertaPedidosVencidos() {
-              var alerta = document.getElementById('alerta-pedidos-vencidos');
-              if (alerta) {
-                  alerta.classList.remove('show');
-                  setTimeout(function() {
-                      alerta.style.display = 'none';
-                  }, 150);
-              }
-          }
-            </script>
+        @if(isset($pedidosVencidos) && count($pedidosVencidos) > 0)
+          <div class="seller-notification-category" data-notification-category>
+            <h6 class="mb-0">
+              <button class="seller-notification-toggle collapsed" type="button" data-toggle="collapse"
+                data-target="#sellerOverdueOrders" aria-expanded="false" aria-controls="sellerOverdueOrders">
+                <i class="fas fa-clock text-warning mr-2" aria-hidden="true"></i>
+                ¡Tiene Pedidos Vencidos!
+                <span class="seller-notification-count ml-2" data-category-count>{{ count($pedidosVencidos) }}</span>
+                <i class="fas fa-chevron-down seller-notification-chevron" aria-hidden="true"></i>
+              </button>
+            </h6>
+            <div id="sellerOverdueOrders" class="collapse" data-parent="#sellerNotificationsAccordion">
+              <div class="row px-3 pt-2 pb-1">
+                <div class="col-12 mb-3 seller-notification-item" data-notification-count="{{ count($pedidosVencidos) }}">
+                  <article class="seller-notification-card overdue">
+                    <div class="seller-notification-card-heading">
+                      <i class="fas fa-exclamation-triangle text-warning mt-1" aria-hidden="true"></i>
+                      <h6 style="color: #856404;">Usted tiene {{ count($pedidosVencidos) }} pedido(s) que han superado el plazo de crédito establecido.</h6>
+                      <button type="button" class="btn btn-sm btn-link text-muted p-0" data-dismiss-notification title="Cerrar notificación" aria-label="Cerrar notificación">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                      </button>
+                    </div>
+                    <div class="seller-notification-card-body">
+                      <small class="text-muted">Pedidos afectados:</small>
+                      <ul class="mb-0 mt-2">
+                        @foreach($pedidosVencidos as $pedido)
+                          <li class="mb-1" style="color: #856404;">
+                            <strong>#{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}</strong> -
+                            {{ $pedido->descripcion }}
+                            <span class="badge badge-danger ml-2">Vencido hace {{ (int) $pedido->dias_vencidos }} días</span>
+                          </li>
+                        @endforeach
+                      </ul>
+                    </div>
+                    <div class="mt-3">
+                      <a href="{{ route('vendedores.pagos.clientes') }}" class="btn btn-warning btn-sm">
+                        <i class="fas fa-hand-holding-usd mr-2" aria-hidden="true"></i>Ir a Gestión de Pagos
+                      </a>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        @endif
+      </div>
+    </section>
+
+    <script>
+      document.querySelectorAll('[data-dismiss-notification]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          var notification = button.closest('.seller-notification-item');
+          var category = button.closest('[data-notification-category]');
+
+          notification.style.opacity = '0';
+          notification.style.transform = 'translateX(20px)';
+          window.setTimeout(function() {
+            notification.remove();
+            if (!category.querySelector('.seller-notification-item')) {
+              category.remove();
+            } else {
+              var categoryCount = Array.from(category.querySelectorAll('.seller-notification-item'))
+                .reduce(function(total, item) {
+                  return total + (Number(item.getAttribute('data-notification-count')) || 0);
+                }, 0);
+              category.querySelector('[data-category-count]').textContent = categoryCount;
+            }
+
+            var totalCount = Array.from(document.querySelectorAll('#sellerNotificationsAccordion .seller-notification-item'))
+              .reduce(function(total, item) {
+                return total + (Number(item.getAttribute('data-notification-count')) || 0);
+              }, 0);
+            document.querySelector('[data-notification-total]').textContent = totalCount;
+            if (totalCount === 0) {
+              document.querySelector('.seller-notifications').remove();
+            }
+          }, 350);
+        });
+      });
+    </script>
   @endif
 
   @if($pending_commission->count() > 0)

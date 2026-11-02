@@ -10,47 +10,36 @@ use App\Models\OrderInven;
 
 class ManagerDashboardController extends Controller
 {
+    public function refreshSignals()
+    {
+        return response()->json([
+            'signals' => $this->getDashboardSignals(),
+            'activity_trend' => $this->getActivityTrend(),
+            'updated_at' => now()->format('H:i:s'),
+        ]);
+    }
+
     public function index()
     {
-        // Totales y estadísticas para el dashboard
-        $pendingOrdersCount = Pedido::where('estatus', 'PENDIENTE')->count();
-        $approvedOrdersCount = Pedido::where('estatus', 'APROBADO')->count();
-        
-        $createdOrdersCount = Pedido::whereDate('created_at', today())->count(); // Pedidos de hoy
-        $totalOrdersCount = $pendingOrdersCount + $approvedOrdersCount + $createdOrdersCount;
-        
-        // Pagos
-        $pendingPaymentsCount = Pago::where('estatus', 'EN REVISION')->count();
-        $approvedPaymentsCount = Pago::where('estatus', 'APROBADO')->count();
-        $totalPaymentsCount = $pendingPaymentsCount + $approvedPaymentsCount;
-
-        // Comisiones
-        $pendingCommissions = \App\Models\ComisionVendedor::where('estatus_comision', 'pendiente')->sum('monto_comision');
-        $paidCommissions = \App\Models\ComisionVendedor::where('estatus_comision', 'pagada')->sum('monto_comision');
-        $totalCommissions = $pendingCommissions + $paidCommissions;
+        $signals = $this->getDashboardSignals();
+        $pendingOrdersCount = $signals['orders']['pending'];
+        $approvedOrdersCount = $signals['orders']['approved'];
+        $createdOrdersCount = $signals['orders']['created_today'];
+        $totalOrdersCount = $signals['orders']['total'];
+        $pendingPaymentsCount = $signals['payments']['pending'];
+        $approvedPaymentsCount = $signals['payments']['approved'];
+        $totalPaymentsCount = $signals['payments']['total'];
+        $pendingCommissions = $signals['commissions']['pending'];
+        $paidCommissions = $signals['commissions']['paid'];
+        $totalCommissions = $signals['commissions']['total'];
 
         $sellersCount = Vendedor::count();
         $productsCount = OrderInven::count();
 
-        // Pedidos sin cliente asignado (codcli nulo o vacío)
-        $pedidosSinCruceCount = DB::connection('company')->table('pedidos')
-            ->where(function ($q) {
-                $q->whereNull('codcli')
-                  ->orWhere('codcli', '')
-                  ->orWhere('codcli', '0');
-            })
-            ->count();
-
-        // Retenciones de IVA pendientes
-        $retencionesPendientesCount = Pedido::where('porc_retencion', '>', 0)
-            ->where('saldo_iva_bs', '>', 0)
-            ->where('estatus', '!=', 'CANCELADO')
-            ->count();
-
-        $retencionesPendientesBs = Pedido::where('porc_retencion', '>', 0)
-            ->where('saldo_iva_bs', '>', 0)
-            ->where('estatus', '!=', 'CANCELADO')
-            ->sum('saldo_iva_bs');
+        $pedidosSinCruceCount = $signals['unmatched_orders'];
+        $retencionesPendientesCount = $signals['retentions']['count'];
+        $retencionesPendientesBs = $signals['retentions']['amount'];
+        $activityTrend = $this->getActivityTrend();
 
         $mainDb = DB::connection('mysql')->getDatabaseName();
         $recentOrders = DB::connection('company')
@@ -130,7 +119,93 @@ class ManagerDashboardController extends Controller
             'pedidosSinCruceCount',
             'retencionesPendientesCount',
             'retencionesPendientesBs',
-            'recentActivity'
+            'recentActivity',
+            'activityTrend'
         ));
+    }
+
+    private function getDashboardSignals(): array
+    {
+        $pendingOrdersCount = Pedido::where('estatus', 'PENDIENTE')->count();
+        $approvedOrdersCount = Pedido::where('estatus', 'APROBADO')->count();
+        $createdOrdersCount = Pedido::whereDate('created_at', today())->count();
+        $pendingPaymentsCount = Pago::where('estatus', 'EN REVISION')->count();
+        $approvedPaymentsCount = Pago::where('estatus', 'APROBADO')->count();
+        $pendingCommissions = \App\Models\ComisionVendedor::where('estatus_comision', 'pendiente')->sum('monto_comision');
+        $paidCommissions = \App\Models\ComisionVendedor::where('estatus_comision', 'pagada')->sum('monto_comision');
+
+        $pendingRetentions = Pedido::where('porc_retencion', '>', 0)
+            ->where('saldo_iva_bs', '>', 0)
+            ->where('estatus', '!=', 'CANCELADO');
+
+        return [
+            'unmatched_orders' => DB::connection('company')->table('pedidos')
+                ->where(function ($query) {
+                    $query->whereNull('codcli')
+                        ->orWhere('codcli', '')
+                        ->orWhere('codcli', '0');
+                })
+                ->count(),
+            'orders' => [
+                'pending' => $pendingOrdersCount,
+                'approved' => $approvedOrdersCount,
+                'created_today' => $createdOrdersCount,
+                'total' => $pendingOrdersCount + $approvedOrdersCount + $createdOrdersCount,
+            ],
+            'payments' => [
+                'pending' => $pendingPaymentsCount,
+                'approved' => $approvedPaymentsCount,
+                'total' => $pendingPaymentsCount + $approvedPaymentsCount,
+            ],
+            'commissions' => [
+                'pending' => (float) $pendingCommissions,
+                'paid' => (float) $paidCommissions,
+                'total' => (float) ($pendingCommissions + $paidCommissions),
+            ],
+            'retentions' => [
+                'count' => (clone $pendingRetentions)->count(),
+                'amount' => (float) $pendingRetentions->sum('saldo_iva_bs'),
+            ],
+        ];
+    }
+
+    private function getActivityTrend()
+    {
+        $start = today()->subDays(6);
+        $end = now();
+        $groupByDate = DB::raw('DATE(created_at)');
+
+        $orders = DB::connection('company')->table('pedidos')
+            ->selectRaw('DATE(created_at) as activity_date, COUNT(*) as total')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy($groupByDate)
+            ->pluck('total', 'activity_date');
+
+        $payments = Pago::query()
+            ->selectRaw('DATE(created_at) as activity_date, COUNT(*) as total')
+            ->whereBetween('created_at', [$start, $end])
+            ->groupBy($groupByDate)
+            ->pluck('total', 'activity_date');
+
+        $retentions = DB::connection('company')->table('pedidos')
+            ->selectRaw('DATE(comprobante_retencion_at) as activity_date, COUNT(*) as total')
+            ->whereNotNull('comprobante_retencion')
+            ->whereNotNull('comprobante_retencion_at')
+            ->whereBetween('comprobante_retencion_at', [$start, $end])
+            ->groupBy(DB::raw('DATE(comprobante_retencion_at)'))
+            ->pluck('total', 'activity_date');
+
+        return collect(range(0, 6))->map(function ($offset) use ($start, $orders, $payments, $retentions) {
+            $date = $start->copy()->addDays($offset);
+            $key = $date->format('Y-m-d');
+
+            return [
+                'key' => $key,
+                'label' => $date->format('d/m'),
+                'orders' => (int) $orders->get($key, 0),
+                'payments' => (int) $payments->get($key, 0),
+                'retentions' => (int) $retentions->get($key, 0),
+            ];
+        });
     }
 }

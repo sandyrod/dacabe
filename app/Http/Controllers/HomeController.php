@@ -47,12 +47,14 @@ class HomeController extends Controller
         
         // Detectar pedidos vencidos para vendedores
         $pedidosVencidos = [];
+        $sellerStats = null;
         if ($isVendedor) {
             $pedidosVencidos = DB::connection('company')
                 ->table('pedidos')
-                ->select('pedidos.id', 'pedidos.descripcion', 'pedidos.dias_credito', 'pedidos.fecha_despacho')
+                ->select('pedidos.id', 'pedidos.descripcion', 'pedidos.rif', 'pedidos.dias_credito', 'pedidos.fecha_despacho')
+                ->selectRaw('DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY) as fecha_vencimiento')
                 ->selectRaw('DATEDIFF(CURDATE(), DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY)) as dias_vencidos')
-            ->where('pedidos.user_id', $user->id)
+                ->where('pedidos.user_id', $user->id)
                 ->where('pedidos.estatus', 'APROBADO')
                 ->whereNotNull('pedidos.dias_credito')
                 ->where('pedidos.dias_credito', '>', 0)
@@ -60,11 +62,44 @@ class HomeController extends Controller
                 ->whereRaw('TRIM(COALESCE(pedidos.fecha_despacho, "")) != ""')
                 ->whereRaw('DATE_ADD(pedidos.fecha_despacho, INTERVAL pedidos.dias_credito DAY) < CURDATE()')
                 ->get();
+
+            $monthStart = now()->startOfMonth();
+            $monthEnd = now();
+            $orderIdsForStats = function ($query) use ($user, $monthStart, $monthEnd) {
+                $query->select('id')
+                    ->from('pedidos')
+                    ->where('user_id', $user->id)
+                    ->whereBetween('created_at', [$monthStart, $monthEnd]);
+            };
+            $orderTotals = DB::connection('company')->table('pedido_detalle')
+                ->selectRaw('pedido_id, COALESCE(SUM(cantidad * precio_dolar), 0) as total')
+                ->whereIn('pedido_id', $orderIdsForStats)
+                ->groupBy('pedido_id');
+
+            $sellerStats = DB::connection('company')->table('pedidos as p')
+                ->leftJoinSub($orderTotals, 'details', function ($join) {
+                    $join->on('details.pedido_id', '=', 'p.id');
+                })
+                ->where('p.user_id', $user->id)
+                ->whereBetween('p.created_at', [$monthStart, $monthEnd])
+                ->whereRaw('UPPER(COALESCE(p.estatus, "")) NOT IN ("CARGANDO", "ANULADO", "CANCELADO")')
+                ->selectRaw('COUNT(*) as orders_count')
+                ->selectRaw('SUM(CASE WHEN UPPER(COALESCE(p.estatus, "")) IN ("APROBADO", "PAGADO") THEN 1 ELSE 0 END) as approved_count')
+                ->selectRaw('SUM(CASE WHEN UPPER(COALESCE(p.estatus, "")) IN ("PENDIENTE", "EN REVISION") THEN 1 ELSE 0 END) as pending_count')
+                ->selectRaw('COALESCE(SUM(CASE WHEN UPPER(COALESCE(p.estatus, "")) IN ("APROBADO", "PAGADO") THEN COALESCE(details.total, 0) ELSE 0 END), 0) as approved_amount')
+                ->first();
+
+            $sellerStats = [
+                'orders_count' => (int) ($sellerStats->orders_count ?? 0),
+                'approved_count' => (int) ($sellerStats->approved_count ?? 0),
+                'pending_count' => (int) ($sellerStats->pending_count ?? 0),
+                'approved_amount' => (float) ($sellerStats->approved_amount ?? 0),
+            ];
         }
         
         $showLogrosButton = $isVendedor;
 
-        return view('dashboard', compact(['permissions', 'company', 'pedidosVencidos', 'showLogrosButton']));
+        return view('dashboard', compact(['permissions', 'company', 'pedidosVencidos', 'showLogrosButton', 'sellerStats']));
     }
 
     public function getBcvRate()

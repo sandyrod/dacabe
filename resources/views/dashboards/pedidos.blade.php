@@ -628,6 +628,139 @@
 <!-- VENDEDORES -->
   @php($pending_commission = (new \App\Models\ComisionVendedor)->getPendingCommissions())
   @php($orders = (new \App\Models\Pedido)->getMyLastOrders(6))
+  <style>
+    .seller-dashboard-panel {
+      border: 1px solid #e3eaf1;
+      border-radius: 14px;
+      box-shadow: 0 5px 16px rgba(24, 45, 70, .07);
+      transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
+    }
+
+    .seller-dashboard-panel:hover {
+      transform: translateY(-4px);
+      border-color: #c6d5e5;
+      box-shadow: 0 13px 28px rgba(24, 45, 70, .14);
+    }
+
+    .seller-options-panel .btn-primary-seller {
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+
+    .seller-options-panel .btn-primary-seller:hover,
+    .seller-options-panel .btn-primary-seller:focus {
+      transform: translateX(3px);
+      box-shadow: 0 4px 10px rgba(24, 45, 70, .12);
+    }
+
+    .seller-overdue-order {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .8rem;
+      border: 1px solid #f1dfb8;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, .86);
+    }
+
+    .seller-overdue-order + .seller-overdue-order {
+      margin-top: .65rem;
+    }
+
+    .seller-overdue-order > div:first-child {
+      min-width: 0;
+    }
+
+    .seller-overdue-order-title {
+      margin: 0;
+      color: #5b4420;
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    .seller-overdue-order-meta {
+      display: flex;
+      gap: .4rem .8rem;
+      flex-wrap: wrap;
+      margin-top: .35rem;
+      color: #74684f;
+      font-size: .76rem;
+    }
+
+    .seller-overdue-days {
+      flex: 0 0 auto;
+      padding: .3rem .55rem;
+      border-radius: 20px;
+      background: #fde7e3;
+      color: #a13e32;
+      font-size: .72rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .seller-monthly-stats {
+      overflow: hidden;
+      border: 1px solid #dfe8ef;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #f8fbff 0%, #fff 75%);
+      box-shadow: 0 8px 22px rgba(27, 45, 54, .07);
+    }
+
+    .seller-monthly-stat {
+      height: 100%;
+      padding: 1rem;
+      border: 1px solid #e4ebf2;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .seller-monthly-stat-label {
+      color: #718096;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .seller-monthly-stat-value {
+      display: block;
+      margin-top: .3rem;
+      color: #23364d;
+      font-size: 1.45rem;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+
+    .seller-monthly-stat-note {
+      display: block;
+      margin-top: .25rem;
+      color: #8793a1;
+      font-size: .75rem;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .seller-dashboard-panel,
+      .seller-options-panel .btn-primary-seller {
+        transition: none;
+      }
+
+      .seller-dashboard-panel:hover,
+      .seller-options-panel .btn-primary-seller:hover,
+      .seller-options-panel .btn-primary-seller:focus {
+        transform: none;
+      }
+    }
+
+    @media (max-width: 575.98px) {
+      .seller-overdue-order {
+        flex-direction: column;
+      }
+
+      .seller-overdue-days {
+        align-self: flex-start;
+      }
+    }
+  </style>
 
   @if($pagosRechazados->isNotEmpty() || (isset($pedidosVencidos) && count($pedidosVencidos) > 0))
     <style>
@@ -827,22 +960,35 @@
                   <article class="seller-notification-card overdue">
                     <div class="seller-notification-card-heading">
                       <i class="fas fa-exclamation-triangle text-warning mt-1" aria-hidden="true"></i>
-                      <h6 style="color: #856404;">Usted tiene {{ count($pedidosVencidos) }} pedido(s) que han superado el plazo de crédito establecido.</h6>
+                      <div class="flex-fill">
+                        <h6 class="mb-1" style="color: #856404;">{{ count($pedidosVencidos) }} pedido(s) superaron el plazo de crédito</h6>
+                        <small class="text-muted">Revisa las fechas de vencimiento y coordina el seguimiento de cobro.</small>
+                      </div>
                       <button type="button" class="btn btn-sm btn-link text-muted p-0" data-dismiss-notification title="Cerrar notificación" aria-label="Cerrar notificación">
                         <i class="fas fa-times" aria-hidden="true"></i>
                       </button>
                     </div>
                     <div class="seller-notification-card-body">
-                      <small class="text-muted">Pedidos afectados:</small>
-                      <ul class="mb-0 mt-2">
+                      <div class="seller-overdue-orders">
                         @foreach($pedidosVencidos as $pedido)
-                          <li class="mb-1" style="color: #856404;">
-                            <strong>#{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}</strong> -
-                            {{ $pedido->descripcion }}
-                            <span class="badge badge-danger ml-2">Vencido hace {{ (int) $pedido->dias_vencidos }} días</span>
-                          </li>
+                          <article class="seller-overdue-order">
+                            <div class="min-w-0">
+                              <h6 class="seller-overdue-order-title">
+                                Pedido #{{ str_pad($pedido->id, 5, '0', STR_PAD_LEFT) }}
+                              </h6>
+                              <div class="text-dark font-weight-bold">{{ $pedido->descripcion ?: 'Cliente sin identificar' }}</div>
+                              <div class="seller-overdue-order-meta">
+                                @if($pedido->rif)
+                                  <span><i class="fas fa-id-card mr-1"></i>{{ $pedido->rif }}</span>
+                                @endif
+                                <span><i class="fas fa-truck mr-1"></i>Despachado: {{ \Carbon\Carbon::parse($pedido->fecha_despacho)->format('d/m/Y') }}</span>
+                                <span><i class="fas fa-calendar-times mr-1"></i>Venció: {{ \Carbon\Carbon::parse($pedido->fecha_vencimiento)->format('d/m/Y') }}</span>
+                              </div>
+                            </div>
+                            <span class="seller-overdue-days">Vencido hace {{ (int) $pedido->dias_vencidos }} días</span>
+                          </article>
                         @endforeach
-                      </ul>
+                      </div>
                     </div>
                     <div class="mt-3">
                       <a href="{{ route('vendedores.pagos.clientes') }}" class="btn btn-warning btn-sm">
@@ -909,7 +1055,7 @@
   <div class="row">
     
     <div class="col-lg-3 col-md-3 col-sm-12 col-xs-12">
-      <div class="card card-seller">
+      <div class="card card-seller seller-dashboard-panel seller-options-panel">
         <img src="{{ getUserPhoto() }}" class="card-img-top-seller d-none" alt="...">
         <img src="{{ asset('imgs/logos/dacabe.png') }}" class="" alt="...">
         <div class="card-body">
@@ -966,7 +1112,7 @@
           </div>          
         </div>
 
-        <div class="card card-seller">
+        <div class="card card-seller seller-dashboard-panel">
               <div class="card-header border-transparent">
                 <h3 class="card-title"><b><i class="fa fa-shopping-cart"></i> Novedades</b></h3>
 
@@ -1040,7 +1186,7 @@
     @else
       <div class="col-xs-12 col-sm-12 col-md-9 co-lg-9">
     @endif
-        <div class="card card-seller">
+        <div class="card card-seller seller-dashboard-panel">
               <div class="card-header border-transparent">
                 <h3 class="card-title"><b><i class="fa fa-edit"></i> Últimos Pedidos</b></h3>
 
@@ -1071,9 +1217,9 @@
                         @foreach($orders as $order)
                           <tr style="text-align: left;">
                             @php($styles = ['PENDIENTE'=>'warning', 'APROBADO'=>'success', 'RECHAZADO'=>'danger', 'CARGANDO'=>'warning', 'PAGADO'=>'success', 'EN REVISION'=>'info'])
-                            @php($style = $styles[$order->estatus])
+                            @php($style = $styles[$order->estatus] ?? 'secondary')
                             @php($icons = ['PENDIENTE' => 'eye', 'EN REVISION' => 'money-bill','APROBADO' => 'check', 'RECHAZADO' => 'times','CARGANDO' => 'shopping-cart', 'PAGADO' => 'money-check-alt'])
-                            @php($icon = $icons[$order->estatus])
+                            @php($icon = $icons[$order->estatus] ?? 'file-alt')
                             @php($url = $order->estatus=='CARGANDO' ? 'view-cart': 'view-order/'.$order->id)
                             <td><span class="badge badge-{{$style}}"><i class="fa fa-{{$icon}}"></i> {{$order->estatus}}</span></td>
                             <td><a href="{{url($url)}}">{{formatoFechaDMASimple($order->fecha)}}</a></td>
@@ -1089,9 +1235,54 @@
                   @endif
                 </div>
               </div>              
-            </div>   
+            </div>
       </div>
   </div>
+  @if(isset($sellerStats))
+    <section class="seller-monthly-stats mt-4 p-3 p-md-4" aria-labelledby="seller-monthly-stats-title">
+      <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+        <div>
+          <h5 class="mb-1 font-weight-bold text-dark" id="seller-monthly-stats-title">
+            <i class="fas fa-chart-line text-primary mr-2" aria-hidden="true"></i>Resumen del mes
+          </h5>
+          <small class="text-muted">{{ now()->translatedFormat('F Y') }}</small>
+        </div>
+        <a href="{{ route('vendedor.pedidos.historial') }}" class="btn btn-sm btn-outline-primary mt-2 mt-md-0">
+          Ver historial <i class="fas fa-arrow-right ml-1" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div class="row">
+        <div class="col-6 col-lg-3 mb-2">
+          <div class="seller-monthly-stat">
+            <span class="seller-monthly-stat-label">Pedidos del mes</span>
+            <strong class="seller-monthly-stat-value">{{ number_format($sellerStats['orders_count'], 0, ',', '.') }}</strong>
+            <small class="seller-monthly-stat-note">Pedidos registrados</small>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3 mb-2">
+          <div class="seller-monthly-stat">
+            <span class="seller-monthly-stat-label">Aprobados</span>
+            <strong class="seller-monthly-stat-value">{{ number_format($sellerStats['approved_count'], 0, ',', '.') }}</strong>
+            <small class="seller-monthly-stat-note">Aprobados o pagados</small>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3 mb-2">
+          <div class="seller-monthly-stat">
+            <span class="seller-monthly-stat-label">Por gestionar</span>
+            <strong class="seller-monthly-stat-value">{{ number_format($sellerStats['pending_count'], 0, ',', '.') }}</strong>
+            <small class="seller-monthly-stat-note">Pendientes o en revisión</small>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3 mb-2">
+          <div class="seller-monthly-stat">
+            <span class="seller-monthly-stat-label">Monto aprobado</span>
+            <strong class="seller-monthly-stat-value">Ref {{ number_format($sellerStats['approved_amount'], 2, ',', '.') }}</strong>
+            <small class="seller-monthly-stat-note">Total de pedidos aprobados</small>
+          </div>
+        </div>
+      </div>
+    </section>
+  @endif
 </div>
 
 

@@ -579,6 +579,226 @@
         transform: rotate(180deg);
     }
 
+    .manager-alerts {
+        overflow: hidden;
+        border: 1px solid #e1e8f0;
+        border-top: 4px solid #244c7c;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 8px 22px rgba(27, 45, 54, 0.07);
+    }
+
+    .manager-alerts-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 1rem 1.25rem;
+        background: linear-gradient(110deg, #f3f6fb 0%, #fff 75%);
+    }
+
+    .manager-alerts-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 0;
+        color: #23364d;
+        font-size: 1.05rem;
+        font-weight: 700;
+    }
+
+    .manager-alerts-title i {
+        color: #315d8c;
+    }
+
+    .manager-alerts-subtitle,
+    .manager-alerts-updated {
+        color: #718096;
+        font-size: 0.8rem;
+    }
+
+    .manager-alerts-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+    }
+
+    .manager-alerts-refresh {
+        flex: 0 0 auto;
+        border-radius: 8px;
+        font-weight: 600;
+    }
+
+    .manager-alerts-refresh i {
+        margin-right: 0.35rem;
+    }
+
+    .manager-alerts.is-refreshing .manager-alerts-refresh i {
+        animation: manager-spin 0.8s linear infinite;
+    }
+
+    .manager-alerts-error {
+        display: none;
+        margin: 0 1.25rem;
+        color: #a4262c;
+        font-size: 0.82rem;
+    }
+
+    .manager-alerts.has-error .manager-alerts-error {
+        display: block;
+    }
+
+    .stats-container > .col > a {
+        display: block;
+        height: 100%;
+        border-radius: 15px;
+        text-decoration: none;
+    }
+
+    .stats-container .manager-card {
+        transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+    }
+
+    .stats-container > .col > a:hover .manager-card,
+    .stats-container > .col > a:focus-visible .manager-card {
+        transform: translateY(-4px);
+        box-shadow: 0 13px 26px rgba(27, 45, 54, 0.18);
+        filter: saturate(1.06);
+    }
+
+    .stats-container .manager-card.is-updated {
+        animation: manager-signal-pulse 0.75s ease-out;
+    }
+
+    .manager-alerts.is-refreshing .stats-container {
+        opacity: 0.72;
+        transition: opacity 0.2s ease;
+    }
+
+    .activity-trend {
+        padding: 1.1rem 1.15rem 1.25rem;
+        border-top: 1px solid #e6e9ed;
+        background: linear-gradient(180deg, #fbfcfe 0%, #fff 100%);
+    }
+
+    .activity-trend-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .activity-trend-title {
+        margin: 0;
+        color: #26384d;
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .activity-trend-subtitle {
+        color: #7a8796;
+        font-size: 0.78rem;
+    }
+
+    .activity-trend-legend {
+        display: flex;
+        align-items: center;
+        gap: 0.85rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.8rem;
+        color: #687789;
+        font-size: 0.72rem;
+    }
+
+    .activity-trend-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+
+    .activity-trend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+
+    .activity-trend-chart {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-around;
+        gap: 0.75rem;
+        min-height: 142px;
+        overflow-x: auto;
+        padding: 0.45rem 0.2rem 0;
+    }
+
+    .activity-trend-day {
+        display: flex;
+        flex: 1 0 42px;
+        flex-direction: column;
+        align-items: center;
+        min-width: 42px;
+        color: #718096;
+        font-size: 0.7rem;
+    }
+
+    .activity-trend-total {
+        height: 1.1rem;
+        color: #526174;
+        font-size: 0.68rem;
+        font-weight: 700;
+    }
+
+    .activity-trend-bars {
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 3px;
+        width: 100%;
+        height: 100px;
+        border-bottom: 1px solid #dce3eb;
+    }
+
+    .activity-trend-bar {
+        width: min(18%, 11px);
+        min-width: 5px;
+        border-radius: 4px 4px 0 0;
+        transition: height 0.35s ease, opacity 0.2s ease;
+    }
+
+    .activity-trend-bar.orders { background: #2f8f78; }
+    .activity-trend-bar.payments { background: #d29a35; }
+    .activity-trend-bar.retentions { background: #c65a4a; }
+
+    .activity-trend-label {
+        margin-top: 0.4rem;
+        white-space: nowrap;
+    }
+
+    .activity-trend-summary {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-top: 0.9rem;
+        color: #687789;
+        font-size: 0.77rem;
+    }
+
+    .activity-trend-summary strong {
+        color: #26384d;
+    }
+
+    @keyframes manager-spin {
+        to { transform: rotate(360deg); }
+    }
+
+    @keyframes manager-signal-pulse {
+        0% { filter: brightness(1.14); }
+        100% { filter: brightness(1); }
+    }
+
     @media (max-width: 575.98px) {
         .activity-feed-topline {
             align-items: flex-start;
@@ -599,20 +819,59 @@
         .activity-feed-footer {
             align-self: flex-end;
         }
+
+        .manager-alerts-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .activity-trend-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .manager-alerts.is-refreshing .manager-alerts-refresh i,
+        .stats-container .manager-card,
+        .activity-trend-bar {
+            animation: none;
+            transition: none;
+        }
     }
 </style>
 @endsection
 
 @section('content')
 
-    <!-- Encabezado con Indicadores -->
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 stats-container mb-4">
+    <section class="manager-alerts mb-4" id="manager-alerts" aria-labelledby="manager-alerts-heading">
+        <div class="manager-alerts-header">
+            <div>
+                <h2 class="manager-alerts-title" id="manager-alerts-heading">
+                    <i class="fas fa-clipboard-check"></i> Centro de atención gerencial
+                </h2>
+                <div class="manager-alerts-subtitle mt-1">Indicadores operativos y financieros</div>
+            </div>
+            <div class="manager-alerts-actions">
+                <span class="manager-alerts-updated" id="manager-alerts-updated" aria-live="polite">
+                    Actualizado {{ now()->format('H:i:s') }}
+                </span>
+                <button type="button" class="btn btn-sm btn-outline-primary manager-alerts-refresh" id="manager-alerts-refresh">
+                    <i class="fas fa-sync-alt" aria-hidden="true"></i> Actualizar
+                </button>
+            </div>
+        </div>
+        <div class="manager-alerts-error" id="manager-alerts-error" role="alert">
+            No fue posible actualizar los indicadores. Inténtalo nuevamente.
+        </div>
+        <div class="p-3" id="manager-alerts-content" aria-busy="false">
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-5 g-3 stats-container mb-0">
 
         <!-- Primera Fila -->
         <!-- Client Sync Indicator -->
         <div class="col mb-3">
             <a href="{{ url('vendedores/sincronizar-clientes') }}" class="text-decoration-none text-reset h-100 w-100 d-block">
-                <div class="card manager-card h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <div class="card manager-card h-100" data-manager-kpi="clients" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                     <div class="card-body">
                         <h6 class="text-white mb-2"><i class="fas fa-sync-alt mr-1"></i> Sinc. Clientes</h6>
                         <div class="d-flex justify-content-between align-items-end mb-1">
@@ -622,9 +881,9 @@
                             </small>
                         </div>
                         <div class="progress" style="height: 8px; border-radius: 4px;">
-                            <div class="progress-bar bg-gradient-light" role="progressbar"
-                                style="width: 100%; background: rgba(255,255,255,0.3);"
-                                aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                            <div class="progress-bar bg-gradient-light" id="manager-clients-progress" role="progressbar"
+                                style="width: {{ $pedidosSinCruceCount > 0 ? '100%' : '0%' }}; background: rgba(255,255,255,0.3);"
+                                aria-valuenow="{{ $pedidosSinCruceCount > 0 ? 1 : 0 }}" aria-valuemin="0" aria-valuemax="1"></div>
                         </div>
                         <div class="mt-2">
                             <small class="text-white-50">
@@ -640,26 +899,27 @@
         <!-- Pedidos Indicator -->
         <div class="col mb-3">
             <a href="{{ url('pedidos') }}" class="text-decoration-none text-reset h-100 w-100 d-block">
-                <div class="card manager-card h-100">
+                <div class="card manager-card h-100" data-manager-kpi="orders">
                     <div class="card-body">
                         <h6 class="text-muted mb-2"><i class="fas fa-shopping-bag mr-1"></i> Pedidos</h6>
                         <div class="d-flex justify-content-between align-items-end mb-1">
-                            <h3 class="mb-0">{{ $totalOrdersCount }}</h3>
-                            <small class="text-success font-weight-bold">
+                            <h3 class="mb-0" id="manager-orders-total">{{ $totalOrdersCount }}</h3>
+                            <small class="text-success font-weight-bold" id="manager-orders-approved-percent">
                                 {{ $totalOrdersCount > 0 ? round(($approvedOrdersCount / $totalOrdersCount) * 100) : 0 }}% Aprobados
                             </small>
                         </div>
+                        <small class="text-muted d-block mb-1"><span id="manager-orders-created-today">{{ $createdOrdersCount }}</span> creados hoy</small>
                         <div class="progress" style="height: 10px; border-radius: 5px;">
-                            <div class="progress-bar bg-gradient-success" role="progressbar"
+                            <div class="progress-bar bg-gradient-success" id="manager-orders-approved-progress" role="progressbar"
                                 style="width: {{ $totalOrdersCount > 0 ? ($approvedOrdersCount / $totalOrdersCount) * 100 : 0 }}%"
                                 aria-valuenow="{{ $approvedOrdersCount }}" aria-valuemin="0" aria-valuemax="{{ $totalOrdersCount }}"></div>
-                            <div class="progress-bar bg-warning" role="progressbar"
+                            <div class="progress-bar bg-warning" id="manager-orders-pending-progress" role="progressbar"
                                 style="width: {{ $totalOrdersCount > 0 ? ($pendingOrdersCount / $totalOrdersCount) * 100 : 0 }}%"
                                 aria-valuenow="{{ $pendingOrdersCount }}" aria-valuemin="0" aria-valuemax="{{ $totalOrdersCount }}"></div>
                         </div>
                         <div class="d-flex justify-content-between mt-2">
-                            <small class="text-muted">{{ $approvedOrdersCount }} Aprobados</small>
-                            <small class="text-muted">{{ $pendingOrdersCount }} Pendientes</small>
+                            <small class="text-muted"><span id="manager-orders-approved-count">{{ $approvedOrdersCount }}</span> Aprobados</small>
+                            <small class="text-muted"><span id="manager-orders-pending-count">{{ $pendingOrdersCount }}</span> Pendientes</small>
                         </div>
                     </div>
                 </div>
@@ -670,26 +930,26 @@
         <!-- Pagos Indicator -->
         <div class="col mb-3">
             <a href="{{ url('admin/pagos/aprobar') }}" class="text-decoration-none text-reset h-100 w-100 d-block">
-                <div class="card manager-card h-100">
+                <div class="card manager-card h-100" data-manager-kpi="payments">
                     <div class="card-body">
                         <h6 class="text-muted mb-2"><i class="fas fa-money-bill-wave mr-1"></i> Pagos Recibidos</h6>
                         <div class="d-flex justify-content-between align-items-end mb-1">
-                            <h3 class="mb-0">{{ $totalPaymentsCount }}</h3>
-                            <small class="text-info font-weight-bold">
+                            <h3 class="mb-0" id="manager-payments-total">{{ $totalPaymentsCount }}</h3>
+                            <small class="text-info font-weight-bold" id="manager-payments-approved-percent">
                                 {{ $totalPaymentsCount > 0 ? round(($approvedPaymentsCount / $totalPaymentsCount) * 100) : 0 }}% Procesados
                             </small>
                         </div>
                         <div class="progress" style="height: 10px; border-radius: 5px;">
-                            <div class="progress-bar bg-gradient-info" role="progressbar"
+                            <div class="progress-bar bg-gradient-info" id="manager-payments-approved-progress" role="progressbar"
                                 style="width: {{ $totalPaymentsCount > 0 ? ($approvedPaymentsCount / $totalPaymentsCount) * 100 : 0 }}%"
                                 aria-valuenow="{{ $approvedPaymentsCount }}" aria-valuemin="0" aria-valuemax="{{ $totalPaymentsCount }}"></div>
-                            <div class="progress-bar bg-warning" role="progressbar"
+                            <div class="progress-bar bg-warning" id="manager-payments-pending-progress" role="progressbar"
                                 style="width: {{ $totalPaymentsCount > 0 ? ($pendingPaymentsCount / $totalPaymentsCount) * 100 : 0 }}%"
                                 aria-valuenow="{{ $pendingPaymentsCount }}" aria-valuemin="0" aria-valuemax="{{ $totalPaymentsCount }}"></div>
                         </div>
                         <div class="d-flex justify-content-between mt-2">
-                            <small class="text-muted">{{ $approvedPaymentsCount }} Aprobados</small>
-                            <small class="text-muted">{{ $pendingPaymentsCount }} Pendientes</small>
+                            <small class="text-muted"><span id="manager-payments-approved-count">{{ $approvedPaymentsCount }}</span> Aprobados</small>
+                            <small class="text-muted"><span id="manager-payments-pending-count">{{ $pendingPaymentsCount }}</span> Pendientes</small>
                         </div>
                     </div>
                 </div>
@@ -699,26 +959,26 @@
         <!-- Comisiones Indicator -->
         <div class="col mb-3">
             <a href="{{ url('comisiones') }}" class="text-decoration-none text-reset h-100 w-100 d-block">
-                <div class="card manager-card h-100">
+                <div class="card manager-card h-100" data-manager-kpi="commissions">
                     <div class="card-body">
                         <h6 class="text-muted mb-2"><i class="fas fa-chart-pie mr-1"></i> Comisiones</h6>
                         <div class="d-flex justify-content-between align-items-end mb-1">
-                            <h4 class="mb-0">${{ number_format($totalCommissions, 2) }}</h4>
-                            <small class="text-primary font-weight-bold">
+                            <h4 class="mb-0" id="manager-commissions-total">${{ number_format($totalCommissions, 2) }}</h4>
+                            <small class="text-primary font-weight-bold" id="manager-commissions-paid-percent">
                                 {{ $totalCommissions > 0 ? round(($paidCommissions / $totalCommissions) * 100) : 0 }}% Pagadas
                             </small>
                         </div>
                         <div class="progress" style="height: 10px; border-radius: 5px;">
-                            <div class="progress-bar bg-primary" role="progressbar"
+                            <div class="progress-bar bg-primary" id="manager-commissions-paid-progress" role="progressbar"
                                 style="width: {{ $totalCommissions > 0 ? ($paidCommissions / $totalCommissions) * 100 : 0 }}%"
                                 aria-valuenow="{{ $paidCommissions }}" aria-valuemin="0" aria-valuemax="{{ $totalCommissions }}"></div>
-                            <div class="progress-bar bg-secondary" role="progressbar"
+                            <div class="progress-bar bg-secondary" id="manager-commissions-pending-progress" role="progressbar"
                                 style="width: {{ $totalCommissions > 0 ? ($pendingCommissions / $totalCommissions) * 100 : 0 }}%"
                                 aria-valuenow="{{ $pendingCommissions }}" aria-valuemin="0" aria-valuemax="{{ $totalCommissions }}"></div>
                         </div>
                         <div class="d-flex justify-content-between mt-2">
-                            <small class="text-muted">${{ number_format($paidCommissions, 2) }} Pagadas</small>
-                            <small class="text-muted">${{ number_format($pendingCommissions, 2) }} Pendientes</small>
+                            <small class="text-muted">$<span id="manager-commissions-paid">{{ number_format($paidCommissions, 2) }}</span> Pagadas</small>
+                            <small class="text-muted">$<span id="manager-commissions-pending">{{ number_format($pendingCommissions, 2) }}</span> Pendientes</small>
                         </div>
                     </div>
                 </div>
@@ -728,7 +988,7 @@
         <!-- Retenciones Indicator -->
         <div class="col mb-3">
             <a href="{{ route('admin.retenciones.index') }}" class="text-decoration-none text-white h-100 w-100 d-block">
-                <div class="card manager-card h-100" style="background: linear-gradient(135deg, #9a3412 0%, #c2410c 50%, #ea580c 100%);">
+                <div class="card manager-card h-100" data-manager-kpi="retentions" style="background: linear-gradient(135deg, #9a3412 0%, #c2410c 50%, #ea580c 100%);">
                     <div class="card-body d-flex flex-column justify-content-between" style="color:#fff;">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0 fw-bold"><i class="fas fa-file-invoice mr-1"></i> Retenciones IVA</h6>
@@ -736,20 +996,18 @@
                         </div>
                         <div>
                             <div class="d-flex align-items-end gap-2 mb-1">
-                                <h3 class="mb-0 mr-2 fw-bold">{{ $retencionesPendientesCount }}</h3>
-                                <p class="mb-0 small" style="opacity:.85;">comprobante{{ $retencionesPendientesCount != 1 ? 's' : '' }} pendiente{{ $retencionesPendientesCount != 1 ? 's' : '' }}</p>
+                                <h3 class="mb-0 mr-2 fw-bold" id="manager-retentions-count">{{ $retencionesPendientesCount }}</h3>
+                                <p class="mb-0 small"><span id="manager-retentions-label">comprobante{{ $retencionesPendientesCount != 1 ? 's' : '' }} pendiente{{ $retencionesPendientesCount != 1 ? 's' : '' }}</span></p>
                             </div>
                             <small style="opacity:.8; font-size:12px;">
-                                Bs. {{ number_format($retencionesPendientesBs, 2, ',', '.') }} por validar
+                                Bs. <span id="manager-retentions-amount">{{ number_format($retencionesPendientesBs, 2, ',', '.') }}</span> por validar
                             </small>
                         </div>
-                        @if($retencionesPendientesCount > 0)
-                        <div class="mt-2">
+                        <div class="mt-2 {{ $retencionesPendientesCount > 0 ? '' : 'd-none' }}" id="manager-retentions-alert">
                             <span style="background:rgba(255,255,255,.2); border-radius:20px; padding:3px 10px; font-size:11px; font-weight:700; letter-spacing:.5px;">
                                 <i class="fas fa-exclamation-circle mr-1"></i> REQUIERE ATENCIÓN
                             </span>
                         </div>
-                        @endif
                     </div>
                 </div>
             </a>
@@ -777,6 +1035,8 @@
         </div>
 
     </div>
+        </div>
+    </section>
 
     <!-- Menu Acordeon Centrado -->
     <div class="row justify-content-center mt-3">
@@ -1172,6 +1432,50 @@
                         @endforeach
                     </div>
                 </div>
+                @php
+                    $activityTrendMax = max(1, $activityTrend->max(function ($day) {
+                        return max($day['orders'], $day['payments'], $day['retentions']);
+                    }));
+                    $activityOrdersTotal = $activityTrend->sum('orders');
+                    $activityPaymentsTotal = $activityTrend->sum('payments');
+                    $activityRetentionsTotal = $activityTrend->sum('retentions');
+                @endphp
+                <div class="activity-trend" id="manager-activity-trend">
+                    <div class="activity-trend-header">
+                        <div>
+                            <h6 class="activity-trend-title">Actividad de los últimos 7 días</h6>
+                            <small class="activity-trend-subtitle">Movimientos registrados por día</small>
+                        </div>
+                        <a href="{{ url('lista-productos') }}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-tags mr-1" aria-hidden="true"></i> Lista de precios
+                        </a>
+                    </div>
+                    <div class="activity-trend-legend" aria-label="Leyenda del gráfico">
+                        <span class="activity-trend-legend-item"><span class="activity-trend-dot" style="background:#2f8f78;"></span> Pedidos</span>
+                        <span class="activity-trend-legend-item"><span class="activity-trend-dot" style="background:#d29a35;"></span> Pagos</span>
+                        <span class="activity-trend-legend-item"><span class="activity-trend-dot" style="background:#c65a4a;"></span> Retenciones</span>
+                    </div>
+                    <div class="activity-trend-chart" id="manager-activity-chart" role="img" aria-label="Cantidad de pedidos, pagos y retenciones registrados en los últimos siete días">
+                        @foreach($activityTrend as $day)
+                            @php($dayTotal = $day['orders'] + $day['payments'] + $day['retentions'])
+                            <div class="activity-trend-day" data-trend-day="{{ $day['key'] }}" title="{{ $day['label'] }}: {{ $day['orders'] }} pedidos, {{ $day['payments'] }} pagos, {{ $day['retentions'] }} retenciones">
+                                <span class="activity-trend-total" data-trend-total>{{ $dayTotal ?: '' }}</span>
+                                <div class="activity-trend-bars">
+                                    <span class="activity-trend-bar orders" data-trend-bar="orders" title="Pedidos: {{ $day['orders'] }}" style="height: {{ $day['orders'] > 0 ? max(4, round(($day['orders'] / $activityTrendMax) * 100)) : 0 }}%;"></span>
+                                    <span class="activity-trend-bar payments" data-trend-bar="payments" title="Pagos: {{ $day['payments'] }}" style="height: {{ $day['payments'] > 0 ? max(4, round(($day['payments'] / $activityTrendMax) * 100)) : 0 }}%;"></span>
+                                    <span class="activity-trend-bar retentions" data-trend-bar="retentions" title="Retenciones: {{ $day['retentions'] }}" style="height: {{ $day['retentions'] > 0 ? max(4, round(($day['retentions'] / $activityTrendMax) * 100)) : 0 }}%;"></span>
+                                </div>
+                                <span class="activity-trend-label">{{ $day['label'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="activity-trend-summary">
+                        <span>Pedidos: <strong data-trend-summary="orders">{{ $activityOrdersTotal }}</strong></span>
+                        <span>Pagos: <strong data-trend-summary="payments">{{ $activityPaymentsTotal }}</strong></span>
+                        <span>Retenciones: <strong data-trend-summary="retentions">{{ $activityRetentionsTotal }}</strong></span>
+                    </div>
+                    <small class="activity-trend-subtitle d-block mt-2 {{ ($activityOrdersTotal + $activityPaymentsTotal + $activityRetentionsTotal) > 0 ? 'd-none' : '' }}" id="manager-activity-empty">Sin movimientos registrados durante este período.</small>
+                </div>
             </section>
         </div>
         <div class="col-xs-12 col-sm-12 col-md-4 col-lg-4">
@@ -1537,29 +1841,141 @@
 
 @push('scripts')
 <script>
-// Cargar contador de pedidos sin cruce dinámicamente
 $(document).ready(function() {
-    $.ajax({
-        url: '{{ route("sincronizar.clientes.get.pedidos.sin.cruce") }}',
-        type: 'GET',
-        success: function(response) {
-            if (response.success) {
-                const count = response.pedidos_sin_cruce ? response.pedidos_sin_cruce.length : 0;
-                $('#pedidos-sin-cruce-count').text(count);
-                
-                // Actualizar la barra de progreso
-                const progressBar = $('#pedidos-sin-cruce-count').closest('.manager-card').find('.progress-bar');
-                if (count > 0) {
-                    progressBar.css('width', '100%');
-                    progressBar.css('background', 'rgba(255,255,255,0.3)');
-                } else {
-                    progressBar.css('width', '0%');
-                    progressBar.css('background', 'rgba(255,255,255,0.1)');
-                }
+    const alertsPanel = document.getElementById('manager-alerts');
+    const refreshButton = document.getElementById('manager-alerts-refresh');
+    const alertsContent = document.getElementById('manager-alerts-content');
+    const updatedLabel = document.getElementById('manager-alerts-updated');
+    const numberFormat = new Intl.NumberFormat('es-VE');
+    const amountFormat = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const commissionFormat = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const percent = (value, total) => total > 0 ? Math.round((value / total) * 100) : 0;
+
+    const setProgress = (id, value, total) => {
+        const progress = document.getElementById(id);
+        const percentage = percent(value, total);
+        progress.style.width = `${percentage}%`;
+        progress.setAttribute('aria-valuenow', value);
+        progress.setAttribute('aria-valuemax', total);
+    };
+
+    const updateTrend = (trend) => {
+        const chartMaximum = Math.max(1, ...trend.map((day) => Math.max(day.orders, day.payments, day.retentions)));
+        const totals = { orders: 0, payments: 0, retentions: 0 };
+        const chart = document.getElementById('manager-activity-chart');
+        chart.replaceChildren();
+
+        trend.forEach((day) => {
+            const dayTotal = day.orders + day.payments + day.retentions;
+            const column = document.createElement('div');
+            column.className = 'activity-trend-day';
+            column.dataset.trendDay = day.key;
+            column.title = `${day.label}: ${day.orders} pedidos, ${day.payments} pagos, ${day.retentions} retenciones`;
+            const totalLabel = document.createElement('span');
+            totalLabel.className = 'activity-trend-total';
+            totalLabel.textContent = dayTotal || '';
+            column.appendChild(totalLabel);
+
+            const bars = document.createElement('div');
+            bars.className = 'activity-trend-bars';
+            ['orders', 'payments', 'retentions'].forEach((type) => {
+                const count = day[type];
+                const bar = document.createElement('span');
+                bar.className = `activity-trend-bar ${type}`;
+                bar.style.height = count > 0 ? `${Math.max(4, Math.round((count / chartMaximum) * 100))}%` : '0%';
+                bar.title = `${type === 'orders' ? 'Pedidos' : (type === 'payments' ? 'Pagos' : 'Retenciones')}: ${count}`;
+                bars.appendChild(bar);
+                totals[type] += count;
+            });
+            column.appendChild(bars);
+
+            const dateLabel = document.createElement('span');
+            dateLabel.className = 'activity-trend-label';
+            dateLabel.textContent = day.label;
+            column.appendChild(dateLabel);
+            chart.appendChild(column);
+        });
+
+        Object.entries(totals).forEach(([type, count]) => {
+            document.querySelector(`[data-trend-summary="${type}"]`).textContent = numberFormat.format(count);
+        });
+        document.getElementById('manager-activity-empty').classList.toggle(
+            'd-none',
+            totals.orders + totals.payments + totals.retentions > 0
+        );
+    };
+
+    refreshButton.addEventListener('click', async function() {
+        refreshButton.disabled = true;
+        alertsPanel.classList.add('is-refreshing');
+        alertsPanel.classList.remove('has-error');
+        alertsContent.setAttribute('aria-busy', 'true');
+
+        try {
+            const response = await fetch('{{ route("manager.dashboard.signals") }}', {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                throw new Error(`La actualización respondió con estado ${response.status}`);
             }
-        },
-        error: function() {
-            console.error('Error al cargar contador de pedidos sin cruce');
+
+            const result = await response.json();
+            const signals = result.signals;
+            const orders = signals.orders;
+            const payments = signals.payments;
+            const commissions = signals.commissions;
+            const retentions = signals.retentions;
+
+            document.getElementById('pedidos-sin-cruce-count').textContent = numberFormat.format(signals.unmatched_orders);
+            const clientsProgress = document.getElementById('manager-clients-progress');
+            clientsProgress.style.width = signals.unmatched_orders > 0 ? '100%' : '0%';
+            clientsProgress.setAttribute('aria-valuenow', signals.unmatched_orders > 0 ? 1 : 0);
+
+            document.getElementById('manager-orders-total').textContent = numberFormat.format(orders.total);
+            document.getElementById('manager-orders-created-today').textContent = numberFormat.format(orders.created_today);
+            document.getElementById('manager-orders-approved-percent').textContent = `${percent(orders.approved, orders.total)}% Aprobados`;
+            document.getElementById('manager-orders-approved-count').textContent = numberFormat.format(orders.approved);
+            document.getElementById('manager-orders-pending-count').textContent = numberFormat.format(orders.pending);
+            setProgress('manager-orders-approved-progress', orders.approved, orders.total);
+            setProgress('manager-orders-pending-progress', orders.pending, orders.total);
+
+            document.getElementById('manager-payments-total').textContent = numberFormat.format(payments.total);
+            document.getElementById('manager-payments-approved-percent').textContent = `${percent(payments.approved, payments.total)}% Procesados`;
+            document.getElementById('manager-payments-approved-count').textContent = numberFormat.format(payments.approved);
+            document.getElementById('manager-payments-pending-count').textContent = numberFormat.format(payments.pending);
+            setProgress('manager-payments-approved-progress', payments.approved, payments.total);
+            setProgress('manager-payments-pending-progress', payments.pending, payments.total);
+
+            document.getElementById('manager-commissions-total').textContent = `$${commissionFormat.format(commissions.total)}`;
+            document.getElementById('manager-commissions-paid-percent').textContent = `${percent(commissions.paid, commissions.total)}% Pagadas`;
+            document.getElementById('manager-commissions-paid').textContent = commissionFormat.format(commissions.paid);
+            document.getElementById('manager-commissions-pending').textContent = commissionFormat.format(commissions.pending);
+            setProgress('manager-commissions-paid-progress', commissions.paid, commissions.total);
+            setProgress('manager-commissions-pending-progress', commissions.pending, commissions.total);
+
+            document.getElementById('manager-retentions-count').textContent = numberFormat.format(retentions.count);
+            document.getElementById('manager-retentions-label').textContent = `comprobante${retentions.count === 1 ? '' : 's'} pendiente${retentions.count === 1 ? '' : 's'}`;
+            document.getElementById('manager-retentions-amount').textContent = amountFormat.format(retentions.amount);
+            document.getElementById('manager-retentions-alert').classList.toggle('d-none', retentions.count === 0);
+
+            updateTrend(result.activity_trend);
+            alertsPanel.querySelectorAll('[data-manager-kpi]').forEach((card) => {
+                card.classList.remove('is-updated');
+                void card.offsetWidth;
+                card.classList.add('is-updated');
+            });
+
+            updatedLabel.textContent = `Actualizado ${result.updated_at}`;
+        } catch (error) {
+            console.error('Error al actualizar los indicadores gerenciales', error);
+            alertsPanel.classList.add('has-error');
+        } finally {
+            refreshButton.disabled = false;
+            alertsPanel.classList.remove('is-refreshing');
+            alertsContent.setAttribute('aria-busy', 'false');
         }
     });
 });

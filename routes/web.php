@@ -56,6 +56,7 @@ Auth::routes(['register' => false]);
 Route::group(['middleware' => 'auth'], function () {
     Route::get('/inicio', 'HomeController@index')->name('inicio');
     Route::get('/manager-dashboard', 'ManagerDashboardController@index')->name('manager.dashboard');
+    Route::get('/manager-dashboard/signals', 'ManagerDashboardController@refreshSignals')->name('manager.dashboard.signals');
     Route::get('/facturacion-dashboard', 'FacturacionDashboardController@index')->name('facturacion.dashboard');
 
 

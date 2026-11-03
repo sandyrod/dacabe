@@ -74,6 +74,23 @@
 
             @include('layouts.partials.content_header')
 
+            @if ($errors->has('impersonation'))
+                <div class="container-fluid pt-3">
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+                        <div class="d-flex align-items-start">
+                            <i class="fas fa-exclamation-circle fa-lg mr-3 mt-1" aria-hidden="true"></i>
+                            <div>
+                                <strong>No fue posible impersonar al vendedor</strong>
+                                <div>{{ $errors->first('impersonation') }}</div>
+                            </div>
+                        </div>
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                </div>
+            @endif
+
             @yield('content')
 
         </div>

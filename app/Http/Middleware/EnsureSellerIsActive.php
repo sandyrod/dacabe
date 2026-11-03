@@ -18,7 +18,7 @@ class EnsureSellerIsActive
         }
 
         $user = Auth::user();
-        if ($request->routeIs('logout')) {
+        if ($request->routeIs('logout', 'users.impersonate.stop')) {
             return $next($request);
         }
 

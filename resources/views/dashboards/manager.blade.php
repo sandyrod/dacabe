@@ -844,6 +844,26 @@
 
 @section('content')
 
+    @if (Auth::user()->canImpersonateSellers())
+        <section class="card border-0 shadow-sm mb-4" role="note"
+            style="border-radius: 14px; background: linear-gradient(110deg, #eef5ff 0%, #fff 75%); border-left: 5px solid #2a5298 !important;">
+            <div class="card-body d-flex align-items-center">
+                <div class="mr-3 d-flex align-items-center justify-content-center"
+                    style="width: 48px; height: 48px; flex: 0 0 48px; border-radius: 12px; background: #dce9fb; color: #1e3c72;">
+                    <i class="fas fa-user-secret fa-lg" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h2 class="h5 mb-1" style="color: #1e3c72;">Impersonar vendedores</h2>
+                    <p class="mb-0 text-muted">
+                        ¿Necesitas revisar la experiencia de un vendedor? Abre el menú de tu usuario, arriba a la derecha,
+                        selecciona <strong>Impersonar vendedor</strong> e ingresa su correo. Podrás volver a tu cuenta
+                        desde ese mismo menú.
+                    </p>
+                </div>
+            </div>
+        </section>
+    @endif
+
     <section class="manager-alerts mb-4" id="manager-alerts" aria-labelledby="manager-alerts-heading">
         <div class="manager-alerts-header">
             <div>

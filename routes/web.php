@@ -205,6 +205,8 @@ Route::get('users/card', ['as' => 'users.card', 'uses' => 'UsersController@showC
 Route::get('users/print', ['as' => 'users.print', 'uses' => 'UsersController@showPrintList']);
 Route::get('users/{user_id}/permissions', ['as' => 'users.permissions', 'uses' => 'UsersController@editPermissions']);
 Route::post('users/permissions', ['as' => 'users.permissions', 'uses' => 'UsersController@updatePermissions']);
+Route::post('users/impersonate', 'UsersController@impersonate')->name('users.impersonate');
+Route::post('users/impersonate/stop', 'UsersController@stopImpersonating')->name('users.impersonate.stop');
 Route::resource('users', 'UsersController');
 
 Route::post('descuento-global/update', ['as' => 'descuento-global.update', 'uses' => 'OrderInvenController@actualizarDescuentoGlobal']);

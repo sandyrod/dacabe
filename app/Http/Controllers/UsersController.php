@@ -10,7 +10,8 @@ use App\Http\Requests\UserEditRequest;
 use App\User;
 use App\Permission;
 use App\{Role};
-use App\Models\{Company};
+use App\Models\{Company, Vendedor};
+use Illuminate\Validation\ValidationException;
 use App\Traits\UserTrait;
 
 use Illuminate\Support\Facades\Storage;
@@ -44,6 +45,81 @@ class UsersController extends Controller
     	$data = $user->getData();
      
         return (requestAjaxOrJson($request, $data)) ? $this->getJsonOrDatatableResponse($request, $data) : view($this->module.'.index');
+    }
+
+    public function impersonate(Request $request)
+    {
+        $admin = Auth::user();
+        if (!$admin || !$admin->canImpersonateSellers() || session()->has('impersonator')) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $email = strtolower(trim($validated['email']));
+        $seller = User::whereRaw('LOWER(TRIM(email)) = ?', [$email])->first();
+        $sellerExists = (new Vendedor)
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
+            ->exists();
+        $sellerRole = Role::where('name', 'vendedor')->first();
+
+        if (!$seller || $seller->id === $admin->id || !$sellerExists || !$sellerRole) {
+            throw ValidationException::withMessages([
+                'impersonation' => 'No se encontró un usuario vendedor con ese correo. Verifica la dirección e inténtalo nuevamente.',
+            ]);
+        }
+
+        session([
+            'impersonator' => [
+                'user_id' => $admin->id,
+                'had_active_role' => session()->has('active_role_id'),
+                'active_role_id' => session('active_role_id'),
+            ],
+        ]);
+
+        Auth::login($seller);
+        session([
+            'active_role_id' => $sellerRole->id,
+            'active_role_name' => $sellerRole->display_name,
+        ]);
+        $request->session()->regenerate();
+
+        return redirect()->route('inicio')
+            ->with('info', 'Ahora estás usando la cuenta de ' . $seller->email . '.');
+    }
+
+    public function stopImpersonating(Request $request)
+    {
+        $impersonator = session('impersonator');
+        if (!$impersonator) {
+            abort(403);
+        }
+
+        $admin = User::find($impersonator['user_id']);
+        if (!$admin || !$admin->canImpersonateSellers()) {
+            abort(403);
+        }
+
+        Auth::login($admin);
+        session()->forget(['impersonator', 'active_role_id', 'active_role_name']);
+
+        $ordersAdminRole = $admin->roles()->where('name', 'admin_pedidos')->first();
+        $previousRole = $impersonator['had_active_role']
+            ? $admin->roles()->where('role_id', $impersonator['active_role_id'])->first()
+            : null;
+        $activeRole = $ordersAdminRole ?: $previousRole ?: $admin->roles()->first();
+        if ($activeRole) {
+            session([
+                'active_role_id' => $activeRole->id,
+                'active_role_name' => $activeRole->display_name,
+            ]);
+        }
+
+        $request->session()->regenerate();
+
+        return redirect()->route('manager.dashboard')->with('info', 'Has vuelto a tu cuenta de administrador.');
     }
 
     public function store(UserCreateRequest $request)

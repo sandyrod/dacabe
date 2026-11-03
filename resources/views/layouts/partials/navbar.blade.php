@@ -131,7 +131,43 @@
                 @endauth
 
             </a>
-            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow">
+            <ul aria-labelledby="dropdownSubMenu1" class="dropdown-menu border-0 shadow"
+                style="{{ session()->has('impersonator') || (Auth::check() && Auth::user()->canImpersonateSellers()) ? 'min-width: 280px;' : '' }}">
+                @if (session()->has('impersonator'))
+                    <li class="dropdown-header text-center text-warning">
+                        Impersonando a {{ Auth::user()->email }}
+                    </li>
+                    <li class="px-3 py-2">
+                        <form action="{{ route('users.impersonate.stop') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="btn btn-warning btn-sm btn-block">
+                                <i class="fas fa-undo"></i> Volver a mi cuenta
+                            </button>
+                        </form>
+                    </li>
+                    <li class="dropdown-divider"></li>
+                @elseif (Auth::check() && Auth::user()->canImpersonateSellers())
+                    <li class="dropdown-header text-center"><strong>Impersonar vendedor</strong></li>
+                    <li class="px-3 py-2">
+                        <form action="{{ route('users.impersonate') }}" method="POST">
+                            @csrf
+                            <div class="input-group input-group-sm">
+                                <input type="email" name="email" class="form-control" placeholder="Correo del vendedor"
+                                    value="{{ old('email') }}" required>
+                                <div class="input-group-append">
+                                    <button type="submit" class="btn btn-primary" title="Impersonar">
+                                        <i class="fas fa-sign-in-alt"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            @error('email')
+                                <small class="text-danger d-block mt-1">{{ $message }}</small>
+                            @enderror
+                        </form>
+                    </li>
+                    <li class="dropdown-divider"></li>
+                @endif
+
                 <li>
                     <a href="{{ getUserUrl() }}" class="dropdown-item">
                         <i class="fas fa-user"></i> Mi Perfil
@@ -139,26 +175,6 @@
                 </li>
 
                 <li class="dropdown-divider"></li>
-
-                @if (isset(Auth::user()->roles) && Auth::user()->roles->count() > 1)
-                    <li class="dropdown-header text-center"><strong>Cambiar Rol</strong></li>
-                    @foreach (Auth::user()->roles as $role)
-                        <li>
-                            <form action="{{ route('roles.setActiveRole') }}" method="POST">
-                                @csrf
-                                <input type="hidden" name="role_id" value="{{ $role->id }}">
-                                <button type="submit"
-                                    class="dropdown-item {{ session('active_role_id') == $role->id ? 'active' : '' }}">
-                                    <i class="fas fa-user-tag"></i> {{ $role->display_name }}
-                                    @if (session('active_role_id') == $role->id)
-                                        <i class="fas fa-check float-right mt-1"></i>
-                                    @endif
-                                </button>
-                            </form>
-                        </li>
-                    @endforeach
-                    <li class="dropdown-divider"></li>
-                @endif
 
                 <li class="nav-item">
                     <a href="{{ route('logout') }}"

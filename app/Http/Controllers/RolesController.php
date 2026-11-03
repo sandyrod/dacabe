@@ -122,6 +122,10 @@ class RolesController extends Controller
 
     public function setActiveRole(Request $request)
     {
+        if (session()->has('impersonator')) {
+            abort(403);
+        }
+
         $roleId = $request->role_id;
         $user = Auth::user();
 

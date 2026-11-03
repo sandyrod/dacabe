@@ -163,6 +163,12 @@ class User extends Authenticatable
        return $this->hasRole('admin');
     } 
 
+    public function canImpersonateSellers()
+    {
+        return $this->realHasRole('admin')
+            || ($this->email === 'dacabe@gmail.com' && $this->realHasRole('admin_pedidos'));
+    }
+
     public function isAdministrativerUser()
     {
        return $this->hasRole('admin_user');
